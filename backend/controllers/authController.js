@@ -1,6 +1,8 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT
 const generateToken = (id) => {
@@ -209,4 +211,67 @@ exports.verifyEmail = async (req, res) => {
 	} catch (error) {
 		res.status(500).json({ message: "Server Error", error: error.message });
 	}
+};
+
+exports.googleAuth = async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    // Verify Google token
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    // Check if user exists
+    let user = await User.findOne({ 
+      $or: [
+        { email },
+        { googleId }
+      ]
+    });
+
+    if (!user) {
+      // Create new user with Google info
+      user = await User.create({
+        firstName: name.split(' ')[0],
+        lastName: name.split(' ').slice(1).join(' '),
+        email,
+        googleId,
+        username: email.split('@')[0] + '_' + googleId.slice(0, 4),
+        password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10),
+        isVerified: true
+      });
+    } else if (!user.googleId) {
+      // Update existing user with Google ID
+      user.googleId = googleId;
+      await user.save();
+    }
+
+    // Generate JWT
+    const authToken = generateToken(user._id);
+
+    res.json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      username: user.username,
+      token: authToken
+    });
+
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(401).json({ 
+      message: 'Google authentication failed',
+      error: error.message 
+    });
+  }
+};
+
+exports.getGoogleClientId = async (req, res) => {
+  res.json({ clientId: process.env.GOOGLE_CLIENT_ID });
 };

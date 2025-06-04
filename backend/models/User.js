@@ -17,7 +17,9 @@ const userSchema = new mongoose.Schema({
 		type: String,
 		enum: ["author", "corresponding_author"],
 		default: ["author"]
-	}]
+	}],
+	googleId: { type: String, unique: true, sparse: true },
+  	isVerified: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model("User", userSchema);

@@ -4,11 +4,56 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 import { FaGoogle } from "react-icons/fa";
 import { SiOrcid } from "react-icons/si";
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 function Login() {
 	const [formData, setFormData] = useState({ email: "", password: "" });
 	const navigate = useNavigate();
 	const { login } = useAuth();
+	const [googleClientId, setGoogleClientId] = useState('');
+
+
+	  // Fetch Google Client ID on component mount
+  React.useEffect(() => {
+    const fetchClientId = async () => {
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/auth/google/client-id`
+        );
+        setGoogleClientId(response.data.clientId);
+      } catch (error) {
+        console.error("Failed to fetch Google Client ID:", error);
+      }
+    };
+    fetchClientId();
+  }, []);
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/google`,
+        { token: credentialResponse.credential }
+      );
+      
+      if (response.data) {
+        localStorage.setItem("user", JSON.stringify(response.data));
+        login(response.data);
+        navigate("/");
+      } else {
+        console.error("User data not found in the response");
+        alert("Login Failed: User data missing");
+      }
+    } catch (error) {
+      console.error("Google Login error:", error);
+      alert(error.response?.data?.message || "Google Login Failed");
+    }
+  };
+
+  const handleGoogleFailure = () => {
+    console.log("Google login failed");
+    alert("Google login failed. Please try again.");
+  };
+
 
 	const handleChange = (e) => {
 		setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -56,25 +101,25 @@ function Login() {
 		}
 	};
 
-	const handleGoogleLogin = async () => {
-		// Implement Google login functionality
-		try {
-			const response = await axios.get(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/google`
-			);
-			alert("Google Login Successful");
-			if (response.data) {
-				login(response.data);
-				navigate("/");
-			} else {
-				console.error("User data not found in the response");
-				alert("Login Failed: User data missing");
-			}
-		} catch (error) {
-			console.error("Google Login error:", error);
-			alert(error.response?.data?.message || "Google Login Failed");
-		}
-	};
+	// const handleGoogleLogin = async () => {
+	// 	// Implement Google login functionality
+	// 	try {
+	// 		const response = await axios.get(
+	// 			`${import.meta.env.VITE_BACKEND_URL}/api/auth/google`
+	// 		);
+	// 		alert("Google Login Successful");
+	// 		if (response.data) {
+	// 			login(response.data);
+	// 			navigate("/");
+	// 		} else {
+	// 			console.error("User data not found in the response");
+	// 			alert("Login Failed: User data missing");
+	// 		}
+	// 	} catch (error) {
+	// 		console.error("Google Login error:", error);
+	// 		alert(error.response?.data?.message || "Google Login Failed");
+	// 	}
+	// };
 
 	const handleEmailLogin = async () => {
 		// Implement Email login functionality
@@ -146,32 +191,49 @@ function Login() {
 						<span className="text-[#64748b]">Or Login via:</span>
 					</div>
 
-					<div className="flex justify-around mt-1">
-						<button
-							type="button"
-							className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
-						>
-							<SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
-							ORCID
-						</button>
+<div className="flex flex-col items-center gap-4 mt-4">
+  <button
+    type="button"
+    className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
+  >
+    <SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
+    ORCID
+  </button>
 
-						<button
-							type="button"
-							className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
-						>
-							<FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
-							Google
-						</button>
-					</div>
+  {googleClientId ? (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <GoogleLogin
+        onSuccess={handleGoogleSuccess}
+        onError={handleGoogleFailure}
+        useOneTap
+        theme="filled_blue"
+        size="medium"
+        shape="pill"
+        text="continue_with"
+        width="200"
+      />
+    </GoogleOAuthProvider>
+  ) : (
+    <button
+      type="button"
+      className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
+      disabled
+    >
+      <FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
+      Loading...
+    </button>
+  )}
+</div>
 
-					<div className="flex justify-center mt-1">
+
+					{/* <div className="flex justify-center mt-1">
 						<button
 							type="button"
 							className="text-[#496580] font-semibold hover:text-[#3a5269] transition-all"
 						>
 							Login via Email
 						</button>
-					</div>
+					</div> */}
 				</div>
 
 				<div className="mt-6 text-center">
