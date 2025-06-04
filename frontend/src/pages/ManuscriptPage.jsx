@@ -1,0 +1,1867 @@
+import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../App";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { useNavigate } from "react-router-dom";
+
+const ManuscriptPage = () => {
+	const { user } = useAuth();
+	const navigate = useNavigate();
+	const [currentSection, setCurrentSection] = useState(1);
+	const totalSections = 6;
+	const [pdfBuilt, setPdfBuilt] = useState(false);
+
+	const [formData, setFormData] = useState({
+		type: "",
+		classification: [],
+		additionalInfo: [],
+		comments: "",
+		title: "",
+		keywords: "",
+		abstract: "",
+		author: [],
+		funding: "",
+	});
+
+	const [files, setFiles] = useState({
+		manuscript: null,
+		coverLetter: null,
+		declaration: null,
+	});
+
+	const [uploadedFiles, setUploadedFiles] = useState({
+		manuscript: false,
+		coverLetter: false,
+		declaration: false,
+	});
+
+	const [selectedFiles, setSelectedFiles] = useState([]);
+	const [completedSections, setCompletedSections] = useState([]);
+
+	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+	const [authors, setAuthors] = useState([]);
+	const [selectedAuthors, setSelectedAuthors] = useState([]);
+	const [allAuthors, setAllAuthors] = useState([]);
+	const [isAuthorModalOpen, setIsAuthorModalOpen] = useState(false);
+	const [correspondingAuthorId, setCorrespondingAuthorId] = useState(null);
+
+	const [users, setUsers] = useState([]);
+
+	const [newAuthor, setNewAuthor] = useState({
+		title: "",
+		firstName: "",
+		middleName: "",
+		lastName: "",
+		academicDegree: "",
+		email: "",
+		institution: "",
+		country: "",
+		isCorresponding: false,
+	});
+
+	const [isEmailVerified, setIsEmailVerified] = useState(false);
+
+	const classificationOptions = [
+		"Science and Technology – Engineering, Science & Technology (All Branch)",
+		"Pharmacy All – Pharmacy (All Branch)",
+		"Management All – Management (All Branch)",
+		"Mathematics All – Mathematics",
+		"Physics All – Physics",
+		"Chemistry All – Chemistry",
+		"Science All – Science (All Branch)",
+		"Arts All – Arts (All Branch)",
+		"Arts1 All – Arts and Social Science (All Branch)",
+		"Commerce All – Commerce (All Branch)",
+		"Life Sciences All – Life Sciences (All Branch)",
+		"Languages – Languages (All Branch)",
+		"Health Science All – Health Science (All Branch)",
+		"Social Science All – Social Science (All Branch)",
+		"Medical Science All – Medical Science (All Branch)",
+		"Humanities All – Humanities",
+		"Commerce and Management, MBA All Branch – Commerce and Management, MBA (All Branch)",
+		"Biological Science – Biological Science (All Branch)",
+		"Applied Mathematics – Applied Mathematics",
+		"Applied Instrumentation – Applied Instrumentation",
+		"Others area – Other Research Area Not in this List, Select this",
+	];
+
+	// Add countries array at the top of the component
+	const countries = [
+		"Afghanistan",
+		"Albania",
+		"Algeria",
+		"Andorra",
+		"Angola",
+		"Antigua and Barbuda",
+		"Argentina",
+		"Armenia",
+		"Australia",
+		"Austria",
+		"Azerbaijan",
+		"Bahamas",
+		"Bahrain",
+		"Bangladesh",
+		"Barbados",
+		"Belarus",
+		"Belgium",
+		"Belize",
+		"Benin",
+		"Bhutan",
+		"Bolivia",
+		"Bosnia and Herzegovina",
+		"Botswana",
+		"Brazil",
+		"Brunei",
+		"Bulgaria",
+		"Burkina Faso",
+		"Burundi",
+		"Cabo Verde",
+		"Cambodia",
+		"Cameroon",
+		"Canada",
+		"Central African Republic",
+		"Chad",
+		"Chile",
+		"China",
+		"Colombia",
+		"Comoros",
+		"Congo",
+		"Costa Rica",
+		"Croatia",
+		"Cuba",
+		"Cyprus",
+		"Czech Republic",
+		"Denmark",
+		"Djibouti",
+		"Dominica",
+		"Dominican Republic",
+		"Ecuador",
+		"Egypt",
+		"El Salvador",
+		"Equatorial Guinea",
+		"Eritrea",
+		"Estonia",
+		"Eswatini",
+		"Ethiopia",
+		"Fiji",
+		"Finland",
+		"France",
+		"Gabon",
+		"Gambia",
+		"Georgia",
+		"Germany",
+		"Ghana",
+		"Greece",
+		"Grenada",
+		"Guatemala",
+		"Guinea",
+		"Guinea-Bissau",
+		"Guyana",
+		"Haiti",
+		"Honduras",
+		"Hungary",
+		"Iceland",
+		"India",
+		"Indonesia",
+		"Iran",
+		"Iraq",
+		"Ireland",
+		"Israel",
+		"Italy",
+		"Jamaica",
+		"Japan",
+		"Jordan",
+		"Kazakhstan",
+		"Kenya",
+		"Kiribati",
+		"Korea, North",
+		"Korea, South",
+		"Kuwait",
+		"Kyrgyzstan",
+		"Laos",
+		"Latvia",
+		"Lebanon",
+		"Lesotho",
+		"Liberia",
+		"Libya",
+		"Liechtenstein",
+		"Lithuania",
+		"Luxembourg",
+		"Madagascar",
+		"Malawi",
+		"Malaysia",
+		"Maldives",
+		"Mali",
+		"Malta",
+		"Marshall Islands",
+		"Mauritania",
+		"Mauritius",
+		"Mexico",
+		"Micronesia",
+		"Moldova",
+		"Monaco",
+		"Mongolia",
+		"Montenegro",
+		"Morocco",
+		"Mozambique",
+		"Myanmar",
+		"Namibia",
+		"Nauru",
+		"Nepal",
+		"Netherlands",
+		"New Zealand",
+		"Nicaragua",
+		"Niger",
+		"Nigeria",
+		"North Macedonia",
+		"Norway",
+		"Oman",
+		"Pakistan",
+		"Palau",
+		"Palestine",
+		"Panama",
+		"Papua New Guinea",
+		"Paraguay",
+		"Peru",
+		"Philippines",
+		"Poland",
+		"Portugal",
+		"Qatar",
+		"Romania",
+		"Russia",
+		"Rwanda",
+		"Saint Kitts and Nevis",
+		"Saint Lucia",
+		"Saint Vincent and the Grenadines",
+		"Samoa",
+		"San Marino",
+		"Sao Tome and Principe",
+		"Saudi Arabia",
+		"Senegal",
+		"Serbia",
+		"Seychelles",
+		"Sierra Leone",
+		"Singapore",
+		"Slovakia",
+		"Slovenia",
+		"Solomon Islands",
+		"Somalia",
+		"South Africa",
+		"South Sudan",
+		"Spain",
+		"Sri Lanka",
+		"Sudan",
+		"Suriname",
+		"Sweden",
+		"Switzerland",
+		"Syria",
+		"Taiwan",
+		"Tajikistan",
+		"Tanzania",
+		"Thailand",
+		"Timor-Leste",
+		"Togo",
+		"Tonga",
+		"Trinidad and Tobago",
+		"Tunisia",
+		"Turkey",
+		"Turkmenistan",
+		"Tuvalu",
+		"Uganda",
+		"Ukraine",
+		"United Arab Emirates",
+		"United Kingdom",
+		"United States",
+		"Uruguay",
+		"Uzbekistan",
+		"Vanuatu",
+		"Vatican City",
+		"Venezuela",
+		"Vietnam",
+		"Yemen",
+		"Zambia",
+		"Zimbabwe",
+	];
+
+	// Check authentication on mount
+	useEffect(() => {
+		if (!user || !user.token) {
+			navigate("/login");
+		}
+	}, [user, navigate]);
+
+	// Add useEffect to initialize the authors list with the current user
+	useEffect(() => {
+		if (user) {
+			// Create main author object from user data
+			const mainAuthor = {
+				_id: user._id,
+				title: user.title || "",
+				firstName: user.firstName,
+				middleName: user.middleName || "",
+				lastName: user.lastName,
+				email: user.email,
+				institution: user.institution || "",
+				country: user.country || "",
+				isCorresponding: true,
+			};
+
+			// Initialize authors list with main author
+			setAuthors([mainAuthor]);
+			setSelectedAuthors([user._id]);
+			setCorrespondingAuthorId(user._id);
+		}
+	}, [user]);
+
+	const handleCheckboxChange = (doc) => {
+		setUploadedFiles((prev) => ({ ...prev, [doc]: !prev[doc] }));
+	};
+
+	const handleFileSelection = (doc) => {
+		setSelectedFiles((prev) =>
+			prev.includes(doc) ? prev.filter((f) => f !== doc) : [...prev, doc]
+		);
+	};
+
+	const handleFileChange = (e, doc) => {
+		const file = e.target.files[0];
+		if (file) {
+			setFiles((prev) => ({ ...prev, [doc]: file }));
+			setUploadedFiles((prev) => ({ ...prev, [doc]: true }));
+		}
+	};
+
+	const handleDelete = () => {
+		selectedFiles.forEach((doc) => {
+			setFiles((prev) => ({ ...prev, [doc]: null }));
+			setUploadedFiles((prev) => ({ ...prev, [doc]: false }));
+		});
+		setSelectedFiles([]);
+	};
+	const handleInputChange = (e) => {
+		const { name, value, checked } = e.target;
+		if (name === "classification") {
+			setFormData((prevData) => ({
+				...prevData,
+				classification: checked
+					? [...prevData.classification, value]
+					: prevData.classification.filter((item) => item !== value),
+			}));
+		} else if (name === "additionalInfo") {
+			const isChecked = e.target.checked;
+
+			setFormData((prevData) => ({
+				...prevData,
+				additionalInfo: isChecked
+					? [...prevData.additionalInfo, value]
+					: prevData.additionalInfo.filter((item) => item !== value),
+			}));
+		} else {
+			setFormData({ ...formData, [name]: value });
+		}
+	};
+
+	const validateSection = (section) => {
+		switch (section) {
+			case 1:
+				return formData.type !== "";
+			case 2:
+				return (
+					files.manuscript && files.coverLetter && files.declaration
+				);
+			case 3:
+				return formData.classification.length > 0;
+			case 4:
+				return formData.additionalInfo.length === 5; // All 5 terms must be checked
+			case 5:
+				return formData.comments.trim() !== "";
+			case 6:
+				return (
+					formData.title.trim() !== "" &&
+					formData.keywords.trim() !== "" &&
+					formData.abstract.trim() !== "" &&
+					selectedAuthors.length > 0 && // Check if there are selected authors
+					correspondingAuthorId !== null && // Check if there is a corresponding author
+					(formData.funding === "Yes" || formData.funding === "No")
+				);
+			default:
+				return false;
+		}
+	};
+
+	const clearForm = () => {
+		setFormData({
+			type: "",
+			classification: [],
+			additionalInfo: [],
+			comments: "",
+			title: "",
+			keywords: "",
+			abstract: "",
+			author: [],
+			funding: "",
+		});
+		setFiles({ manuscript: null, coverLetter: null });
+		setCurrentSection(1);
+		setCompletedSections([]);
+	};
+
+	const handleNext = () => {
+		if (validateSection(currentSection)) {
+			setCompletedSections((prev) => [...prev, currentSection]);
+			setCurrentSection((prev) => Math.min(prev + 1, totalSections));
+		} else {
+			alert(
+				"Please complete all required fields in this section before proceeding."
+			);
+		}
+	};
+
+	const handlePrev = () => {
+		setCurrentSection((prev) => Math.max(prev - 1, 1));
+	};
+
+	const handleStepClick = (step) => {
+		// Only allow navigation to completed steps or the next sequential step
+		if (
+			step === 1 ||
+			completedSections.includes(step - 1) ||
+			step === currentSection + 1
+		) {
+			setCurrentSection(step);
+		} else {
+			alert(
+				"Please complete the current section before proceeding to step " +
+					step
+			);
+		}
+	};
+
+	const handleSubmit = async (e) => {
+		e.preventDefault();
+
+		if (!user?.token) {
+			alert("Please log in to submit a manuscript");
+			return;
+		}
+
+		for (let section = 1; section <= 6; section++) {
+			if (!validateSection(section)) {
+				alert(
+					`Please complete all required fields in Section ${section}`
+				);
+				setCurrentSection(section);
+				return;
+			}
+		}
+
+		const data = new FormData();
+		Object.keys(formData).forEach((key) => {
+			if (key === "additionalInfo") {
+				data.append(key, JSON.stringify(formData[key]));
+			} else {
+				data.append(key, formData[key]);
+			}
+		});
+
+		// Append files
+		if (files.manuscript) {
+			data.append("manuscript", files.manuscript);
+		}
+		if (files.coverLetter) {
+			data.append("coverLetter", files.coverLetter);
+		}
+		if (files.declaration) {
+			data.append("declaration", files.declaration);
+		}
+
+		try {
+			const response = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts`,
+				data,
+				{
+					headers: {
+						"Content-Type": "multipart/form-data",
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			if (response.data.success) {
+				alert("Manuscript submitted successfully!");
+				clearForm();
+			} else {
+				throw new Error(response.data.message || "Submission failed");
+			}
+		} catch (error) {
+			console.error("Error submitting manuscript:", error);
+			if (error.response?.status === 401) {
+				alert("Your session has expired. Please log in again.");
+			} else {
+				alert(
+					"Submission failed: " +
+						(error.response?.data?.message || error.message)
+				);
+			}
+		}
+	};
+
+	const dropdownRef = useRef(null);
+
+	// Handle clicks outside dropdown
+	useEffect(() => {
+		const handleClickOutside = (event) => {
+			if (
+				dropdownRef.current &&
+				!dropdownRef.current.contains(event.target)
+			) {
+				setIsDropdownOpen(false);
+			}
+		};
+
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, []);
+
+	// Add a new function to handle save and submit later
+	const handleSaveAndSubmitLater = async (e) => {
+		e.preventDefault();
+
+		if (!user?.token) {
+			alert("Please log in to submit a manuscript");
+			return;
+		}
+
+		// Validate all sections
+		for (let section = 1; section <= 6; section++) {
+			if (!validateSection(section)) {
+				alert(
+					`Please complete all required fields in Section ${section}`
+				);
+				setCurrentSection(section);
+				return;
+			}
+		}
+
+		// Check if all required files are present
+		if (!files.manuscript || !files.coverLetter || !files.declaration) {
+			alert(
+				"Please upload all required files: manuscript, cover letter, and declaration"
+			);
+			setCurrentSection(2); // Navigate to the files section
+			return;
+		}
+
+		const data = new FormData();
+		Object.keys(formData).forEach((key) => {
+			if (key === "additionalInfo") {
+				data.append(key, JSON.stringify(formData[key]));
+			} else {
+				data.append(key, formData[key]);
+			}
+		});
+
+		// Append files
+		if (files.manuscript) {
+			data.append("manuscript", files.manuscript);
+		}
+		if (files.coverLetter) {
+			data.append("coverLetter", files.coverLetter);
+		}
+		if (files.declaration) {
+			data.append("declaration", files.declaration);
+		}
+
+		// Add authors data
+		data.append("authors", JSON.stringify(selectedAuthors));
+		data.append("correspondingAuthorId", correspondingAuthorId);
+
+		try {
+			const response = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts`,
+				data,
+				{
+					headers: {
+						"Content-Type": "multipart/form-data",
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			if (response.data.success) {
+				alert("Manuscript saved successfully!");
+			} else {
+				throw new Error(response.data.message || "Submission failed");
+			}
+		} catch (error) {
+			console.error("Error saving manuscript:", error);
+			if (error.response?.status === 401) {
+				alert("Your session has expired. Please log in again.");
+				navigate("/login");
+			} else {
+				alert(
+					"Save failed: " +
+						(error.response?.data?.message || error.message)
+				);
+			}
+		}
+	};
+
+	const buildPdf = async (e) => {
+		e.preventDefault();
+
+		if (!user?.token) {
+			alert("Please log in to preview the manuscript");
+			return;
+		}
+
+		for (let section = 1; section <= 6; section++) {
+			if (!validateSection(section)) {
+				alert(
+					`Please complete all required fields in Section ${section}`
+				);
+				setCurrentSection(section);
+				return;
+			}
+		}
+
+		const data = new FormData();
+		Object.keys(formData).forEach((key) => {
+			if (key === "additionalInfo") {
+				data.append(key, JSON.stringify(formData[key]));
+			} else {
+				data.append(key, formData[key]);
+			}
+		});
+
+		// Append files
+		if (files.manuscript) {
+			data.append("manuscript", files.manuscript);
+		}
+		if (files.coverLetter) {
+			data.append("coverLetter", files.coverLetter);
+		}
+		if (files.declaration) {
+			data.append("declaration", files.declaration);
+		}
+
+		try {
+			const response = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/preview`,
+				data,
+				{
+					headers: {
+						"Content-Type": "multipart/form-data",
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			if (response.data.success) {
+				const mergedPdfPath = response.data.mergedPdfPath;
+				const downloadUrl = `${
+					import.meta.env.VITE_BACKEND_URL
+				}/${mergedPdfPath}`;
+				window.open(downloadUrl, "_blank");
+				setPdfBuilt(true);
+			}
+		} catch (error) {
+			console.error("Error building PDF:", error);
+			if (error.response?.status === 401) {
+				alert("Your session has expired. Please log in again.");
+			} else {
+				alert(
+					"Failed to build PDF: " +
+						(error.response?.data?.message || error.message)
+				);
+			}
+		}
+	};
+
+	const handleAddAuthors = () => {
+		setIsAuthorModalOpen(true);
+	};
+
+	const handleNewAuthorChange = async (e) => {
+		const { name, value, type, checked } = e.target;
+		setNewAuthor((prev) => ({
+			...prev,
+			[name]: type === "checkbox" ? checked : value,
+		}));
+
+		// If email field is being changed, verify it
+		if (name === "email" && value) {
+			// Check if the email is the same as the current user's email
+			if (value.toLowerCase() === user.email.toLowerCase()) {
+				setIsEmailVerified(false);
+				alert("You cannot add yourself as a co-author.");
+				return;
+			}
+
+			try {
+				const response = await axios.post(
+					`${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-email`,
+					{ email: value },
+					{
+						headers: {
+							Authorization: `Bearer ${user.token}`,
+						},
+					}
+				);
+
+				if (response.data.exists) {
+					// Check if this author is already in the list
+					const isAlreadyAdded = authors.some(
+						(author) =>
+							author.email.toLowerCase() === value.toLowerCase()
+					);
+
+					if (isAlreadyAdded) {
+						setIsEmailVerified(false);
+						alert("This author is already in the list.");
+						return;
+					}
+
+					// If user exists and not already added, pre-fill their information
+					const userData = response.data.user;
+					setNewAuthor((prev) => ({
+						...prev,
+						title: userData.title || prev.title,
+						firstName: userData.firstName || prev.firstName,
+						middleName: userData.middleName || prev.middleName,
+						lastName: userData.lastName || prev.lastName,
+						academicDegree:
+							userData.academicDegree || prev.academicDegree,
+						institution: userData.institution || prev.institution,
+						country: userData.country || prev.country,
+						email: userData.email,
+					}));
+					setIsEmailVerified(true);
+				} else {
+					setIsEmailVerified(false);
+				}
+			} catch (error) {
+				console.error("Error verifying email:", error);
+				setIsEmailVerified(false);
+			}
+		} else if (name === "email" && !value) {
+			setIsEmailVerified(false);
+		}
+	};
+
+	const handleAddNewAuthor = async () => {
+		// Validate required fields
+		const requiredFields = [
+			"title",
+			"firstName",
+			"lastName",
+			"email",
+			"institution",
+			"country",
+		];
+		const missingFields = requiredFields.filter(
+			(field) => !newAuthor[field]
+		);
+
+		if (missingFields.length > 0) {
+			alert(
+				`Please fill in all required fields: ${missingFields.join(
+					", "
+				)}`
+			);
+			return;
+		}
+
+		// Check if trying to add self
+		if (newAuthor.email.toLowerCase() === user.email.toLowerCase()) {
+			alert("You cannot add yourself as a co-author.");
+			return;
+		}
+
+		// Check if author is already in the list
+		const isAlreadyAdded = authors.some(
+			(author) =>
+				author.email.toLowerCase() === newAuthor.email.toLowerCase()
+		);
+
+		if (isAlreadyAdded) {
+			alert("This author is already in the list.");
+			return;
+		}
+
+		try {
+			// Verify email exists in database
+			const response = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-email`,
+				{ email: newAuthor.email },
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			if (!response.data.exists) {
+				alert(
+					"Cannot add author: Email does not exist in our database. Please enter a valid registered email."
+				);
+				return;
+			}
+
+			// Create new author object with the actual user ID from the response
+			const author = {
+				_id: response.data.user._id, // Use the actual MongoDB ObjectId from the user
+				...newAuthor,
+			};
+
+			// Update authors list
+			setAuthors((prev) => [...prev, author]);
+			setSelectedAuthors((prev) => [...prev, author._id]);
+
+			// If marked as corresponding author, update corresponding author
+			if (newAuthor.isCorresponding) {
+				setCorrespondingAuthorId(author._id);
+			}
+
+			// Reset form and close modal
+			setNewAuthor({
+				title: "",
+				firstName: "",
+				middleName: "",
+				lastName: "",
+				academicDegree: "",
+				email: "",
+				institution: "",
+				country: "",
+				isCorresponding: false,
+			});
+			setIsAuthorModalOpen(false);
+		} catch (error) {
+			console.error("Error adding author:", error);
+			alert("Error adding author. Please try again.");
+		}
+	};
+
+	const handleAuthorSelection = (authorId) => {
+		if (!selectedAuthors.includes(authorId)) {
+			setSelectedAuthors((prev) => [...prev, authorId]);
+		} else {
+			setSelectedAuthors((prev) => prev.filter((id) => id !== authorId));
+		}
+	};
+
+	const handleConfirmAuthors = () => {
+		setIsAuthorModalOpen(false);
+	};
+
+	const handleRemoveAuthor = (authorId) => {
+		setSelectedAuthors((prev) => prev.filter((id) => id !== authorId));
+	};
+
+	const renderNextButton = (section) => {
+		if (section < 6) {
+			return (
+				<motion.button
+					type="button"
+					onClick={handleNext}
+					className="mt-4 px-8 py-3 bg-[#496580] text-white font-semibold text-lg rounded-lg shadow-lg hover:bg-[#3a5269] transition-all duration-300 transform hover:scale-105 block ml-auto"
+					whileHover={{ scale: 1.05 }}
+					whileTap={{ scale: 0.95 }}
+				>
+					Next
+				</motion.button>
+			);
+		}
+		return null;
+	};
+
+	const renderBackButton = (section) => {
+		if (section > 1) {
+			return (
+				<motion.button
+					type="button"
+					onClick={handlePrev}
+					className="mt-4 px-6 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269] transition-colors block mr-auto"
+					whileHover={{ scale: 1.05 }}
+					whileTap={{ scale: 0.95 }}
+				>
+					Back
+				</motion.button>
+			);
+		}
+		return null;
+	};
+
+	const sectionVariants = {
+		hidden: { opacity: 0, x: -50 },
+		visible: { opacity: 1, x: 0 },
+		exit: { opacity: 0, x: 50 },
+	};
+
+	// Calculate progress percentage
+	const progress = ((currentSection - 1) / (totalSections - 1)) * 100;
+
+	const onDragEnd = (result) => {
+		if (!result.destination) return;
+
+		const reorderedAuthors = Array.from(selectedAuthors);
+		const [removed] = reorderedAuthors.splice(result.source.index, 1);
+		reorderedAuthors.splice(result.destination.index, 0, removed);
+
+		setSelectedAuthors(reorderedAuthors);
+	};
+
+	const moveAuthorUp = (index) => {
+		if (index > 0) {
+			const newAuthors = [...selectedAuthors];
+			[newAuthors[index - 1], newAuthors[index]] = [
+				newAuthors[index],
+				newAuthors[index - 1],
+			];
+			setSelectedAuthors(newAuthors);
+		}
+	};
+
+	const moveAuthorDown = (index) => {
+		if (index < selectedAuthors.length - 1) {
+			const newAuthors = [...selectedAuthors];
+			[newAuthors[index + 1], newAuthors[index]] = [
+				newAuthors[index],
+				newAuthors[index + 1],
+			];
+			setSelectedAuthors(newAuthors);
+		}
+	};
+
+	return (
+		<div className="min-h-screen bg-[#f8fafc] p-6 text-[#1a365d]">
+			<h1 className="mt-20 text-3xl font-bold text-center text-[#496580] mb-6">
+				Submit Manuscript
+			</h1>
+
+			{/* Stepper */}
+			<div className="flex justify-center items-center mb-6 relative">
+				{[...Array(totalSections)].map((_, i) => (
+					<React.Fragment key={i}>
+						<motion.div
+							className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mx-2 
+						${
+							currentSection === i + 1
+								? "bg-[#496580] text-white cursor-default"
+								: completedSections.includes(i + 1)
+								? "bg-[#BAFFF5] text-[#496580] cursor-pointer"
+								: i + 1 <= Math.max(...completedSections) + 1
+								? "bg-[#e2e8f0] text-[#496580] cursor-pointer"
+								: "bg-gray-300 text-gray-500 cursor-not-allowed"
+						}`}
+							whileHover={{
+								scale:
+									i + 1 <= Math.max(...completedSections) + 1
+										? 1.1
+										: 1,
+								cursor:
+									i + 1 <= Math.max(...completedSections) + 1
+										? "pointer"
+										: "not-allowed",
+							}}
+							onClick={() => {
+								if (
+									i + 1 <=
+									Math.max(...completedSections) + 1
+								) {
+									handleStepClick(i + 1);
+								}
+							}}
+						>
+							{i + 1}
+						</motion.div>
+
+						{/* Progress Bar */}
+						{i < totalSections - 1 && (
+							<motion.div
+								className="h-1 bg-[#e2e8f0] flex-1 mx-2 relative"
+								initial={{ width: 0 }}
+								animate={{
+									width:
+										i + 1 <= currentSection ? "100%" : "0%",
+								}}
+								transition={{ duration: 0.5 }}
+							>
+								<motion.div
+									className="h-1 bg-[#496580] absolute left-0"
+									initial={{ width: 0 }}
+									animate={{ width: `${progress}%` }}
+									transition={{ duration: 0.5 }}
+								/>
+							</motion.div>
+						)}
+					</React.Fragment>
+				))}
+			</div>
+
+			<form
+				onSubmit={handleSubmit}
+				className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-lg border border-[#d1d5db]"
+			>
+				<AnimatePresence mode="wait">
+					{currentSection === 1 && (
+						<motion.div
+							key="section1"
+							variants={sectionVariants}
+							initial="hidden"
+							animate="visible"
+							exit="exit"
+							className="mb-6 p-6 bg-white shadow-lg rounded-lg"
+						>
+							<label className="block text-lg font-semibold text-[#496580] mb-4 text-center">
+								Type of Article
+							</label>
+							<div className="flex justify-center">
+								<select
+									name="type"
+									value={formData.type}
+									onChange={handleInputChange}
+									className="px-4 py-2 rounded-lg bg-white text-[#496580] border border-[#d1d5db] focus:outline-none focus:ring-2 focus:ring-[#496580]"
+								>
+									<option value="">Select Type</option>
+									<option value="Review Article">
+										Review Article
+									</option>
+									<option value="Research Article">
+										Research Article
+									</option>
+								</select>
+							</div>
+							<div className="flex justify-between mt-6">
+								{renderBackButton(1)}
+								{renderNextButton(1)}
+							</div>
+						</motion.div>
+					)}
+
+					{currentSection === 2 && (
+						<motion.div
+							key="section2"
+							variants={sectionVariants}
+							initial="hidden"
+							animate="visible"
+							exit="exit"
+							className="mb-4"
+						>
+							<div className="flex space-x-4">
+								<div className="w-1/2">
+									<h3 className="text-lg font-semibold mb-4 text-[#496580]">
+										Required Documents
+									</h3>
+									<div className="space-y-2">
+										{[
+											"manuscript",
+											"coverLetter",
+											"declaration",
+										].map((doc) => (
+											<div
+												key={doc}
+												className="flex items-center"
+											>
+												<input
+													type="checkbox"
+													checked={uploadedFiles[doc]}
+													readOnly // Make it read-only
+													className="mr-2 cursor-default"
+												/>
+												<span className="capitalize text-[#496580]">
+													{doc}
+												</span>
+											</div>
+										))}
+									</div>
+								</div>
+								<div className="w-1/2">
+									<h3 className="text-lg font-semibold mb-4 text-[#496580]">
+										Upload Files (DOCX only)
+									</h3>
+									{[
+										"manuscript",
+										"coverLetter",
+										"declaration",
+									].map((doc) => (
+										<div key={doc} className="mb-4">
+											<div className="flex items-center">
+												<input
+													type="checkbox"
+													checked={selectedFiles.includes(
+														doc
+													)}
+													onChange={() =>
+														handleFileSelection(doc)
+													}
+													className="mr-2"
+												/>
+												<label className="flex flex-col items-center justify-center w-full h-32 border-2 border-[#d1d5db] border-dashed rounded-lg cursor-pointer bg-white hover:bg-[#f0f9ff]">
+													<div className="flex flex-col items-center justify-center pt-5 pb-6">
+														<p className="mb-2 text-sm text-[#496580]">
+															<span className="font-semibold">
+																Click to upload
+															</span>{" "}
+															or drag and drop
+														</p>
+														<p className="text-xs text-[#496580]">
+															Upload {doc} (DOCX
+															only)
+														</p>
+													</div>
+													<input
+														type="file"
+														name={doc}
+														accept=".docx,.pdf"
+														onChange={(e) =>
+															handleFileChange(
+																e,
+																doc
+															)
+														}
+														className="hidden"
+													/>
+												</label>
+											</div>
+											{files[doc] && (
+												<p className="mt-2 text-sm text-[#496580]">
+													{files[doc].name}
+												</p>
+											)}
+										</div>
+									))}
+								</div>
+							</div>
+
+							<div className="flex gap-4">
+								{renderBackButton(2)}
+								{/* Delete Button */}
+								<motion.button
+									type="button"
+									onClick={handleDelete}
+									className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors block mr-auto"
+									disabled={selectedFiles.length === 0}
+									whileHover={{ scale: 1.05 }}
+									whileTap={{ scale: 0.95 }}
+								>
+									Delete Selected
+								</motion.button>
+
+								{/* Next Button */}
+								<motion.button
+									type="button"
+									onClick={handleNext}
+									className="mt-4 px-6 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269] transition-colors block"
+									disabled={
+										!Object.values(uploadedFiles).every(
+											Boolean
+										)
+									}
+									whileHover={{ scale: 1.05 }}
+									whileTap={{ scale: 0.95 }}
+								>
+									Next
+								</motion.button>
+							</div>
+						</motion.div>
+					)}
+					{currentSection === 3 && (
+						<motion.div
+							key="section3"
+							variants={sectionVariants}
+							initial="hidden"
+							animate="visible"
+							exit="exit"
+							className="mb-4"
+						>
+							<label className="block font-medium mb-2 text-[#496580]">
+								Classification:
+							</label>
+							<div className="relative" ref={dropdownRef}>
+								<div
+									className="cursor-pointer p-2 border border-[#d1d5db] rounded-lg bg-white text-[#496580]"
+									onClick={() =>
+										setIsDropdownOpen(!isDropdownOpen)
+									}
+								>
+									{formData.classification.length > 0
+										? formData.classification.join(", ")
+										: "Select Classification"}
+								</div>
+								{isDropdownOpen && (
+									<div
+										className="absolute z-10 mt-2 w-full bg-white border border-[#d1d5db] rounded-lg shadow-lg max-h-60 overflow-y-auto 
+							[&::-webkit-scrollbar]:w-2
+							[&::-webkit-scrollbar-track]:bg-[#f0f9ff]
+							[&::-webkit-scrollbar-thumb]:bg-[#496580]
+							[&::-webkit-scrollbar-thumb]:rounded-full"
+									>
+										{classificationOptions.map((option) => (
+											<div
+												key={option}
+												className={`p-2 cursor-pointer flex items-center ${
+													formData.classification.includes(
+														option
+													)
+														? "bg-[#BAFFF5]"
+														: "hover:bg-[#f0f9ff]"
+												}`}
+												onClick={(e) => {
+													e.stopPropagation();
+													handleInputChange({
+														target: {
+															name: "classification",
+															value: option,
+															checked:
+																!formData.classification.includes(
+																	option
+																),
+														},
+													});
+												}}
+											>
+												<input
+													type="checkbox"
+													name="classification"
+													value={option}
+													checked={formData.classification.includes(
+														option
+													)}
+													onChange={handleInputChange}
+													className="mr-2"
+												/>
+												<label className="ml-2 text-[#496580]">
+													{option}
+												</label>
+											</div>
+										))}
+									</div>
+								)}
+							</div>
+							<div className="flex justify-between">
+								{renderBackButton(3)}
+								{renderNextButton(3)}
+							</div>
+						</motion.div>
+					)}
+
+					{/* In the step 4 section */}
+					{currentSection === 4 && (
+						<motion.div
+							key="section4"
+							variants={sectionVariants}
+							initial="hidden"
+							animate="visible"
+							exit="exit"
+							className="mb-4"
+						>
+							<label className="block font-medium mb-2 text-[#496580]">
+								Additional Information (All terms must be
+								accepted):
+							</label>
+							{[...Array(5)].map((_, i) => (
+								<div key={i} className="mb-2 flex items-center">
+									<input
+										type="checkbox"
+										name="additionalInfo"
+										value={`Term ${i + 1}`}
+										checked={formData.additionalInfo.includes(
+											`Term ${i + 1}`
+										)}
+										onChange={handleInputChange}
+										className="mr-2"
+									/>
+									<span className="text-[#496580]">
+										Accept Term {i + 1}
+									</span>
+								</div>
+							))}
+							<div className="flex justify-between">
+								{renderBackButton(4)}
+								{renderNextButton(4)}
+							</div>
+						</motion.div>
+					)}
+
+					{currentSection === 5 && (
+						<motion.div
+							key="section5"
+							variants={sectionVariants}
+							initial="hidden"
+							animate="visible"
+							exit="exit"
+							className="mb-4"
+						>
+							<label className="block font-medium mb-2 text-[#496580]">
+								Comments:
+							</label>
+							<textarea
+								name="comments"
+								value={formData.comments}
+								onChange={handleInputChange}
+								rows={4}
+								className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]"
+							></textarea>
+							<div className="flex justify-between">
+								{renderBackButton(5)}
+								{renderNextButton(5)}
+							</div>
+						</motion.div>
+					)}
+
+					{currentSection === 6 && (
+						<motion.div
+							key="section6"
+							variants={sectionVariants}
+							initial="hidden"
+							animate="visible"
+							exit="exit"
+						>
+							<div className="mb-4">
+								<label className="block font-medium mb-2 text-[#496580]">
+									Title:
+								</label>
+								<input
+									type="text"
+									name="title"
+									value={formData.title}
+									onChange={handleInputChange}
+									className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]"
+								/>
+							</div>
+
+							<div className="mb-4">
+								<label className="block font-medium mb-2 text-[#496580]">
+									Keywords:
+								</label>
+								<input
+									type="text"
+									name="keywords"
+									value={formData.keywords}
+									onChange={handleInputChange}
+									className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]"
+								/>
+							</div>
+
+							<div className="mb-4">
+								<label className="block font-medium mb-2 text-[#496580]">
+									Abstract:
+								</label>
+								<textarea
+									name="abstract"
+									value={formData.abstract}
+									onChange={handleInputChange}
+									rows={4}
+									className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]"
+								></textarea>
+							</div>
+
+							<div className="mb-4">
+								<label className="block font-medium mb-2 text-[#496580]">
+									Author:
+								</label>
+								{user && (
+									<div className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]">
+										{user.title} {user.firstName}{" "}
+										{user.middleName
+											? `${user.middleName} `
+											: ""}
+										{user.lastName}
+										{user.academicDegree &&
+											`, ${user.academicDegree}`}
+									</div>
+								)}
+							</div>
+
+							<button
+								type="button"
+								onClick={handleAddAuthors}
+								className="mt-2 px-4 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269]"
+							>
+								Add Co-Authors
+							</button>
+
+							{/* Selected authors list */}
+							<div className="mt-4">
+								<h3 className="text-lg font-semibold mb-4 text-[#496580]">
+									Authors List:
+								</h3>
+								<div className="bg-white rounded-lg overflow-hidden border border-[#d1d5db]">
+									<table className="min-w-full divide-y divide-[#d1d5db]">
+										<thead className="bg-[#f0f9ff]">
+											<tr>
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+													Move
+												</th>
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+													Name
+												</th>
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+													Email
+												</th>
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+													Roles
+												</th>
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+													Actions
+												</th>
+											</tr>
+										</thead>
+										<tbody className="divide-y divide-[#d1d5db]">
+											{selectedAuthors.map(
+												(authorId, index) => {
+													const author = authors.find(
+														(a) =>
+															a._id === authorId
+													);
+													if (!author) return null;
+
+													const isCorrespondingAuthor =
+														authorId ===
+														correspondingAuthorId;
+
+													return (
+														<tr
+															key={authorId}
+															className="text-[#496580]"
+														>
+															<td className="px-4 py-3">
+																<div className="flex space-x-1">
+																	<button
+																		onClick={() =>
+																			moveAuthorUp(
+																				index
+																			)
+																		}
+																		disabled={
+																			index ===
+																			0
+																		}
+																		className="bg-[#e2e8f0] hover:bg-[#d1d5db] text-[#496580] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+																	>
+																		↑
+																	</button>
+																	<button
+																		onClick={() =>
+																			moveAuthorDown(
+																				index
+																			)
+																		}
+																		disabled={
+																			index ===
+																			selectedAuthors.length -
+																				1
+																		}
+																		className="bg-[#e2e8f0] hover:bg-[#d1d5db] text-[#496580] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+																	>
+																		↓
+																	</button>
+																</div>
+															</td>
+															<td className="px-4 py-3">
+																<div className="text-sm">
+																	{
+																		author.title
+																	}{" "}
+																	{
+																		author.firstName
+																	}{" "}
+																	{author.middleName
+																		? `${author.middleName} `
+																		: ""}
+																	{
+																		author.lastName
+																	}
+																	{author.academicDegree && (
+																		<span className="text-[#64748b]">
+																			,{" "}
+																			{
+																				author.academicDegree
+																			}
+																		</span>
+																	)}
+																</div>
+															</td>
+															<td className="px-4 py-3">
+																<div className="text-sm">
+																	{
+																		author.email
+																	}
+																</div>
+															</td>
+															<td className="px-4 py-3">
+																<div className="text-sm">
+																	<div>
+																		Author
+																	</div>
+																	{isCorrespondingAuthor && (
+																		<div className="text-[#496580] text-xs mt-1">
+																			Corresponding
+																			Author
+																		</div>
+																	)}
+																</div>
+															</td>
+															<td className="px-4 py-3">
+																{authorId !==
+																	user._id && (
+																	<div className="flex space-x-2">
+																		<button
+																			onClick={() =>
+																				handleRemoveAuthor(
+																					authorId
+																				)
+																			}
+																			className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
+																		>
+																			Remove
+																		</button>
+																		<button
+																			onClick={() =>
+																				setCorrespondingAuthorId(
+																					authorId
+																				)
+																			}
+																			className={`px-3 py-1 rounded text-sm transition-colors ${
+																				isCorrespondingAuthor
+																					? "bg-[#BAFFF5] text-[#496580] cursor-default"
+																					: "bg-[#496580] hover:bg-[#3a5269] text-white"
+																			}`}
+																			disabled={
+																				isCorrespondingAuthor
+																			}
+																		>
+																			{isCorrespondingAuthor
+																				? "Current Corresponding"
+																				: "Make Corresponding"}
+																		</button>
+																	</div>
+																)}
+															</td>
+														</tr>
+													);
+												}
+											)}
+										</tbody>
+									</table>
+								</div>
+							</div>
+
+							{/* Modal for selecting authors */}
+							{isAuthorModalOpen && (
+								<div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+									<div className="bg-white p-4 rounded text-[#1a365d] w-[500px]">
+										<div className="flex justify-between items-center mb-2">
+											<h3 className="font-bold">
+												Add New Author
+											</h3>
+											<button
+												onClick={() =>
+													setIsAuthorModalOpen(false)
+												}
+												className="text-[#64748b] hover:text-[#1a365d]"
+											>
+												×
+											</button>
+										</div>
+
+										<div className="space-y-2">
+											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
+												<label className="text-sm">
+													Title
+													<span className="text-red-500">
+														*
+													</span>
+												</label>
+												<select
+													name="title"
+													value={newAuthor.title}
+													onChange={
+														handleNewAuthorChange
+													}
+													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													required
+												>
+													<option value="">
+														Select Title
+													</option>
+													<option value="Mr">
+														Mr
+													</option>
+													<option value="Mrs">
+														Mrs
+													</option>
+													<option value="Miss">
+														Miss
+													</option>
+													<option value="Dr">
+														Dr
+													</option>
+													<option value="Er">
+														Er
+													</option>
+												</select>
+											</div>
+
+											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
+												<label className="text-sm">
+													Given/First Name
+													<span className="text-red-500">
+														*
+													</span>
+												</label>
+												<input
+													type="text"
+													name="firstName"
+													value={newAuthor.firstName}
+													onChange={
+														handleNewAuthorChange
+													}
+													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													required
+												/>
+											</div>
+
+											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
+												<label className="text-sm">
+													Middle Name
+												</label>
+												<input
+													type="text"
+													name="middleName"
+													value={newAuthor.middleName}
+													onChange={
+														handleNewAuthorChange
+													}
+													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+												/>
+											</div>
+
+											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
+												<label className="text-sm">
+													Family/Last Name
+													<span className="text-red-500">
+														*
+													</span>
+												</label>
+												<input
+													type="text"
+													name="lastName"
+													value={newAuthor.lastName}
+													onChange={
+														handleNewAuthorChange
+													}
+													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													required
+												/>
+											</div>
+
+											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
+												<label className="text-sm">
+													Academic Degree(s)
+												</label>
+												<input
+													type="text"
+													name="academicDegree"
+													value={
+														newAuthor.academicDegree
+													}
+													onChange={
+														handleNewAuthorChange
+													}
+													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+												/>
+											</div>
+
+											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
+												<label className="text-sm">
+													E-mail Address
+													<span className="text-red-500">
+														*
+													</span>
+												</label>
+												<div className="relative">
+													<input
+														type="email"
+														name="email"
+														value={newAuthor.email}
+														onChange={
+															handleNewAuthorChange
+														}
+														className={`w-full border rounded px-2 py-1 text-sm border-[#d1d5db] ${
+															isEmailVerified
+																? "border-green-500"
+																: ""
+														}`}
+														required
+													/>
+													{isEmailVerified && (
+														<span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500">
+															✓
+														</span>
+													)}
+												</div>
+											</div>
+
+											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
+												<label className="text-sm">
+													Institution
+													<span className="text-red-500">
+														*
+													</span>
+												</label>
+												<input
+													type="text"
+													name="institution"
+													value={
+														newAuthor.institution
+													}
+													onChange={
+														handleNewAuthorChange
+													}
+													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													required
+												/>
+											</div>
+
+											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
+												<label className="text-sm">
+													Country or Region
+													<span className="text-red-500">
+														*
+													</span>
+												</label>
+												<select
+													name="country"
+													value={newAuthor.country}
+													onChange={
+														handleNewAuthorChange
+													}
+													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													required
+												>
+													<option value="">
+														Please select from the
+														list below
+													</option>
+													{countries.map(
+														(country) => (
+															<option
+																key={country}
+																value={country}
+															>
+																{country}
+															</option>
+														)
+													)}
+												</select>
+											</div>
+
+											<div className="flex items-center mt-2">
+												<input
+													type="checkbox"
+													name="isCorresponding"
+													checked={
+														newAuthor.isCorresponding
+													}
+													onChange={
+														handleNewAuthorChange
+													}
+													className="mr-2"
+												/>
+												<label className="text-sm">
+													This is the corresponding
+													author
+												</label>
+											</div>
+
+											<div className="flex justify-end gap-2 mt-4">
+												<button
+													type="button"
+													onClick={() =>
+														setIsAuthorModalOpen(
+															false
+														)
+													}
+													className="px-3 py-1 bg-[#e2e8f0] text-[#496580] rounded text-sm hover:bg-[#d1d5db]"
+												>
+													Cancel
+												</button>
+												<button
+													type="button"
+													onClick={handleAddNewAuthor}
+													className="px-3 py-1 bg-[#496580] text-white rounded text-sm hover:bg-[#3a5269]"
+												>
+													Add Author
+												</button>
+											</div>
+										</div>
+									</div>
+								</div>
+							)}
+
+							<div className="mb-4">
+								<span className="block font-medium mb-2 text-[#496580]">
+									Funding:
+								</span>
+								<div className="flex items-center gap-4">
+									<label className="flex items-center text-[#496580]">
+										<input
+											type="radio"
+											name="funding"
+											value="Yes"
+											checked={formData.funding === "Yes"}
+											onChange={handleInputChange}
+											className="mr-2"
+										/>
+										Yes
+									</label>
+									<label className="flex items-center text-[#496580]">
+										<input
+											type="radio"
+											name="funding"
+											value="No"
+											checked={formData.funding === "No"}
+											onChange={handleInputChange}
+											className="mr-2"
+										/>
+										No
+									</label>
+								</div>
+							</div>
+
+							<div className="flex justify-between">
+								{renderBackButton(6)}
+								<div className="flex space-x-4">
+									<button
+										type="button"
+										onClick={handleSaveAndSubmitLater}
+										className="mt-4 px-6 py-2 bg-[#BAFFF5] text-[#496580] rounded-lg hover:bg-[#a8e6dc]"
+									>
+										Save and Submit Later
+									</button>
+									<button
+										type="button"
+										onClick={() =>
+											navigate("/my-submissions")
+										}
+										className="mt-4 px-6 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269]"
+									>
+										Proceed
+									</button>
+								</div>
+							</div>
+						</motion.div>
+					)}
+				</AnimatePresence>
+			</form>
+		</div>
+	);
+};
+
+export default ManuscriptPage;

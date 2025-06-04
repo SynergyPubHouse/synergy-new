@@ -1,0 +1,4 @@
+@import "tailwindcss";
+body {
+	zoom: 1; /* Adjust this value as needed */
+}
