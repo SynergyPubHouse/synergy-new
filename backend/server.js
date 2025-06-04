@@ -12,7 +12,7 @@ const app = express();
 // CORS configuration
 app.use(
 	cors({
-		origin: "https://synergyworldpress.com",
+		origin: "https://www.synergyworldpress.com",
 		credentials: true,
 		methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
 		allowedHeaders: [
