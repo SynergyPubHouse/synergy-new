@@ -40,7 +40,9 @@ function ReviewerLogin() {
 				};
 				localStorage.setItem("user", JSON.stringify(userData));
 				login(userData);
-				navigate("/reviewer/dashboard");
+				navigate(
+					"/journal/Journal-of-Intelligent-Computing-Systems/reviewer/dashboard"
+				);
 			}
 		} catch (error) {
 			alert(error.response?.data?.message || "Login failed");

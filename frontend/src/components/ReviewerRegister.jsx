@@ -33,11 +33,15 @@ function ReviewerRegister() {
 
 		try {
 			await axios.post(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/register`,
+				`${
+					import.meta.env.VITE_BACKEND_URL
+				}/api/auth/reviewer/register`,
 				formData
 			);
 			alert("Reviewer Registration Successful!");
-			navigate("/reviewer/login");
+			navigate(
+				"/journal/Journal-of-Intelligent-Computing-Systems/reviewer/login"
+			);
 		} catch (error) {
 			setErrorMessage(
 				error.response?.data?.message || "Registration Failed"

@@ -37,7 +37,9 @@ function EditorRegister() {
 				formData
 			);
 			alert("Editor Registration Successful!");
-			navigate("/editor/login");
+			navigate(
+				"/journal/Journal-of-Intelligent-Computing-Systems/editor/login"
+			);
 		} catch (error) {
 			setErrorMessage(
 				error.response?.data?.message || "Registration Failed"

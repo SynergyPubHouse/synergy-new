@@ -42,7 +42,9 @@ function EditorLogin() {
 				localStorage.setItem("user", JSON.stringify(userData));
 				login(userData);
 				alert("Editor Login Successful");
-				navigate("/editor/dashboard");
+				navigate(
+					"/journal/Journal-of-Intelligent-Computing-Systems/editor/dashboard"
+				);
 			} else {
 				alert("Login Failed: Editor data missing");
 			}
