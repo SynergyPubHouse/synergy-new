@@ -2,3 +2,53 @@
 body {
 	zoom: 1; /* Adjust this value as needed */
 }
+/* Ultra-minimal scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00796b;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00acc1;
+}
+
+/* Force hide everything else */
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+::-webkit-scrollbar-corner {
+  display: none;
+}
+
+/* Hide scrollbar for Chrome, Safari, and Opera */
+.your-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge */
+.your-scroll-container {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+
+
+
+
+
+
+
+
+
+/* <div className="your-scroll-container" style={{ overflow: "auto", maxHeight: "400px" }}> */
+  /* {...content...} */
+/* </div> */

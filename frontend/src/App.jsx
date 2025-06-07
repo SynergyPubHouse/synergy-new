@@ -41,11 +41,14 @@ import FeedbackAndRevisions from "./pages/peer-review/FeedbackAndRevisions";
 import FinalEvaluationAndAcceptance from "./pages/peer-review/FinalEvaluationAndAcceptance";
 import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationIntegrityAndTimeline";
 
+
+
+import PageNotAvailable from "./pages/pagenotavailable";
 // Create Authentication Context
 const AuthContext = createContext(null);
 
-const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
-
+// const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+const BASE_URL = '/';
 function AppContent() {
     const location = useLocation();
     const [user, setUser] = React.useState(null);
@@ -89,7 +92,8 @@ function AppContent() {
 
     return (
         <AuthContext.Provider value={{ user, login, logout }}>
-            {!hideNavbar && <Navbar />}
+            {/* {!hideNavbar && <Navbar />} */}
+            <Navbar />
             <Routes>
                 {/* Landing Page */}
                 <Route path="/" element={<LandingPage />} />
@@ -104,8 +108,13 @@ function AppContent() {
                 <Route path="/peer-review/final-evaluation-and-acceptance" element={<FinalEvaluationAndAcceptance />} />
                 <Route path="/peer-review/publication-integrity-and-timeline" element={<PublicationIntegrityAndTimeline />} />
 
+
+
+
+                <Route path="/books*" element={<PageNotAvailable />} />
+
                 {/* Journal Management Routes */}
-                <Route path={BASE_URL} element={<HomePage />} />
+                {/* <Route path={BASE_URL} element={<HomePage />} /> */}
                 <Route path={`${BASE_URL}/publish`} element={<Publish />} />
                 <Route path={`${BASE_URL}/editor`} element={<Editors />} />
                 <Route path={`${BASE_URL}/reviewer`} element={<Reviewers />} />

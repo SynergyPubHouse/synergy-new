@@ -1,366 +1,311 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 const Navigation = () => {
-	const [activeDropdown, setActiveDropdown] = useState(null);
-	const [dropdownTimeout, setDropdownTimeout] = useState(null);
-	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState(null);
+  const [dropdownTimeout, setDropdownTimeout] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSticky, setIsSticky] = useState(false);
+  const [isSmall, setIsSmall] = useState(false);
+  const navRef = useRef(null);
 
-	const peerReviewItems = [
-		{
-			name: "Initial Editorial Screening",
-			path: "/peer-review/initial-editorial-screening",
-		},
-		{
-			name: "Double-Blind Peer Review",
-			path: "/peer-review/double-blind-peer-review",
-		},
-		{
-			name: "Feedback and Revisions",
-			path: "/peer-review/feedback-and-revisions",
-		},
-		{
-			name: "Final Evaluation and Acceptance",
-			path: "/peer-review/final-evaluation-and-acceptance",
-		},
-		{
-			name: "Publication Integrity and Timeline",
-			path: "/peer-review/publication-integrity-and-timeline",
-		},
-	];
+  const peerReviewItems = [
+    { name: "Initial Editorial Screening", path: "/peer-review/initial-editorial-screening" },
+    { name: "Double-Blind Peer Review", path: "/peer-review/double-blind-peer-review" },
+    { name: "Feedback and Revisions", path: "/peer-review/feedback-and-revisions" },
+    { name: "Final Evaluation and Acceptance", path: "/peer-review/final-evaluation-and-acceptance" },
+    { name: "Publication Integrity and Timeline", path: "/peer-review/publication-integrity-and-timeline" },
+  ];
 
-	const journalsItems = [
-		{
-			name: "Journal of Intelligent Computing System (JICS)",
-			path: "/jics",
-		},
-	];
+  const journalsItems = [
+    { name: "Journal of Intelligent Computing System (JICS)", path: "/jics" },
+  ];
 
-	const handleMouseEnter = (dropdownName) => {
-		clearTimeout(dropdownTimeout);
-		setActiveDropdown(dropdownName);
-	};
+  // Scroll detection for sticky behavior
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!navRef.current) return;
+      const header = document.querySelector('header');
+      const headerBottom = header?.offsetTop + header?.offsetHeight || 0;
+      if (window.scrollY > headerBottom) {
+        setIsSticky(true);
+        setIsSmall(true);
+      } else {
+        setIsSticky(false);
+        setIsSmall(false);
+      }
+    };
 
-	const handleMouseLeave = () => {
-		const timeout = setTimeout(() => {
-			setActiveDropdown(null);
-		}, 200);
-		setDropdownTimeout(timeout);
-	};
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-	const toggleMobileMenu = () => {
-		setIsMobileMenuOpen(!isMobileMenuOpen);
-	};
+  const handleMouseEnter = (dropdownName) => {
+    clearTimeout(dropdownTimeout);
+    setActiveDropdown(dropdownName);
+  };
 
-	return (
-		<nav className="bg-white shadow-md sticky top-0 z-50">
-			<div className="max-w-7xl mx-auto px-4">
-				<div className="flex justify-between h-16">
-					{/* Mobile menu button */}
-					<div className="flex items-center md:hidden">
-						<button
-							onClick={toggleMobileMenu}
-							className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
-						>
-							<span className="sr-only">Open main menu</span>
-							{/* Hamburger icon */}
-							<svg
-								className={`${
-									isMobileMenuOpen ? "hidden" : "block"
-								} h-6 w-6`}
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M4 6h16M4 12h16M4 18h16"
-								/>
-							</svg>
-							{/* Close icon */}
-							<svg
-								className={`${
-									isMobileMenuOpen ? "block" : "hidden"
-								} h-6 w-6`}
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M6 18L18 6M6 6l12 12"
-								/>
-							</svg>
-						</button>
-					</div>
+  const handleMouseLeave = () => {
+    const timeout = setTimeout(() => {
+      setActiveDropdown(null);
+    }, 200);
+    setDropdownTimeout(timeout);
+  };
 
-					{/* Desktop Navigation */}
-					<div className="hidden md:flex items-center space-x-8">
-						<Link
-							to="/"
-							className="inline-flex items-center px-3 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors duration-200"
-						>
-							About Us
-						</Link>
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
 
-						<div
-							className="relative"
-							onMouseEnter={() => handleMouseEnter("peerReview")}
-							onMouseLeave={handleMouseLeave}
-						>
-							<button className="inline-flex items-center px-3 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors duration-200">
-								Peer Review Process
-								<svg
-									className={`ml-2 h-5 w-5 transform transition-transform duration-200 ${
-										activeDropdown === "peerReview"
-											? "rotate-180"
-											: ""
-									}`}
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M19 9l-7 7-7-7"
-									/>
-								</svg>
-							</button>
-							{activeDropdown === "peerReview" && (
-								<div className="absolute left-0 mt-2 w-72 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 transform transition-all duration-200 ease-out">
-									<div className="py-1">
-										{peerReviewItems.map((item, index) => (
-											<Link
-												key={index}
-												to={item.path}
-												className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
-											>
-												{item.name}
-											</Link>
-										))}
-									</div>
-								</div>
-							)}
-						</div>
+  return (
+    <nav
+      ref={navRef}
+      className={`bg-[#f9f9f9] shadow-sm z-40 transition-all duration-300 ${
+        isSticky
+          ? "fixed left-0 right-0 top-[75px] border-b border-[#e0e0e0]"
+          : "relative"
+      } ${
+        isSmall ? "h-12" : "h-16"
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-4">
+        <div className={`flex justify-between items-center h-full transition-all duration-300 ${
+          isSmall ? "py-1" : "py-2"
+        }`}>
+          {/* Mobile menu button */}
+          <div className="flex items-center md:hidden">
+            <button
+              onClick={toggleMobileMenu}
+              className="inline-flex items-center justify-center p-2 rounded-md text-[#212121] hover:text-[#00796b] hover:bg-[#e0e0e0] focus:outline-none focus:ring-2 focus:ring-[#00acc1]"
+            >
+              <span className="sr-only">Open main menu</span>
+              <svg
+                className={`${isMobileMenuOpen ? "hidden" : "block"} ${isSmall ? "h-5 w-5" : "h-6 w-6"}`}
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <svg
+                className={`${isMobileMenuOpen ? "block" : "hidden"} ${isSmall ? "h-5 w-5" : "h-6 w-6"}`}
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
-						<div
-							className="relative"
-							onMouseEnter={() => handleMouseEnter("journals")}
-							onMouseLeave={handleMouseLeave}
-						>
-							<button className="inline-flex items-center px-3 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors duration-200">
-								JOURNALS
-								<svg
-									className={`ml-2 h-5 w-5 transform transition-transform duration-200 ${
-										activeDropdown === "journals"
-											? "rotate-180"
-											: ""
-									}`}
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M19 9l-7 7-7-7"
-									/>
-								</svg>
-							</button>
-							{activeDropdown === "journals" && (
-								<div className="absolute left-0 mt-2 w-72 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 transform transition-all duration-200 ease-out">
-									<div className="py-1">
-										{journalsItems.map((item, index) => (
-											<Link
-												key={index}
-												to={item.path}
-												className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
-											>
-												{item.name}
-											</Link>
-										))}
-									</div>
-								</div>
-							)}
-						</div>
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center justify-center w-full space-x-8">
+            <Link
+              to="/"
+              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
+                isSmall ? "text-sm" : "text-base"
+              }`}
+            >
+              About Us
+            </Link>
 
-						<Link
-							to="/books"
-							className="inline-flex items-center px-3 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors duration-200"
-						>
-							BOOK PUBLISHED
-						</Link>
+            <div
+              className="relative"
+              onMouseEnter={() => handleMouseEnter("peerReview")}
+              onMouseLeave={handleMouseLeave}
+            >
+              <button className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
+                isSmall ? "text-sm" : "text-base"
+              }`}>
+                Peer Review Process
+                <svg
+                  className={`ml-2 transform transition-transform duration-200 ${
+                    isSmall ? "h-4 w-4" : "h-5 w-5"
+                  } ${activeDropdown === "peerReview" ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {activeDropdown === "peerReview" && (
+                <div className={`absolute left-0 w-72 rounded-md shadow-lg bg-white ring-1 ring-[#e0e0e0] transform transition-all duration-200 ease-out ${
+                  isSticky ? "mt-1" : "mt-2"
+                }`}>
+                  <div className="py-1">
+                    {peerReviewItems.map((item, index) => (
+                      <Link
+                        key={index}
+                        to={item.path}
+                        className="block px-4 py-2 text-sm text-[#212121] hover:bg-[#00acc1] hover:text-white transition-colors duration-200"
+                      >
+                        {item.name}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
-						<Link
-							to="/login"
-							className="inline-flex items-center px-3 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors duration-200"
-						>
-							AUTHOR LOGIN
-						</Link>
-					</div>
+            <div
+              className="relative"
+              onMouseEnter={() => handleMouseEnter("journals")}
+              onMouseLeave={handleMouseLeave}
+            >
+              <button className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
+                isSmall ? "text-sm" : "text-base"
+              }`}>
+                JOURNALS
+                <svg
+                  className={`ml-2 transform transition-transform duration-200 ${
+                    isSmall ? "h-4 w-4" : "h-5 w-5"
+                  } ${activeDropdown === "journals" ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {activeDropdown === "journals" && (
+                <div className={`absolute left-0 w-72 rounded-md shadow-lg bg-white ring-1 ring-[#e0e0e0] transform transition-all duration-200 ease-out ${
+                  isSticky ? "mt-1" : "mt-2"
+                }`}>
+                  <div className="py-1">
+                    {journalsItems.map((item, index) => (
+                      <Link
+                        key={index}
+                        to={item.path}
+                        className="block px-4 py-2 text-sm text-[#212121] hover:bg-[#00acc1] hover:text-white transition-colors duration-200"
+                      >
+                        {item.name}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
-					{/* Submit Article Button */}
-					<div className="hidden md:flex items-center">
-						<Link
-							to="/journal/Journal-of-Intelligent-Computing-Systems/submit"
-							className="inline-flex items-center px-4 py-2 text-gray-700 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-all duration-200 font-medium shadow-sm hover:shadow"
-						>
-							Submit your article
-							<svg
-								className="ml-2 h-5 w-5"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M14 5l7 7m0 0l-7 7m7-7H3"
-								/>
-							</svg>
-						</Link>
-					</div>
-				</div>
-			</div>
+            <Link
+              to="/books"
+              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
+                isSmall ? "text-sm" : "text-base"
+              }`}
+            >
+              BOOK PUBLISHED
+            </Link>
 
-			{/* Mobile menu */}
-			<div
-				className={`${
-					isMobileMenuOpen ? "block" : "hidden"
-				} md:hidden bg-white`}
-			>
-				<div className="px-2 pt-2 pb-3 space-y-1">
-					<Link
-						to="/"
-						className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-					>
-						About Us
-					</Link>
+            <Link
+              to="/login"
+              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
+                isSmall ? "text-sm" : "text-base"
+              }`}
+            >
+              AUTHOR LOGIN
+            </Link>
+          </div>
+        </div>
+      </div>
 
-					<div className="relative">
-						<button
-							onClick={() =>
-								setActiveDropdown(
-									activeDropdown === "peerReview"
-										? null
-										: "peerReview"
-								)
-							}
-							className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-						>
-							Peer Review Process
-							<svg
-								className={`ml-2 h-5 w-5 inline transform transition-transform duration-200 ${
-									activeDropdown === "peerReview"
-										? "rotate-180"
-										: ""
-								}`}
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M19 9l-7 7-7-7"
-								/>
-							</svg>
-						</button>
-						{activeDropdown === "peerReview" && (
-							<div className="pl-4">
-								{peerReviewItems.map((item, index) => (
-									<Link
-										key={index}
-										to={item.path}
-										className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-									>
-										{item.name}
-									</Link>
-								))}
-							</div>
-						)}
-					</div>
+      {/* Mobile menu */}
+      <div
+        className={`${
+          isMobileMenuOpen ? "block" : "hidden"
+        } md:hidden bg-white shadow-lg absolute w-full ${
+          isSticky ? "top-[100%]" : "top-[calc(100%-1px)]"
+        } border-t border-[#e0e0e0]`}
+      >
+        <div className="px-2 pt-2 pb-3 space-y-1">
+          <Link
+            to="/"
+            className="block px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+          >
+            About Us
+          </Link>
 
-					<div className="relative">
-						<button
-							onClick={() =>
-								setActiveDropdown(
-									activeDropdown === "journals"
-										? null
-										: "journals"
-								)
-							}
-							className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-						>
-							JOURNALS
-							<svg
-								className={`ml-2 h-5 w-5 inline transform transition-transform duration-200 ${
-									activeDropdown === "journals"
-										? "rotate-180"
-										: ""
-								}`}
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M19 9l-7 7-7-7"
-								/>
-							</svg>
-						</button>
-						{activeDropdown === "journals" && (
-							<div className="pl-4">
-								{journalsItems.map((item, index) => (
-									<Link
-										key={index}
-										to={item.path}
-										className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-									>
-										{item.name}
-									</Link>
-								))}
-							</div>
-						)}
-					</div>
+          <div className="relative">
+            <button
+              onClick={() => setActiveDropdown(activeDropdown === "peerReview" ? null : "peerReview")}
+              className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+            >
+              Peer Review Process
+              <svg
+                className={`ml-2 h-5 w-5 inline transform transition-transform duration-200 ${
+                  activeDropdown === "peerReview" ? "rotate-180" : ""
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {activeDropdown === "peerReview" && (
+              <div className="pl-4">
+                {peerReviewItems.map((item, index) => (
+                  <Link
+                    key={index}
+                    to={item.path}
+                    className="block px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
 
-					<Link
-						to="/books"
-						className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-					>
-						BOOK PUBLISHED
-					</Link>
+          <div className="relative">
+            <button
+              onClick={() => setActiveDropdown(activeDropdown === "journals" ? null : "journals")}
+              className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+            >
+              JOURNALS
+              <svg
+                className={`ml-2 h-5 w-5 inline transform transition-transform duration-200 ${
+                  activeDropdown === "journals" ? "rotate-180" : ""
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {activeDropdown === "journals" && (
+              <div className="pl-4">
+                {journalsItems.map((item, index) => (
+                  <Link
+                    key={index}
+                    to={item.path}
+                    className="block px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
 
-					<Link
-						to="/login"
-						className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-					>
-						AUTHOR LOGIN
-					</Link>
+          <Link
+            to="/books"
+            className="block px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+          >
+            BOOK PUBLISHED
+          </Link>
 
-					<Link
-						to="/journal/Journal-of-Intelligent-Computing-Systems/submit"
-						className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-					>
-						Submit your article
-					</Link>
-				</div>
-			</div>
-		</nav>
-	);
+          <Link
+            to="/login"
+            className="block px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+          >
+            AUTHOR LOGIN
+          </Link>
+        </div>
+      </div>
+    </nav>
+  );
 };
 
 export default Navigation;

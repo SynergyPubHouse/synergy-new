@@ -4,177 +4,118 @@ import { Link } from "react-router-dom";
 const BASE_URL = "/journal/Journal-of-Intelligent-Computing-Systems";
 
 function Footer() {
-	return (
-		<footer className="bg-[#1f3247] text-white py-12">
-			<div className="container mx-auto px-6 md:px-20">
-				{/* Footer Grid */}
-				<div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-					{/* About Section */}
-					<div>
-						<h3 className="text-xl font-bold text-[#BAFFF5] mb-4">
-							About Synergy World Press
-						</h3>
-						<p className="text-[#BADDFF]">
-							Synergy World Press is a platform for researchers to
-							publish, share, and collaborate on groundbreaking
-							research.
-						</p>
-					</div>
+  return (
+    <footer className="bg-[#00796b] text-[#e0e0e0] py-12 mt-16">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Footer Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* About Section */}
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4">
+              About Synergy World Press
+            </h3>
+            <p className="leading-relaxed">
+              Advancing interdisciplinary research through accessible publishing solutions. 
+              Committed to innovation, integrity, and global collaboration.
+            </p>
+          </div>
 
-					{/* Quick Links Section */}
-					<div>
-						<h3 className="text-xl font-bold text-[#BAFFF5] mb-4">
-							Quick Links
-						</h3>
-						<ul className="space-y-2">
-							<li>
-								<Link
-									to={`${BASE_URL}/publish`}
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									Publish With Us
-								</Link>
-							</li>
-							<li>
-								<Link
-									to={`${BASE_URL}/editors`}
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									For Editors
-								</Link>
-							</li>
-							<li>
-								<Link
-									to={`${BASE_URL}/reviewers`}
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									For Reviewers
-								</Link>
-							</li>
-							<li>
-								<Link
-									to={`${BASE_URL}/track`}
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									Track Your Research
-								</Link>
-							</li>
-							<li>
-								<Link
-									to={`${BASE_URL}/contactus`}
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									Contact Us
-								</Link>
-							</li>
-							<li>
-								<Link
-									to={`${BASE_URL}/about`}
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									About Us
-								</Link>
-							</li>
-						</ul>
-					</div>
+          {/* Quick Links */}
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4">Quick Links</h3>
+            <ul className="space-y-2">
+              {[
+                { name: "Publish With Us", path: "/publish" },
+                { name: "For Editors", path: "/editors" },
+                { name: "For Reviewers", path: "/reviewers" },
+                { name: "Track Research", path: "/track" },
+                { name: "Contact Us", path: "/contact" },
+              ].map((link) => (
+                <li key={link.path}>
+                  <Link
+                    to={`${BASE_URL}${link.path}`}
+                    className="hover:text-[#00acc1] transition-colors"
+                  >
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-					{/* Legal Section */}
-					<div>
-						<h3 className="text-xl font-bold text-[#BAFFF5] mb-4">
-							Legal
-						</h3>
-						<ul className="space-y-2">
-							<li>
-								<Link
-									to={`${BASE_URL}/termsofservice`}
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									Terms of Service
-								</Link>
-							</li>
-							<li>
-								<Link
-									to={`${BASE_URL}/privacy`}
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									Privacy Policy
-								</Link>
-							</li>
-							<li>
-								<a
-									href="https://www.example.com/cookies"
-									target="_blank"
-									rel="noopener noreferrer"
-									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-								>
-									Cookie Policy(to be addded)
-								</a>
-							</li>
-						</ul>
-					</div>
+          {/* Legal */}
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4">Legal</h3>
+            <ul className="space-y-2">
+              {[
+                { name: "Terms of Service", path: "/terms" },
+                { name: "Privacy Policy", path: "/privacy" },
+                { name: "Cookie Policy", path: "/cookies" },
+              ].map((link) => (
+                <li key={link.path}>
+                  <Link
+                    to={`${BASE_URL}${link.path}`}
+                    className="hover:text-[#00acc1] transition-colors"
+                  >
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-					{/* Social Media Section */}
-					<div>
-						<h3 className="text-xl font-bold text-[#BAFFF5] mb-4">
-							Follow Us
-						</h3>
-						<div className="flex space-x-4">
-							<a
-								href="https://twitter.com/papersphere"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-							>
-								<FaTwitter className="w-6 h-6" />
-							</a>
-							<a
-								href="https://linkedin.com/company/papersphere"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-							>
-								<FaLinkedin className="w-6 h-6" />
-							</a>
-							<a
-								href="https://github.com/papersphere"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-							>
-								<FaGithub className="w-6 h-6" />
-							</a>
-							<a
-								href="mailto:support@papersphere.com"
-								className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
-							>
-								<FaEnvelope className="w-6 h-6" />
-							</a>
-						</div>
-					</div>
-				</div>
+          {/* Social & Contact */}
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4">Connect</h3>
+            <div className="flex gap-4 mb-4">
+              {[
+                { icon: <FaTwitter />, link: "https://twitter.com" },
+                { icon: <FaLinkedin />, link: "https://linkedin.com" },
+                { icon: <FaGithub />, link: "https://github.com" },
+                { icon: <FaEnvelope />, link: "mailto:contact@synergyworldpress.com" },
+              ].map((social, index) => (
+                <a
+                  key={index}
+                  href={social.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-2xl hover:text-[#00acc1] transition-colors"
+                >
+                  {social.icon}
+                </a>
+              ))}
+            </div>
+            <p className="mt-4">
+              Need help? <br />
+              <a href="mailto:support@synergyworldpress.com" className="text-[#00acc1] hover:text-[#0097a7]">
+                support@synergyworldpress.com
+              </a>
+            </p>
+          </div>
+        </div>
 
-				{/* Divider */}
-				<hr className="border-[#496580] my-8" />
+        {/* Divider */}
+        <hr className="border-[#005f56] my-8" />
 
-				{/* Copyright Section */}
-				<div className="text-center text-[#BADDFF]">
-					<p>
-						&copy; {new Date().getFullYear()} Synergy World Press.
-						All rights reserved.
-					</p>
-					<p className="mt-2">
-						Designed with ❤️ by the
-						<Link
-							to={`${BASE_URL}/teamDev`}
-							className="ml-2 text-[#BAFFF5] hover:text-[#a8e6dc] transition-colors"
-						>
-							Synergy World Press Team
-						</Link>
-					</p>
-				</div>
-			</div>
-		</footer>
-	);
+        {/* Copyright */}
+        <div className="text-center text-sm">
+          <p>
+            © {new Date().getFullYear()} Synergy World Press. All rights reserved.<br />
+            {/* ISSN: 1234-5678 | DOI Prefix: 10.12345 */}
+          </p>
+          <p className="mt-2">
+            Designed by the{" "}
+            <Link 
+              to={`${BASE_URL}/team`} 
+              className="text-[#00acc1] hover:text-[#0097a7]"
+            >
+              Synergy Team
+            </Link>
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
 }
 
 export default Footer;

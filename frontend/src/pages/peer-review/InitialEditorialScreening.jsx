@@ -4,7 +4,7 @@ import Layout from '../../components/Layout';
 const InitialEditorialScreening = () => (
   <Layout>
     <section className="bg-white max-w-3xl mx-auto my-8 rounded-xl shadow-lg p-8">
-      <h2 className="text-2xl font-bold text-indigo-900 mb-4">Initial Editorial Screening</h2>
+      <h2 className="text-2xl font-bold text-[#00796b] mb-4">Initial Editorial Screening</h2>
       <div className="space-y-4">
         <p className="text-gray-700">
           All submitted manuscripts—whether journal articles or book chapters—undergo an initial screening by the editorial team to ensure:
