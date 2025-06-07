@@ -44,6 +44,8 @@ import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationInte
 // Create Authentication Context
 const AuthContext = createContext(null);
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function AppContent() {
     const location = useLocation();
     const [user, setUser] = React.useState(null);
@@ -89,6 +91,7 @@ function AppContent() {
         <AuthContext.Provider value={{ user, login, logout }}>
             {!hideNavbar && <Navbar />}
             <Routes>
+                {/* Landing Page */}
                 <Route path="/" element={<LandingPage />} />
                 
                 {/* JICS Journal Routes */}
@@ -102,58 +105,64 @@ function AppContent() {
                 <Route path="/peer-review/publication-integrity-and-timeline" element={<PublicationIntegrityAndTimeline />} />
 
                 {/* Journal Management Routes */}
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems" element={<HomePage />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/publish" element={<Publish />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/editors" element={<Editors />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/reviewers" element={<Reviewers />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/track" element={<TrackResearch />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/contactus" element={<ContactUs />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/termsofservice" element={<TermsOfService />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/privacy" element={<PrivacyPolicy />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/login" element={<Login />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/register" element={<Register />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/account" element={<MyAccount />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/subscriptions" element={<MySubscriptions />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/teamDev" element={<TeamDevPage />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/settings" element={<Settings />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/about" element={<AboutUs />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/editor/register" element={<EditorRegister />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/editor/login" element={<EditorLogin />} />
+                <Route path={BASE_URL} element={<HomePage />} />
+                <Route path={`${BASE_URL}/publish`} element={<Publish />} />
+                <Route path={`${BASE_URL}/editor`} element={<Editors />} />
+                <Route path={`${BASE_URL}/reviewer`} element={<Reviewers />} />
+                <Route path={`${BASE_URL}/track`} element={<TrackResearch />} />
+                <Route path={`${BASE_URL}/contactus`} element={<ContactUs />} />
+                <Route path={`${BASE_URL}/termsofservice`} element={<TermsOfService />} />
+                <Route path={`${BASE_URL}/privacy`} element={<PrivacyPolicy />} />
+                <Route path={`${BASE_URL}/login`} element={<Login />} />
+                <Route path={`${BASE_URL}/register`} element={<Register />} />
+                <Route path={`${BASE_URL}/account`} element={<MyAccount />} />
+                <Route path={`${BASE_URL}/subscriptions`} element={<MySubscriptions />} />
+                <Route path={`${BASE_URL}/teamDev`} element={<TeamDevPage />} />
+                <Route path={`${BASE_URL}/settings`} element={<Settings />} />
+                <Route path={`${BASE_URL}/about`} element={<AboutUs />} />
+
+                {/* Editor Routes */}
+                <Route path={`${BASE_URL}/editor/register`} element={<EditorRegister />} />
+                <Route path={`${BASE_URL}/editor/login`} element={<EditorLogin />} />
                 <Route
-                    path="/journal/Journal-of-Intelligent-Computing-Systems/editor/dashboard"
+                    path={`${BASE_URL}/editor/dashboard`}
                     element={
                         user?.editor?.role === "editor" ? (
                             <EditorDashboard />
                         ) : (
-                            <Navigate to="/journal/Journal-of-Intelligent-Computing-Systems/editor/login" replace />
+                            <Navigate to={`${BASE_URL}/editor/login`} replace />
                         )
                     }
                 />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/reviewer/register" element={<ReviewerRegister />} />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/reviewer/login" element={<ReviewerLogin />} />
+
+                {/* Reviewer Routes */}
+                <Route path={`${BASE_URL}/reviewer/register`} element={<ReviewerRegister />} />
+                <Route path={`${BASE_URL}/reviewer/login`} element={<ReviewerLogin />} />
                 <Route
-                    path="/journal/Journal-of-Intelligent-Computing-Systems/reviewer/dashboard"
+                    path={`${BASE_URL}/reviewer/dashboard`}
                     element={
                         user?.reviewer?.role === "reviewer" ? (
                             <ReviewerDashboard />
                         ) : (
-                            <Navigate to="/journal/Journal-of-Intelligent-Computing-Systems/reviewer/login" replace />
+                            <Navigate to={`${BASE_URL}/reviewer/login`} replace />
                         )
                     }
                 />
+
+                {/* Protected Routes */}
                 <Route
-                    path="/journal/Journal-of-Intelligent-Computing-Systems/profile"
+                    path={`${BASE_URL}/profile`}
                     element={
-                        user ? <ProfilePage /> : <Navigate to="/journal/Journal-of-Intelligent-Computing-Systems/login" replace />
+                        user ? <ProfilePage /> : <Navigate to={`${BASE_URL}/login`} replace />
                     }
                 />
                 <Route
-                    path="/journal/Journal-of-Intelligent-Computing-Systems/submit"
+                    path={`${BASE_URL}/submit`}
                     element={
-                        user ? <ManuscriptPage /> : <Navigate to="/journal/Journal-of-Intelligent-Computing-Systems/login" replace />
+                        user ? <ManuscriptPage /> : <Navigate to={`${BASE_URL}/login`} replace />
                     }
                 />
-                <Route path="/journal/Journal-of-Intelligent-Computing-Systems/my-submissions" element={<MySubmissions />} />
+                <Route path={`${BASE_URL}/my-submissions`} element={<MySubmissions />} />
             </Routes>
             <Footer />
         </AuthContext.Provider>

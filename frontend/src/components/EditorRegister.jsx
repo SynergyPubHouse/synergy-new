@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function EditorRegister() {
 	const [formData, setFormData] = useState({
 		title: "",
@@ -37,9 +39,7 @@ function EditorRegister() {
 				formData
 			);
 			alert("Editor Registration Successful!");
-			navigate(
-				"/journal/Journal-of-Intelligent-Computing-Systems/editor/login"
-			);
+			navigate(`${BASE_URL}/editor/login`);
 		} catch (error) {
 			setErrorMessage(
 				error.response?.data?.message || "Registration Failed"

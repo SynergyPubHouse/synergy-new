@@ -630,3 +630,31 @@ exports.withdrawManuscript = async (req, res) => {
     });
   }
 };
+
+// Get a single manuscript by ID
+exports.getManuscriptById = async (req, res) => {
+  try {
+    const manuscript = await Manuscript.findById(req.params.manuscriptId)
+      .populate('authors', 'firstName lastName email')
+      .populate('correspondingAuthor', 'firstName lastName email')
+      .populate('assignedReviewers', 'firstName lastName email');
+
+    if (!manuscript) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Manuscript not found" 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: manuscript
+    });
+  } catch (error) {
+    console.error("Error fetching manuscript:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};

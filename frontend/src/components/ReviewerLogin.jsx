@@ -3,6 +3,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function ReviewerLogin() {
 	const [formData, setFormData] = useState({
 		email: "",
@@ -40,9 +42,7 @@ function ReviewerLogin() {
 				};
 				localStorage.setItem("user", JSON.stringify(userData));
 				login(userData);
-				navigate(
-					"/journal/Journal-of-Intelligent-Computing-Systems/reviewer/dashboard"
-				);
+				navigate(`${BASE_URL}/reviewer/dashboard`);
 			}
 		} catch (error) {
 			alert(error.response?.data?.message || "Login failed");

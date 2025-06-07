@@ -18,24 +18,18 @@ const BASE = "/journal/Journal-of-Intelligent-Computing-Systems";
 const JICSJournal = () => (
 	<div className="min-h-screen bg-gray-50 font-sans pb-8">
 		<header className="bg-yellow-300 px-4 sm:px-8 pt-8 pb-4 border-b border-gray-200 relative">
-			<div className="max-w-7xl mx-auto mb-4 flex justify-end">
-				<Link
-					to="/"
-					className="bg-indigo-900 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors shadow-md"
-				>
-					Back to Home
-				</Link>
-			</div>
-
 			<div className="flex flex-col sm:flex-row items-center max-w-7xl mx-auto">
 				{/* Logo */}
-				<div className="w-24 h-32 sm:w-32 sm:h-40 bg-gray-200 mb-4 sm:mb-0 sm:mr-8 flex-shrink-0 flex items-center justify-center text-gray-500">
+				<Link
+					to="/"
+					className="w-24 h-32 sm:w-32 sm:h-40 bg-gray-200 mb-4 sm:mb-0 sm:mr-8 flex-shrink-0 flex items-center justify-center text-gray-500"
+				>
 					<img
 						src="/images/JICSLogo.png"
 						alt="JICS Logo"
 						className="max-h-full max-w-full object-contain"
 					/>
-				</div>
+				</Link>
 				{/* Title and Description */}
 				<div className="text-center sm:text-left">
 					<h1 className="text-2xl sm:text-4xl font-bold text-indigo-900 mb-2">

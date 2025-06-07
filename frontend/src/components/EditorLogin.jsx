@@ -3,6 +3,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function EditorLogin() {
 	const [formData, setFormData] = useState({
 		email: "",
@@ -42,9 +44,7 @@ function EditorLogin() {
 				localStorage.setItem("user", JSON.stringify(userData));
 				login(userData);
 				alert("Editor Login Successful");
-				navigate(
-					"/journal/Journal-of-Intelligent-Computing-Systems/editor/dashboard"
-				);
+				navigate(`${BASE_URL}/editor/dashboard`);
 			} else {
 				alert("Login Failed: Editor data missing");
 			}

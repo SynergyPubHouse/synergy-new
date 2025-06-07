@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App"; // Import the same useAuth hook used in Navbar
 
-const BASE = "/journal/Journal-of-Intelligent-Computing-Systems";
+const BASE_URL = "/journal/Journal-of-Intelligent-Computing-Systems";
 
 function HomePage() {
 	const { user } = useAuth(); // Get the user object from the authentication context
@@ -49,13 +49,13 @@ function HomePage() {
 					className="mt-20 flex gap-4"
 				>
 					<Link
-						to="/submit"
+						to={`${BASE_URL}/submit`}
 						className="px-6 py-3 rounded-lg bg-[#496580] hover:bg-[#3a5269] text-white font-semibold shadow-md transition-all duration-300 transform hover:scale-105"
 					>
 						Submit Your Paper
 					</Link>
 					<Link
-						to="/browse"
+						to={`${BASE_URL}/browse`}
 						className="px-6 py-3 rounded-lg bg-[#BAFFF5] hover:bg-[#a8e6dc] text-[#496580] font-semibold shadow-md transition-all duration-300 transform hover:scale-105"
 					>
 						Browse Papers
@@ -127,7 +127,7 @@ function HomePage() {
 						and global community.
 					</p>
 					<Link
-						to="/register"
+						to={`${BASE_URL}/register`}
 						className="mt-6 inline-block px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-md transition-all duration-300 transform hover:scale-105"
 					>
 						Register Now
@@ -292,7 +292,7 @@ function HomePage() {
 							for their academic needs.
 						</p>
 						<Link
-							to={`${BASE}/register`}
+							to={`${BASE_URL}/register`}
 							className="mt-6 inline-block px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 						>
 							Get Started Now
@@ -327,7 +327,7 @@ function HomePage() {
 									View and manage your submitted papers.
 								</p>
 								<Link
-									to={`${BASE}/my-submissions`}
+									to={`${BASE_URL}/my-submissions`}
 									className="mt-4 inline-block px-6 py-2 bg-[#496580] hover:bg-[#3a5269] text-gray-100 font-semibold rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 								>
 									View Submissions
@@ -341,7 +341,7 @@ function HomePage() {
 									Review papers assigned to you.
 								</p>
 								<Link
-									to={`${BASE}/my-reviews`}
+									to={`${BASE_URL}/my-reviews`}
 									className="mt-4 inline-block px-6 py-2 bg-[#496580] hover:bg-[#3a5269] text-gray-100 font-semibold rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 								>
 									View Reviews
@@ -355,7 +355,7 @@ function HomePage() {
 									All your submissions that are incomplete.
 								</p>
 								<Link
-									to={`${BASE}/incomplete-submissions`}
+									to={`${BASE_URL}/incomplete-submissions`}
 									className="mt-4 inline-block px-6 py-2 bg-[#496580] hover:bg-[#3a5269] text-gray-100 font-semibold rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 								>
 									View Submissions

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "../App";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
 
 const MySubmissions = () => {
 	const { user } = useAuth();
@@ -12,6 +14,7 @@ const MySubmissions = () => {
 	const [pdfBuiltManuscripts, setPdfBuiltManuscripts] = useState(new Set());
 	const [showNotes, setShowNotes] = useState(null);
 	const [selectedNotesType, setSelectedNotesType] = useState(null);
+	const navigate = useNavigate();
 
 	useEffect(() => {
 		fetchManuscripts();
@@ -70,10 +73,8 @@ const MySubmissions = () => {
 	const handleAccept = async (manuscriptId) => {
 		try {
 			await axios.put(
-				`${
-					import.meta.env.VITE_BACKEND_URL
-				}/api/manuscripts/${manuscriptId}/status`,
-				{ status: "Under Review" },
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
+				{ status: "Pending" },
 				{
 					headers: {
 						Authorization: `Bearer ${user.token}`,
@@ -81,10 +82,10 @@ const MySubmissions = () => {
 				}
 			);
 			fetchManuscripts(); // Refresh the list
-			alert("Manuscript sent to editor successfully");
+			alert("Manuscript submitted successfully and pending editor review");
 		} catch (error) {
 			console.error("Error accepting manuscript:", error);
-			alert("Failed to send manuscript to editor");
+			alert("Failed to submit manuscript");
 		}
 	};
 
@@ -172,6 +173,18 @@ const MySubmissions = () => {
 			default:
 				return "text-[#496580]";
 		}
+	};
+
+	const handleViewManuscript = (manuscriptId) => {
+		navigate(`${BASE_URL}/manuscript/${manuscriptId}`);
+	};
+
+	const handleEditManuscript = (manuscriptId) => {
+		navigate(`${BASE_URL}/edit-manuscript/${manuscriptId}`);
+	};
+
+	const handleSubmitNewManuscript = () => {
+		navigate(`${BASE_URL}/submit-manuscript`);
 	};
 
 	if (loading) {

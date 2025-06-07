@@ -2,6 +2,7 @@ const Manuscript = require("../models/Manuscript");
 const Reviewer = require("../models/Reviewer");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const mongoose = require("mongoose");
 
 // Register a new reviewer
 exports.registerReviewer = async (req, res) => {
@@ -145,10 +146,14 @@ exports.getAssignedManuscripts = async (req, res) => {
 	try {
 		console.log("Fetching manuscripts for reviewer:", req.user._id);
 
-		// Find the reviewer and populate their assigned manuscripts
+		// Find the reviewer and populate their assigned manuscripts with corresponding author information
 		const reviewer = await Reviewer.findById(req.user._id).populate({
 			path: "assignedManuscripts",
-			select: "title author submissionDate status mergedFileUrl reviewerNotes editorNotes",
+			select: "title correspondingAuthor submissionDate status mergedFileUrl reviewerNotes editorNotes",
+			populate: {
+				path: "correspondingAuthor",
+				select: "firstName lastName email"
+			}
 		});
 
 		if (!reviewer) {
@@ -158,40 +163,17 @@ exports.getAssignedManuscripts = async (req, res) => {
 		// Format the manuscripts data
 		const formattedManuscripts = reviewer.assignedManuscripts.map(
 			(manuscript) => {
-				// Handle author data based on its type (string or object)
+				console.log("Populated manuscript correspondingAuthor:", manuscript.correspondingAuthor);
+				// Use correspondingAuthor for author data
 				let authorData = {
-					_id: manuscript._id,
-					firstName: "",
-					lastName: "",
-					email: "",
-					fullName: "",
+					_id: manuscript.correspondingAuthor?._id || null,
+					firstName: manuscript.correspondingAuthor?.firstName || "",
+					lastName: manuscript.correspondingAuthor?.lastName || "",
+					email: manuscript.correspondingAuthor?.email || "",
+					fullName: manuscript.correspondingAuthor?.firstName && manuscript.correspondingAuthor?.lastName
+						? `${manuscript.correspondingAuthor.firstName} ${manuscript.correspondingAuthor.lastName}`
+						: "Unknown Author",
 				};
-
-				if (typeof manuscript.author === "string") {
-					const [firstName = "", lastName = ""] =
-						manuscript.author.split(" ");
-					authorData = {
-						...authorData,
-						firstName,
-						lastName,
-						fullName: manuscript.author,
-					};
-				} else if (
-					manuscript.author &&
-					typeof manuscript.author === "object"
-				) {
-					authorData = {
-						_id: manuscript.author._id || manuscript._id,
-						firstName: manuscript.author.firstName || "",
-						lastName: manuscript.author.lastName || "",
-						email: manuscript.author.email || "",
-						fullName:
-							manuscript.author.firstName &&
-							manuscript.author.lastName
-								? `${manuscript.author.firstName} ${manuscript.author.lastName}`
-								: "",
-					};
-				}
 
 				// Ensure mergedFileUrl is properly formatted
 				let pdfUrl = manuscript.mergedFileUrl || "";
@@ -201,7 +183,7 @@ exports.getAssignedManuscripts = async (req, res) => {
 
 				return {
 					...manuscript.toObject(),
-					author: authorData,
+					author: authorData, // Continue to use 'author' in frontend for now for consistency
 					mergedFileUrl: pdfUrl,
 				};
 			}

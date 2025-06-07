@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function Register() {
 	const [formData, setFormData] = useState({
 		title: "",
@@ -34,7 +36,7 @@ function Register() {
 				formData
 			);
 			alert("Registration Successful!");
-			navigate("/login");
+			navigate(`${BASE_URL}/login`);
 		} catch (error) {
 			setErrorMessage(
 				error.response?.data?.message || "Registration Failed"

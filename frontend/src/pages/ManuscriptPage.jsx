@@ -5,6 +5,8 @@ import { useAuth } from "../App";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { useNavigate } from "react-router-dom";
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 const ManuscriptPage = () => {
 	const { user } = useAuth();
 	const navigate = useNavigate();
@@ -492,6 +494,7 @@ const ManuscriptPage = () => {
 			if (response.data.success) {
 				alert("Manuscript submitted successfully!");
 				clearForm();
+				navigate(`${BASE_URL}/my-submissions`);
 			} else {
 				throw new Error(response.data.message || "Submission failed");
 			}
@@ -594,6 +597,8 @@ const ManuscriptPage = () => {
 
 			if (response.data.success) {
 				alert("Manuscript saved successfully!");
+				clearForm();
+				navigate(`${BASE_URL}/my-submissions`);
 			} else {
 				throw new Error(response.data.message || "Submission failed");
 			}

@@ -6,6 +6,8 @@ import { FaGoogle } from "react-icons/fa";
 import { SiOrcid } from "react-icons/si";
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function Login() {
 	const [formData, setFormData] = useState({ email: "", password: "" });
 	const navigate = useNavigate();
@@ -38,7 +40,7 @@ function Login() {
       if (response.data) {
         localStorage.setItem("user", JSON.stringify(response.data));
         login(response.data);
-        navigate("/");
+        navigate(BASE_URL);
       } else {
         console.error("User data not found in the response");
         alert("Login Failed: User data missing");
@@ -70,7 +72,7 @@ function Login() {
 			if (response.data) {
 				localStorage.setItem("user", JSON.stringify(response.data)); // Save user data
 				login(response.data);
-				navigate("/");
+				navigate(BASE_URL);
 			} else {
 				console.error("User data not found in the response");
 				alert("Login Failed: User data missing");
@@ -90,7 +92,7 @@ function Login() {
 			alert("ORCID Login Successful");
 			if (response.data) {
 				login(response.data);
-				navigate("/");
+				navigate(BASE_URL);
 			} else {
 				console.error("User data not found in the response");
 				alert("Login Failed: User data missing");
@@ -130,7 +132,7 @@ function Login() {
 			alert("Email Login Successful");
 			if (response.data) {
 				login(response.data);
-				navigate("/");
+				navigate(BASE_URL);
 			} else {
 				console.error("User data not found in the response");
 				alert("Login Failed: User data missing");

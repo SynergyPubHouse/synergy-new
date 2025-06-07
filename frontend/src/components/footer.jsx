@@ -1,7 +1,7 @@
 import { FaTwitter, FaLinkedin, FaGithub, FaEnvelope } from "react-icons/fa";
 import { Link } from "react-router-dom";
 
-const BASE = "/journal/Journal-of-Intelligent-Computing-Systems";
+const BASE_URL = "/journal/Journal-of-Intelligent-Computing-Systems";
 
 function Footer() {
 	return (
@@ -29,7 +29,7 @@ function Footer() {
 						<ul className="space-y-2">
 							<li>
 								<Link
-									to={`${BASE}/publish`}
+									to={`${BASE_URL}/publish`}
 									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
 								>
 									Publish With Us
@@ -37,7 +37,7 @@ function Footer() {
 							</li>
 							<li>
 								<Link
-									to={`${BASE}/editors`}
+									to={`${BASE_URL}/editors`}
 									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
 								>
 									For Editors
@@ -45,7 +45,7 @@ function Footer() {
 							</li>
 							<li>
 								<Link
-									to={`${BASE}/reviewers`}
+									to={`${BASE_URL}/reviewers`}
 									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
 								>
 									For Reviewers
@@ -53,7 +53,7 @@ function Footer() {
 							</li>
 							<li>
 								<Link
-									to={`${BASE}/track`}
+									to={`${BASE_URL}/track`}
 									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
 								>
 									Track Your Research
@@ -61,7 +61,7 @@ function Footer() {
 							</li>
 							<li>
 								<Link
-									to={`${BASE}/contactus`}
+									to={`${BASE_URL}/contactus`}
 									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
 								>
 									Contact Us
@@ -69,7 +69,7 @@ function Footer() {
 							</li>
 							<li>
 								<Link
-									to={`${BASE}/about`}
+									to={`${BASE_URL}/about`}
 									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
 								>
 									About Us
@@ -86,7 +86,7 @@ function Footer() {
 						<ul className="space-y-2">
 							<li>
 								<Link
-									to={`${BASE}/termsofservice`}
+									to={`${BASE_URL}/termsofservice`}
 									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
 								>
 									Terms of Service
@@ -94,7 +94,7 @@ function Footer() {
 							</li>
 							<li>
 								<Link
-									to={`${BASE}/privacy`}
+									to={`${BASE_URL}/privacy`}
 									className="text-[#BADDFF] hover:text-[#BAFFF5] transition-colors"
 								>
 									Privacy Policy
@@ -165,7 +165,7 @@ function Footer() {
 					<p className="mt-2">
 						Designed with ❤️ by the
 						<Link
-							to={`${BASE}/teamDev`}
+							to={`${BASE_URL}/teamDev`}
 							className="ml-2 text-[#BAFFF5] hover:text-[#a8e6dc] transition-colors"
 						>
 							Synergy World Press Team

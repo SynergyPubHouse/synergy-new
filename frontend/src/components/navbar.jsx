@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaBars, FaTimes, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../App';
 
-const BASE = '/journal/Journal-of-Intelligent-Computing-Systems';
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -23,9 +23,9 @@ const Navbar = () => {
   };
 
   const navItems = [
-    { name: 'Publish With Us', path: `${BASE}/publish` },
-    { name: 'For Reviewers', path: `${BASE}/reviewers` },
-    { name: 'Track Your Research', path: `${BASE}/track` }
+    { name: 'Publish With Us', path: `${BASE_URL}/publish` },
+    { name: 'For Reviewers', path: `${BASE_URL}/reviewer` },
+    { name: 'Track Your Research', path: `${BASE_URL}/track` }
   ];
 
   useEffect(() => {
@@ -49,7 +49,7 @@ const Navbar = () => {
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto flex justify-between items-center">
-        <Link to={BASE} className="text-2xl font-bold">PaperSphere</Link>
+        <Link to={BASE_URL} className="text-2xl font-bold">PaperSphere</Link>
         
         <div className="hidden md:flex gap-6">
           {navItems.map((item) => (
@@ -106,19 +106,19 @@ const Navbar = () => {
                     </div>
                     <hr className="border-[#496580] border-opacity-20 my-2" />
                     <Link
-                      to={`${BASE}/account`}
+                      to={`${BASE_URL}/account`}
                       className="block px-4 py-2 text-sm hover:bg-[#BAFFF5] hover:text-[#496580] transition-colors"
                     >
                       My Account
                     </Link>
                     <Link
-                      to={`${BASE}/subscriptions`}
+                      to={`${BASE_URL}/subscriptions`}
                       className="block px-4 py-2 text-sm hover:bg-[#BAFFF5] hover:text-[#496580] transition-colors"
                     >
                       My Subscriptions
                     </Link>
                     <Link
-                      to={`${BASE}/settings`}
+                      to={`${BASE_URL}/settings`}
                       className="block px-4 py-2 text-sm hover:bg-[#BAFFF5] hover:text-[#496580] transition-colors"
                     >
                       Settings
@@ -135,10 +135,10 @@ const Navbar = () => {
             </div>
           ) : (
             <div className="hidden md:flex gap-4">
-              <Link to={`${BASE}/login`} className="text-white font-semibold px-4 py-2 rounded-md border border-[#BADDFF] border-opacity-30 transition-all hover:bg-white hover:text-[#496580] hover:border-[#BADDFF] hover:bg-opacity-10">
+              <Link to={`${BASE_URL}/login`} className="text-white font-semibold px-4 py-2 rounded-md border border-[#BADDFF] border-opacity-30 transition-all hover:bg-white hover:text-[#496580] hover:border-[#BADDFF] hover:bg-opacity-10">
                 Login
               </Link>
-              <Link to={`${BASE}/register`} className="bg-[#BAFFF5] text-[#496580] font-semibold px-5 py-2 rounded-md shadow-md transition-all hover:bg-[#a8e6dc]">
+              <Link to={`${BASE_URL}/register`} className="bg-[#BAFFF5] text-[#496580] font-semibold px-5 py-2 rounded-md shadow-md transition-all hover:bg-[#a8e6dc]">
                 Register
               </Link>
             </div>
@@ -170,21 +170,21 @@ const Navbar = () => {
           {user ? (
             <>
               <Link
-                to={`${BASE}/account`}
+                to={`${BASE_URL}/account`}
                 className="text-lg font-medium transition-all hover:text-[#496580]"
                 onClick={() => setMenuOpen(false)}
               >
                 My Account
               </Link>
               <Link
-                to={`${BASE}/subscriptions`}
+                to={`${BASE_URL}/subscriptions`}
                 className="text-lg font-medium transition-all hover:text-[#496580]"
                 onClick={() => setMenuOpen(false)}
               >
                 My Subscriptions
               </Link>
               <Link
-                to={`${BASE}/settings`}
+                to={`${BASE_URL}/settings`}
                 className="text-lg font-medium transition-all hover:text-[#496580]"
                 onClick={() => setMenuOpen(false)}
               >
@@ -200,14 +200,14 @@ const Navbar = () => {
           ) : (
             <div className="flex flex-col gap-4 w-full px-4">
               <Link 
-                to={`${BASE}/login`} 
+                to={`${BASE_URL}/login`} 
                 className="text-center text-[#496580] hover:text-[#3a5269] font-medium py-2 transition-colors" 
                 onClick={() => setMenuOpen(false)}
               >
                 Login
               </Link>
               <Link 
-                to={`${BASE}/register`} 
+                to={`${BASE_URL}/register`} 
                 className="bg-[#BAFFF5] text-[#496580] text-center px-4 py-2 rounded-lg hover:bg-[#a8e6dc] font-medium transition-colors" 
                 onClick={() => setMenuOpen(false)}
               >

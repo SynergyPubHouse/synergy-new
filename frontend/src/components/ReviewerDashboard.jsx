@@ -38,36 +38,48 @@ function ReviewerDashboard() {
 				// Group manuscripts by author's full name
 				const userManuscripts = {};
 				response.data.forEach((manuscript) => {
-					// Handle both string and object author formats
-					let authorFullName = "";
+					console.log("Processing manuscript:", manuscript.title);
+					console.log("Manuscript author object (raw):", manuscript.author); // Added log
+
+					let authorFullName = "Unknown Author";
 					let firstName = "";
 					let lastName = "";
+					let authorId = ""; // Initialize authorId
 
-					if (typeof manuscript.author === "string") {
-						const nameParts = manuscript.author.split(" ");
-						firstName = nameParts[0] || "";
-						lastName = nameParts[1] || "";
-						authorFullName = manuscript.author;
+					// Assuming manuscript.author is always an object now due to backend populate
+					if (manuscript.author && typeof manuscript.author === "object") {
+						firstName = manuscript.author.firstName || "";
+						lastName = manuscript.author.lastName || "";
+						authorFullName = `${firstName} ${lastName}`.trim();
+						authorId = manuscript.author._id || "";
 					} else {
-						firstName = manuscript.author?.firstName || "";
-						lastName = manuscript.author?.lastName || "";
-						authorFullName =
-							manuscript.author?.fullName ||
-							`${firstName} ${lastName}`.trim();
+						// Fallback if manuscript.author is unexpectedly not an object or null
+						console.warn("Manuscript author is not an object or is null/undefined:", manuscript.author);
+						authorId = manuscript._id; // Use manuscript ID as a fallback for grouping
 					}
 
-					if (!userManuscripts[authorFullName]) {
-						userManuscripts[authorFullName] = {
-							_id: manuscript._id,
+					// If authorFullName is still empty (e.g., if firstName/lastName were empty),
+					// ensure it defaults to 'Unknown Author' and use a reliable ID for grouping.
+					if (!authorFullName || authorFullName.trim() === '') {
+						authorFullName = "Unknown Author";
+					}
+					if (!authorId) {
+						authorId = manuscript._id; // Ensure an ID for grouping if author._id is missing
+					}
+
+					// Use authorId for grouping to ensure unique authors are correctly identified
+					const groupKey = authorId;
+
+					if (!userManuscripts[groupKey]) {
+						userManuscripts[groupKey] = {
+							_id: authorId,
 							firstName,
 							lastName,
 							fullName: authorFullName,
 							manuscripts: [],
 						};
 					}
-					userManuscripts[authorFullName].manuscripts.push(
-						manuscript
-					);
+					userManuscripts[groupKey].manuscripts.push(manuscript);
 				});
 
 				const usersList = Object.values(userManuscripts);

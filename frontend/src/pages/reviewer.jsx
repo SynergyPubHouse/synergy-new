@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App"; // Assuming you have an Auth context
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function Reviewers() {
   const { user } = useAuth(); // Fetch user details from Auth context
 
@@ -41,13 +43,13 @@ function Reviewers() {
           {!user ? (
             <>
               <Link
-                to="/reviewer/register"
+                to={`${BASE_URL}/reviewer/register`}
                 className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
               >
                 Join as Reviewer
               </Link>
               <Link
-                to="/reviewer/login"
+                to={`${BASE_URL}/reviewer/login`}
                 className="px-8 py-4 bg-white hover:bg-gray-100 text-[#496580] font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
               >
                 Login as Reviewer
@@ -55,7 +57,7 @@ function Reviewers() {
             </>
           ) : user.role !== "reviewer" ? (
             <Link
-              to="/reviewer/register"
+              to={`${BASE_URL}/reviewer/register`}
               className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
             >
               Apply to Become a Reviewer
@@ -180,7 +182,7 @@ function Reviewers() {
             className="mt-10"
           >
             <Link
-              to="/reviewer/register"
+              to={`${BASE_URL}/reviewer/register`}
               className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
             >
               Apply Now

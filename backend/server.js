@@ -63,10 +63,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes - More specific routes first
+// Routes
+app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/auth/editor", require("./routes/editorRoutes"));
 app.use("/api/auth/reviewer", require("./routes/reviewerRoutes"));
-app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api", require("./routes/manuscriptRoutes"));
 
 // Root route to confirm backend is working

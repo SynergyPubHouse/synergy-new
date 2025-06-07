@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App";
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function Editors() {
 	const { user } = useAuth();
 
@@ -41,13 +43,13 @@ function Editors() {
 					{!user ? (
 						<>
 							<Link
-								to="/editor/register"
+								to={`${BASE_URL}/editor/register`}
 								className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 							>
 								Join as Editor
 							</Link>
 							<Link
-								to="/editor/login"
+								to={`${BASE_URL}/editor/login`}
 								className="px-8 py-4 bg-[#BAFFF5] hover:bg-[#a8e6dc] text-[#496580] font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 							>
 								Login as Editor
@@ -55,7 +57,7 @@ function Editors() {
 						</>
 					) : user.role !== "editor" ? (
 						<Link
-							to="/editor/register"
+							to={`${BASE_URL}/editor/register`}
 							className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 						>
 							Apply to Become an Editor
@@ -187,7 +189,7 @@ function Editors() {
 						className="mt-10"
 					>
 						<Link
-							to="/editor/register"
+							to={`${BASE_URL}/editor/register`}
 							className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 						>
 							Apply Now

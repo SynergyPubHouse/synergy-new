@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+
 function ReviewerRegister() {
 	const [formData, setFormData] = useState({
 		title: "",
@@ -39,9 +41,7 @@ function ReviewerRegister() {
 				formData
 			);
 			alert("Reviewer Registration Successful!");
-			navigate(
-				"/journal/Journal-of-Intelligent-Computing-Systems/reviewer/login"
-			);
+			navigate(`${BASE_URL}/reviewer/login`);
 		} catch (error) {
 			setErrorMessage(
 				error.response?.data?.message || "Registration Failed"
