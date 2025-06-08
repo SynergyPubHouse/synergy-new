@@ -6,8 +6,6 @@ import { FaGoogle } from "react-icons/fa";
 import { SiOrcid } from "react-icons/si";
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
-const BASE_URL = '/';
-
 function Login() {
 	const [formData, setFormData] = useState({ email: "", password: "" });
 	const navigate = useNavigate();
@@ -103,45 +101,8 @@ function Login() {
 		}
 	};
 
-	// const handleGoogleLogin = async () => {
-	// 	// Implement Google login functionality
-	// 	try {
-	// 		const response = await axios.get(
-	// 			`${import.meta.env.VITE_BACKEND_URL}/api/auth/google`
-	// 		);
-	// 		alert("Google Login Successful");
-	// 		if (response.data) {
-	// 			login(response.data);
-	// 			navigate("/");
-	// 		} else {
-	// 			console.error("User data not found in the response");
-	// 			alert("Login Failed: User data missing");
-	// 		}
-	// 	} catch (error) {
-	// 		console.error("Google Login error:", error);
-	// 		alert(error.response?.data?.message || "Google Login Failed");
-	// 	}
-	// };
 
-	const handleEmailLogin = async () => {
-		// Implement Email login functionality
-		try {
-			const response = await axios.get(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/email`
-			);
-			alert("Email Login Successful");
-			if (response.data) {
-				login(response.data);
-				navigate(BASE_URL);
-			} else {
-				console.error("User data not found in the response");
-				alert("Login Failed: User data missing");
-			}
-		} catch (error) {
-			console.error("Email Login error:", error);
-			alert(error.response?.data?.message || "Email Login Failed");
-		}
-	};
+
 
 	return (
 		<div className="flex items-center justify-center min-h-screen bg-[#f8fafc] p-6">
@@ -228,14 +189,6 @@ function Login() {
 </div>
 
 
-					{/* <div className="flex justify-center mt-1">
-						<button
-							type="button"
-							className="text-[#496580] font-semibold hover:text-[#3a5269] transition-all"
-						>
-							Login via Email
-						</button>
-					</div> */}
 				</div>
 
 				<div className="mt-6 text-center">
