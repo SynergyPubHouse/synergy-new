@@ -34,6 +34,7 @@ import MySubmissions from "./pages/MySubmissions";
 import ReviewerRegister from "./components/ReviewerRegister";
 import ReviewerLogin from "./components/ReviewerLogin";
 import ReviewerDashboard from "./components/ReviewerDashboard";
+import OrcidCallback from "./components/OrcidCallback";
 // Import Peer Review Pages
 import InitialEditorialScreening from "./pages/peer-review/InitialEditorialScreening";
 import DoubleBlindPeerReview from "./pages/peer-review/DoubleBlindPeerReview";
@@ -115,6 +116,7 @@ function AppContent() {
                 <Route path={`${BASE_URL}/privacy`} element={<PrivacyPolicy />} />
                 <Route path={`${BASE_URL}/login`} element={<Login />} />
                 <Route path={`${BASE_URL}/register`} element={<Register />} />
+                <Route path={`${BASE_URL}/orcid-callback`} element={<OrcidCallback />} />
                 <Route path={`${BASE_URL}/account`} element={<MyAccount />} />
                 <Route path={`${BASE_URL}/subscriptions`} element={<MySubscriptions />} />
                 <Route path={`${BASE_URL}/teamDev`} element={<TeamDevPage />} />

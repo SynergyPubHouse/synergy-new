@@ -8,54 +8,62 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
 
+// ORCID OAuth configuration
+const ORCID_CLIENT_ID = import.meta.env.VITE_ORCID_CLIENT_ID;
+const ORCID_REDIRECT_URI = `${window.location.origin}${BASE_URL}/orcid-callback`;
+const ORCID_AUTH_URL = `https://orcid.org/oauth/authorize?client_id=${ORCID_CLIENT_ID}&response_type=code&scope=/authenticate&redirect_uri=${encodeURIComponent(ORCID_REDIRECT_URI)}`;
+
+// Debug logging
+console.log('Frontend ORCID Client ID:', ORCID_CLIENT_ID);
+console.log('Frontend ORCID Redirect URI:', ORCID_REDIRECT_URI);
+console.log('Frontend ORCID Auth URL:', ORCID_AUTH_URL);
+
 function Login() {
 	const [formData, setFormData] = useState({ email: "", password: "" });
 	const navigate = useNavigate();
 	const { login } = useAuth();
 	const [googleClientId, setGoogleClientId] = useState('');
 
+	// Fetch Google Client ID on component mount
+	React.useEffect(() => {
+		const fetchClientId = async () => {
+			try {
+				const response = await axios.get(
+					`${import.meta.env.VITE_BACKEND_URL}/api/auth/google/client-id`
+				);
+				setGoogleClientId(response.data.clientId);
+			} catch (error) {
+				console.error("Failed to fetch Google Client ID:", error);
+			}
+		};
+		fetchClientId();
+	}, []);
 
-	  // Fetch Google Client ID on component mount
-  React.useEffect(() => {
-    const fetchClientId = async () => {
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/auth/google/client-id`
-        );
-        setGoogleClientId(response.data.clientId);
-      } catch (error) {
-        console.error("Failed to fetch Google Client ID:", error);
-      }
-    };
-    fetchClientId();
-  }, []);
+	const handleGoogleSuccess = async (credentialResponse) => {
+		try {
+			const response = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/auth/google`,
+				{ token: credentialResponse.credential }
+			);
+			
+			if (response.data) {
+				localStorage.setItem("user", JSON.stringify(response.data));
+				login(response.data);
+				navigate(BASE_URL);
+			} else {
+				console.error("User data not found in the response");
+				alert("Login Failed: User data missing");
+			}
+		} catch (error) {
+			console.error("Google Login error:", error);
+			alert(error.response?.data?.message || "Google Login Failed");
+		}
+	};
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/google`,
-        { token: credentialResponse.credential }
-      );
-      
-      if (response.data) {
-        localStorage.setItem("user", JSON.stringify(response.data));
-        login(response.data);
-        navigate(BASE_URL);
-      } else {
-        console.error("User data not found in the response");
-        alert("Login Failed: User data missing");
-      }
-    } catch (error) {
-      console.error("Google Login error:", error);
-      alert(error.response?.data?.message || "Google Login Failed");
-    }
-  };
-
-  const handleGoogleFailure = () => {
-    console.log("Google login failed");
-    alert("Google login failed. Please try again.");
-  };
-
+	const handleGoogleFailure = () => {
+		console.log("Google login failed");
+		alert("Google login failed. Please try again.");
+	};
 
 	const handleChange = (e) => {
 		setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -70,7 +78,7 @@ function Login() {
 			);
 			alert("Login Successful");
 			if (response.data) {
-				localStorage.setItem("user", JSON.stringify(response.data)); // Save user data
+				localStorage.setItem("user", JSON.stringify(response.data));
 				login(response.data);
 				navigate(BASE_URL);
 			} else {
@@ -83,64 +91,9 @@ function Login() {
 		}
 	};
 
-	const handleOrcidLogin = async () => {
-		// Implement ORCID login functionality
-		try {
-			const response = await axios.get(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/orcid`
-			);
-			alert("ORCID Login Successful");
-			if (response.data) {
-				login(response.data);
-				navigate(BASE_URL);
-			} else {
-				console.error("User data not found in the response");
-				alert("Login Failed: User data missing");
-			}
-		} catch (error) {
-			console.error("ORCID Login error:", error);
-			alert(error.response?.data?.message || "ORCID Login Failed");
-		}
-	};
-
-	// const handleGoogleLogin = async () => {
-	// 	// Implement Google login functionality
-	// 	try {
-	// 		const response = await axios.get(
-	// 			`${import.meta.env.VITE_BACKEND_URL}/api/auth/google`
-	// 		);
-	// 		alert("Google Login Successful");
-	// 		if (response.data) {
-	// 			login(response.data);
-	// 			navigate("/");
-	// 		} else {
-	// 			console.error("User data not found in the response");
-	// 			alert("Login Failed: User data missing");
-	// 		}
-	// 	} catch (error) {
-	// 		console.error("Google Login error:", error);
-	// 		alert(error.response?.data?.message || "Google Login Failed");
-	// 	}
-	// };
-
-	const handleEmailLogin = async () => {
-		// Implement Email login functionality
-		try {
-			const response = await axios.get(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/email`
-			);
-			alert("Email Login Successful");
-			if (response.data) {
-				login(response.data);
-				navigate(BASE_URL);
-			} else {
-				console.error("User data not found in the response");
-				alert("Login Failed: User data missing");
-			}
-		} catch (error) {
-			console.error("Email Login error:", error);
-			alert(error.response?.data?.message || "Email Login Failed");
-		}
+	const handleOrcidLogin = () => {
+		// Redirect to ORCID authorization page
+		window.location.href = ORCID_AUTH_URL;
 	};
 
 	return (
@@ -193,49 +146,40 @@ function Login() {
 						<span className="text-[#64748b]">Or Login via:</span>
 					</div>
 
-<div className="flex flex-col items-center gap-4 mt-4">
-  <button
-    type="button"
-    className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
-  >
-    <SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
-    ORCID
-  </button>
-
-  {googleClientId ? (
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <GoogleLogin
-        onSuccess={handleGoogleSuccess}
-        onError={handleGoogleFailure}
-        useOneTap
-        theme="filled_blue"
-        size="medium"
-        shape="pill"
-        text="continue_with"
-        width="200"
-      />
-    </GoogleOAuthProvider>
-  ) : (
-    <button
-      type="button"
-      className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
-      disabled
-    >
-      <FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
-      Loading...
-    </button>
-  )}
-</div>
-
-
-					{/* <div className="flex justify-center mt-1">
+					<div className="flex flex-col items-center gap-4 mt-4">
 						<button
 							type="button"
-							className="text-[#496580] font-semibold hover:text-[#3a5269] transition-all"
+							onClick={handleOrcidLogin}
+							className="flex items-center justify-center w-full bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
 						>
-							Login via Email
+							<SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
+							Sign in with ORCID
 						</button>
-					</div> */}
+
+						{googleClientId ? (
+							<GoogleOAuthProvider clientId={googleClientId}>
+								<GoogleLogin
+									onSuccess={handleGoogleSuccess}
+									onError={handleGoogleFailure}
+									useOneTap
+									theme="filled_blue"
+									size="medium"
+									shape="pill"
+									text="continue_with"
+									width="200"
+								/>
+							</GoogleOAuthProvider>
+						) : (
+							<button
+								type="button"
+								className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
+								disabled
+							>
+								<FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
+								Loading...
+							</button>
+						)}
+					</div>
 				</div>
 
 				<div className="mt-6 text-center">

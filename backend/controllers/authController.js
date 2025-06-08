@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const axios = require("axios");
 const User = require("../models/User");
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -274,4 +275,93 @@ exports.googleAuth = async (req, res) => {
 
 exports.getGoogleClientId = async (req, res) => {
   res.json({ clientId: process.env.GOOGLE_CLIENT_ID });
+};
+
+// @desc    Handle ORCID OAuth callback
+// @route   POST /api/auth/orcid/callback
+// @access  Public
+exports.orcidCallback = async (req, res) => {
+    try {
+        const { code } = req.body;
+        
+        // Debug logging
+        console.log('ORCID Client ID:', process.env.ORCID_CLIENT_ID);
+        console.log('ORCID Client Secret:', process.env.ORCID_CLIENT_SECRET ? 'Secret is set' : 'Secret is not set');
+        console.log('Authorization Code:', code);
+
+        if (!process.env.ORCID_CLIENT_ID || !process.env.ORCID_CLIENT_SECRET) {
+            console.error('Missing ORCID credentials in environment variables');
+            return res.status(500).json({ 
+                message: 'ORCID configuration error',
+                error: 'Missing ORCID credentials'
+            });
+        }
+
+        // Exchange authorization code for access token
+        const tokenResponse = await axios.post(
+            'https://orcid.org/oauth/token',
+            `client_id=${process.env.ORCID_CLIENT_ID}&client_secret=${process.env.ORCID_CLIENT_SECRET}&grant_type=authorization_code&code=${code}`,
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
+        );
+
+        const { access_token, orcid } = tokenResponse.data;
+
+        // Get user information from ORCID
+        const userResponse = await axios.get(`https://api.orcid.org/v3.0/${orcid}/person`, {
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const orcidData = userResponse.data;
+        const email = orcidData.emails?.[0]?.email;
+        const name = orcidData.name;
+
+        if (!email) {
+            return res.status(400).json({ message: "No email found in ORCID profile" });
+        }
+
+        // Check if user exists
+        let user = await User.findOne({
+            $or: [
+                { email },
+                { orcidId: orcid }
+            ]
+        });
+
+        if (!user) {
+            // Create new user with ORCID info
+            user = await User.create({
+                firstName: name['given-names']?.value || name.givenNames,
+                lastName: name['family-name']?.value || name.familyName,
+                email,
+                orcidId: orcid,
+                username: email.split('@')[0] + '_' + orcid.slice(-4),
+                password: await bcrypt.hash(orcid + process.env.JWT_SECRET, 10),
+                isVerified: true
+            });
+        } else if (!user.orcidId) {
+            // Update existing user with ORCID ID
+            user.orcidId = orcid;
+            await user.save();
+        }
+
+        res.json({
+            _id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            username: user.username,
+            orcidId: user.orcidId,
+            token: generateToken(user._id)
+        });
+    } catch (error) {
+        console.error('ORCID callback error:', error);
+        res.status(500).json({ message: 'ORCID authentication failed', error: error.message });
+    }
 };

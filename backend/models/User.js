@@ -19,7 +19,8 @@ const userSchema = new mongoose.Schema({
 		default: ["author"]
 	}],
 	googleId: { type: String, unique: true, sparse: true },
-  	isVerified: { type: Boolean, default: false }
+	orcidId: { type: String, unique: true, sparse: true },
+	isVerified: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model("User", userSchema);

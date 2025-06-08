@@ -12,6 +12,7 @@ const {
   verifyEmail,
   googleAuth,
   getGoogleClientId,
+  orcidCallback
 } = require("../controllers/authController");
 
 // Public routes
@@ -19,6 +20,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/google", googleAuth);
 router.get("/google-client-id", getGoogleClientId);
+router.post("/orcid/callback", orcidCallback);
 
 // Protected routes
 router.get("/profile", auth, getUserProfile);
