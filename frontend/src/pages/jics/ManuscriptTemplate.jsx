@@ -7,12 +7,12 @@ const ManuscriptTemplate = () => (
     </h2>
     
     <div className="bg-[#e0f7fa] border-l-4 border-[#00acc1] p-6 rounded-lg mb-8">
-      <p className="text-[#00796b] font-medium leading-relaxed">
+      <p className="text-[#00796b] font-medium leading-relaxed text-justify">
         The JICS Manuscript Template will be available for download soon. Please check back later or contact our editorial team for the current template.
       </p>
     </div>
 
-    <p className="text-[#212121] text-lg leading-relaxed">
+    <p className="text-[#212121] text-lg leading-relaxed text-justify">
       The template will include all necessary formatting guidelines and styles to help authors prepare their manuscripts according to JICS requirements. It will be provided in Microsoft Word format and will include:
     </p>
 

@@ -7,7 +7,7 @@ const AimsAndScope = () => (
       Aims and Scope
     </h2>
     
-    <p className="text-[#212121] mb-8 text-lg leading-relaxed">
+    <p className="text-[#212121] mb-8 text-lg leading-relaxed text-justify">
       The Journal of Intelligent Computing System welcomes original research articles, review papers, short communications, and case studies in (but not limited to) the following areas:
     </p>
 
