@@ -18,7 +18,7 @@ const Navigation = () => {
   ];
 
   const journalsItems = [
-    { name: "Journal of Intelligent Computing System (JICS)", path: "/jics" },
+    { name: "Journal of Intelligent Computing System (JICS)", path: "/journal/jics" },
   ];
 
   // Scroll detection for sticky behavior

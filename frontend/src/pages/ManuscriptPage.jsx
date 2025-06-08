@@ -1853,7 +1853,7 @@ const ManuscriptPage = () => {
 									<button
 										type="button"
 										onClick={() =>
-											navigate("/journal/Journal-of-Intelligent-Computing-Systems/my-submissions")
+											navigate("/journal/jics/my-submissions")
 										}
 										className="mt-4 px-6 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269]"
 									>

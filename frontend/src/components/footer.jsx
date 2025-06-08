@@ -106,7 +106,7 @@ function Footer() {
           <p className="mt-2">
             Designed by the{" "}
             <Link 
-              to={`${BASE_URL}/team`} 
+              to={`/team`} 
               className="text-[#00acc1] hover:text-[#0097a7]"
             >
               Synergy Team

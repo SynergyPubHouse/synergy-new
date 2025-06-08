@@ -6,7 +6,7 @@ import { FaGoogle } from "react-icons/fa";
 import { SiOrcid } from "react-icons/si";
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
-const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+const BASE_URL = '/';
 
 function Login() {
 	const [formData, setFormData] = useState({ email: "", password: "" });

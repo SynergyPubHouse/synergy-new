@@ -13,21 +13,21 @@ const JICSNavigation = () => {
 	const navigationItems = [
 		{
 			label: "About the Journal",
-			path: "/jics/about/overview",
+			path: "/journal/jics/about/overview",
 			dropdown: [
-				{ label: "Overview", path: "/jics/about/overview" },
-				{ label: "Aims and Scope", path: "/jics/about/aims-scope" },
-				{ label: "Academic Integrity", path: "/jics/about/integrity" },
+				{ label: "Overview", path: "/journal/jics/about/overview" },
+				{ label: "Aims and Scope", path: "/journal/jics/about/aims-scope" },
+				{ label: "Academic Integrity", path: "/journal/jics/about/integrity" },
 			],
 		},
 		{
 			label: "Articles/Issues",
-			path: "/jics/articles/current",
+			path: "/journal/jics/articles/current",
 			dropdown: [
-				{ label: "Current Issue", path: "/jics/articles/current" },
+				{ label: "Current Issue", path: "/journal/jics/articles/current" },
 				{
 					label: "Past Issues / Archives",
-					path: "/jics/articles/archives",
+					path: "/journal/jics/articles/archives",
 				},
 				{
 					label: "Article Download",
@@ -54,20 +54,20 @@ const JICSNavigation = () => {
 		},
 		{
 			label: "For Authors",
-			path: "/jics/authors/guidelines",
+			path: "/journal/jics/authors/guidelines",
 			dropdown: [
 				{
 					label: "Submission Guidelines",
-					path: "/jics/authors/guidelines",
+					path: "/journal/jics/authors/guidelines",
 				},
 				{
 					label: "Manuscript Template",
-					path: "/jics/authors/template",
+					path: "/journal/jics/authors/template",
 				},
-				{ label: "Ethical Guidelines", path: "/jics/authors/ethics" },
+				{ label: "Ethical Guidelines", path: "/journal/jics/authors/ethics" },
 				{
 					label: "Submit Manuscript",
-					path: "/jics/authors/submit",
+					path: "/journal/jics/authors/submit",
 					icon: (
 						<svg
 							className="w-5 h-5 ml-2"
@@ -88,15 +88,15 @@ const JICSNavigation = () => {
 		},
 		{
 			label: "Peer Review",
-			path: "/jics/review/process",
+			path: "/journal/jics/review/process",
 			dropdown: [
-				{ label: "Review Process", path: "/jics/review/process" },
-				{ label: "Review Timeline", path: "/jics/review/timeline" },
-				{ label: "Reviewer Ethics", path: "/jics/review/ethics" },
-				{ label: "Decision Criteria", path: "/jics/review/criteria" },
+				{ label: "Review Process", path: "/journal/jics/review/process" },
+				{ label: "Review Timeline", path: "/journal/jics/review/timeline" },
+				{ label: "Reviewer Ethics", path: "/journal/jics/review/ethics" },
+				{ label: "Decision Criteria", path: "/journal/jics/review/criteria" },
 				{
 					label: "Transparency Measures",
-					path: "/jics/review/transparency",
+					path: "/journal/jics/review/transparency",
 				},
 			],
 		},

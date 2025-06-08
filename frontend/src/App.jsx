@@ -47,8 +47,9 @@ import PageNotAvailable from "./pages/pagenotavailable";
 // Create Authentication Context
 const AuthContext = createContext(null);
 
-// const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
-const BASE_URL = '/';
+// const JICS_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+const JICS_URL = '/journal/jics';
+// const BASE_URL = '/';
 function AppContent() {
     const location = useLocation();
     const [user, setUser] = React.useState(null);
@@ -85,10 +86,10 @@ function AppContent() {
     }
 
     // Hide Navbar on landing and JICS journal pages
-    const hideNavbar =
-        location.pathname === "/" ||
-        location.pathname.startsWith("/jics") ||
-        location.pathname.startsWith("/peer-review");
+    // const hideNavbar =
+    //     location.pathname === "/" ||
+    //     location.pathname.startsWith("/jics") ||
+    //     location.pathname.startsWith("/peer-review");
 
     return (
         <AuthContext.Provider value={{ user, login, logout }}>
@@ -99,14 +100,14 @@ function AppContent() {
                 <Route path="/" element={<LandingPage />} />
                 
                 {/* JICS Journal Routes */}
-                <Route path="/jics/*" element={<JICSJournal />} />
+                <Route path={`${JICS_URL}/*`} element={<JICSJournal />} />
                 
                 {/* Peer Review Process Routes */}
-                <Route path="/peer-review/initial-editorial-screening" element={<InitialEditorialScreening />} />
-                <Route path="/peer-review/double-blind-peer-review" element={<DoubleBlindPeerReview />} />
-                <Route path="/peer-review/feedback-and-revisions" element={<FeedbackAndRevisions />} />
-                <Route path="/peer-review/final-evaluation-and-acceptance" element={<FinalEvaluationAndAcceptance />} />
-                <Route path="/peer-review/publication-integrity-and-timeline" element={<PublicationIntegrityAndTimeline />} />
+                <Route path={`${JICS_URL}/peer-review/initial-editorial-screening`} element={<InitialEditorialScreening />} />
+                <Route path={`${JICS_URL}/peer-review/double-blind-peer-review`} element={<DoubleBlindPeerReview />} />
+                <Route path={`${JICS_URL}/peer-review/feedback-and-revisions`} element={<FeedbackAndRevisions />} />
+                <Route path={`${JICS_URL}/peer-review/final-evaluation-and-acceptance`} element={<FinalEvaluationAndAcceptance />} />
+                <Route path={`${JICS_URL}/peer-review/publication-integrity-and-timeline`} element={<PublicationIntegrityAndTimeline />} />
 
 
 
@@ -115,63 +116,63 @@ function AppContent() {
 
                 {/* Journal Management Routes */}
                 {/* <Route path={BASE_URL} element={<HomePage />} /> */}
-                <Route path={`${BASE_URL}/publish`} element={<Publish />} />
-                <Route path={`${BASE_URL}/editor`} element={<Editors />} />
-                <Route path={`${BASE_URL}/reviewer`} element={<Reviewers />} />
-                <Route path={`${BASE_URL}/track`} element={<TrackResearch />} />
-                <Route path={`${BASE_URL}/contactus`} element={<ContactUs />} />
-                <Route path={`${BASE_URL}/termsofservice`} element={<TermsOfService />} />
-                <Route path={`${BASE_URL}/privacy`} element={<PrivacyPolicy />} />
-                <Route path={`${BASE_URL}/login`} element={<Login />} />
-                <Route path={`${BASE_URL}/register`} element={<Register />} />
-                <Route path={`${BASE_URL}/account`} element={<MyAccount />} />
-                <Route path={`${BASE_URL}/subscriptions`} element={<MySubscriptions />} />
-                <Route path={`${BASE_URL}/teamDev`} element={<TeamDevPage />} />
-                <Route path={`${BASE_URL}/settings`} element={<Settings />} />
-                <Route path={`${BASE_URL}/about`} element={<AboutUs />} />
+                <Route path={`/publish`} element={<Publish />} />
+                <Route path={`${JICS_URL}/editor`} element={<Editors />} />
+                <Route path={`${JICS_URL}/reviewer`} element={<Reviewers />} />
+                <Route path={`/track`} element={<TrackResearch />} />
+                <Route path={`/contactus`} element={<ContactUs />} />
+                <Route path={`/termsofservice`} element={<TermsOfService />} />
+                <Route path={`/privacy`} element={<PrivacyPolicy />} />
+                <Route path={`/login`} element={<Login />} />
+                <Route path={`/register`} element={<Register />} />
+                <Route path={`/account`} element={<MyAccount />} />
+                <Route path={`/subscriptions`} element={<MySubscriptions />} />
+                <Route path={`/team`} element={<TeamDevPage />} />
+                <Route path={`/settings`} element={<Settings />} />
+                <Route path={`/about`} element={<AboutUs />} />
 
                 {/* Editor Routes */}
-                <Route path={`${BASE_URL}/editor/register`} element={<EditorRegister />} />
-                <Route path={`${BASE_URL}/editor/login`} element={<EditorLogin />} />
+                <Route path={`${JICS_URL}/editor/register`} element={<EditorRegister />} />
+                <Route path={`${JICS_URL}/editor/login`} element={<EditorLogin />} />
                 <Route
-                    path={`${BASE_URL}/editor/dashboard`}
+                    path={`${JICS_URL}/editor/dashboard`}
                     element={
                         user?.editor?.role === "editor" ? (
                             <EditorDashboard />
                         ) : (
-                            <Navigate to={`${BASE_URL}/editor/login`} replace />
+                            <Navigate to={`${JICS_URL}/editor/login`} replace />
                         )
                     }
                 />
 
                 {/* Reviewer Routes */}
-                <Route path={`${BASE_URL}/reviewer/register`} element={<ReviewerRegister />} />
-                <Route path={`${BASE_URL}/reviewer/login`} element={<ReviewerLogin />} />
+                <Route path={`${JICS_URL}/reviewer/register`} element={<ReviewerRegister />} />
+                <Route path={`${JICS_URL}/reviewer/login`} element={<ReviewerLogin />} />
                 <Route
-                    path={`${BASE_URL}/reviewer/dashboard`}
+                    path={`${JICS_URL}/reviewer/dashboard`}
                     element={
                         user?.reviewer?.role === "reviewer" ? (
                             <ReviewerDashboard />
                         ) : (
-                            <Navigate to={`${BASE_URL}/reviewer/login`} replace />
+                            <Navigate to={`${JICS_URL}/reviewer/login`} replace />
                         )
                     }
                 />
 
                 {/* Protected Routes */}
                 <Route
-                    path={`${BASE_URL}/profile`}
+                    path={`/profile`}
                     element={
-                        user ? <ProfilePage /> : <Navigate to={`${BASE_URL}/login`} replace />
+                        user ? <ProfilePage /> : <Navigate to={`${JICS_URL}/login`} replace />
                     }
                 />
                 <Route
-                    path={`${BASE_URL}/submit`}
+                    path={`${JICS_URL}/submit`}
                     element={
-                        user ? <ManuscriptPage /> : <Navigate to={`${BASE_URL}/login`} replace />
+                        user ? <ManuscriptPage /> : <Navigate to={`/login`} replace />
                     }
                 />
-                <Route path={`${BASE_URL}/my-submissions`} element={<MySubmissions />} />
+                <Route path={`${JICS_URL}/my-submissions`} element={<MySubmissions />} />
             </Routes>
             <Footer />
         </AuthContext.Provider>

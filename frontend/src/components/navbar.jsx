@@ -23,9 +23,9 @@ const Navbar = () => {
   };
 
   const navItems = [
-    { name: 'Publish With Us', path: `${BASE_URL}/publish` },
+    { name: 'Publish With Us', path: `${BASE_URL}publish` },
     // { name: 'For Reviewers', path: `${BASE_URL}/reviewer` },
-    { name: 'Track Your Research', path: `${BASE_URL}/track` }
+    { name: 'Track Your Research', path: `${BASE_URL}track` }
   ];
 
   useEffect(() => {
@@ -105,19 +105,19 @@ const Navbar = () => {
                     </div>
                     <hr className="border-[#e0e0e0] my-2" />
                     <Link
-                      to={`${BASE_URL}/account`}
+                      to={`${BASE_URL}account`}
                       className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
                     >
                       My Account
                     </Link>
                     <Link
-                      to={`${BASE_URL}/subscriptions`}
+                      to={`${BASE_URL}subscriptions`}
                       className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
                     >
                       My Subscriptions
                     </Link>
                     <Link
-                      to={`${BASE_URL}/settings`}
+                      to={`${BASE_URL}settings`}
                       className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
                     >
                       Settings
@@ -135,13 +135,13 @@ const Navbar = () => {
           ) : (
             <div className="hidden md:flex gap-4">
               <Link
-                to={`${BASE_URL}/login`}
+                to={`/login`}
                 className="text-white font-semibold px-4 py-2 rounded-md border-2 border-[#00acc1] hover:bg-[#00acc1] hover:text-white transition-colors"
               >
                 Login
               </Link>
               <Link
-                to={`${BASE_URL}/register`}
+                to={`/register`}
                 className="bg-[#00acc1] text-white font-semibold px-5 py-2 rounded-md shadow transition-colors hover:bg-[#0097a7]"
               >
                 Register
