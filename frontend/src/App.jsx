@@ -105,10 +105,15 @@ function AppContent() {
                 <Route path={`${JICS_URL}/*`} element={<JICSJournal />} />
                 
                 {/* Peer Review Process Routes */}
+                <Route path={`/peer-review/initial-editorial-screening`} element={<InitialEditorialScreening />} />
                 <Route path={`${JICS_URL}/peer-review/initial-editorial-screening`} element={<InitialEditorialScreening />} />
+                <Route path={`/peer-review/double-blind-peer-review`} element={<DoubleBlindPeerReview />} />
                 <Route path={`${JICS_URL}/peer-review/double-blind-peer-review`} element={<DoubleBlindPeerReview />} />
+                <Route path={`/peer-review/feedback-and-revisions`} element={<FeedbackAndRevisions />} />
                 <Route path={`${JICS_URL}/peer-review/feedback-and-revisions`} element={<FeedbackAndRevisions />} />
+                <Route path={`/peer-review/final-evaluation-and-acceptance`} element={<FinalEvaluationAndAcceptance />} />
                 <Route path={`${JICS_URL}/peer-review/final-evaluation-and-acceptance`} element={<FinalEvaluationAndAcceptance />} />
+                <Route path={`/peer-review/publication-integrity-and-timeline`} element={<PublicationIntegrityAndTimeline />} />
                 <Route path={`${JICS_URL}/peer-review/publication-integrity-and-timeline`} element={<PublicationIntegrityAndTimeline />} />
 
 

@@ -116,12 +116,12 @@ const Navbar = () => {
                     >
                       My Subscriptions
                     </Link>
-                    <Link
+                    {/* <Link
                       to={`${BASE_URL}settings`}
                       className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
                     >
                       Settings
-                    </Link>
+                    </Link> */}
                     <button
                       onClick={handleLogout}
                       className="w-full text-left px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"

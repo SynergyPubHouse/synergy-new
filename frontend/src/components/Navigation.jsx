@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../App";
 
 const Navigation = () => {
+  const { user } = useAuth();
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [dropdownTimeout, setDropdownTimeout] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSticky, setIsSticky] = useState(false);
   const [isSmall, setIsSmall] = useState(false);
+  const [clickedAuthorLogin, setClickedAuthorLogin] = useState(false);
   const navRef = useRef(null);
+  const navigate = useNavigate();
 
   const peerReviewItems = [
     { name: "Initial Editorial Screening", path: "/peer-review/initial-editorial-screening" },
@@ -43,6 +47,7 @@ const Navigation = () => {
   const handleMouseEnter = (dropdownName) => {
     clearTimeout(dropdownTimeout);
     setActiveDropdown(dropdownName);
+    setClickedAuthorLogin(false); // Reset on any menu interaction
   };
 
   const handleMouseLeave = () => {
@@ -54,6 +59,17 @@ const Navigation = () => {
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+    setClickedAuthorLogin(false); // Reset on menu toggle
+  };
+
+  const handleAuthorLoginClick = (e) => {
+    if (user) {
+      e.preventDefault();
+      setClickedAuthorLogin(true);
+      setTimeout(() => setClickedAuthorLogin(false), 3000);
+    } else {
+      navigate("/login");
+    }
   };
 
   return (
@@ -63,9 +79,7 @@ const Navigation = () => {
         isSticky
           ? "fixed left-0 right-0 top-[75px] border-b border-[#e0e0e0]"
           : "relative"
-      } ${
-        isSmall ? "h-12" : "h-16"
-      }`}
+      } ${isSmall ? "h-12" : "h-16"}`}
     >
       <div className="max-w-7xl mx-auto px-4">
         <div className={`flex justify-between items-center h-full transition-all duration-300 ${
@@ -197,14 +211,18 @@ const Navigation = () => {
               BOOK PUBLISHED
             </Link>
 
-            <Link
-              to="/login"
-              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
+            <span
+              onClick={handleAuthorLoginClick}
+              className={`inline-flex items-center px-3 py-2 cursor-pointer ${
                 isSmall ? "text-sm" : "text-base"
+              } ${
+                user && clickedAuthorLogin
+                  ? "text-[#00796b] font-medium"
+                  : "text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200"
               }`}
             >
-              AUTHOR LOGIN
-            </Link>
+              {user && clickedAuthorLogin ? "User already logged in" : "AUTHOR LOGIN"}
+            </span>
           </div>
         </div>
       </div>
@@ -238,6 +256,7 @@ const Navigation = () => {
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -270,6 +289,7 @@ const Navigation = () => {
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -296,12 +316,16 @@ const Navigation = () => {
             BOOK PUBLISHED
           </Link>
 
-          <Link
-            to="/login"
-            className="block px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+          <span
+            onClick={handleAuthorLoginClick}
+            className={`block px-3 py-2 rounded-md text-base font-medium cursor-pointer ${
+              user && clickedAuthorLogin
+                ? "text-[#00796b]"
+                : "text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+            }`}
           >
-            AUTHOR LOGIN
-          </Link>
+            {user && clickedAuthorLogin ? "User already logged in" : "AUTHOR LOGIN"}
+          </span>
         </div>
       </div>
     </nav>

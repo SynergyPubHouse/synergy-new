@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
@@ -8,28 +8,43 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 const BASE_URL = '/';
 
-
 // ORCID OAuth configuration
 const ORCID_CLIENT_ID = import.meta.env.VITE_ORCID_CLIENT_ID;
 const ORCID_REDIRECT_URI = `${window.location.origin}${BASE_URL}/orcid-callback`;
 const ORCID_AUTH_URL = `https://orcid.org/oauth/authorize?client_id=${ORCID_CLIENT_ID}&response_type=code&scope=/authenticate&redirect_uri=${encodeURIComponent(ORCID_REDIRECT_URI)}`;
 
-// Debug logging
-console.log('Frontend ORCID Client ID:', ORCID_CLIENT_ID);
-console.log('Frontend ORCID Redirect URI:', ORCID_REDIRECT_URI);
-console.log('Frontend ORCID Auth URL:', ORCID_AUTH_URL);
-
 function Login() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState({ show: false, message: "" });
   const navigate = useNavigate();
   const { login } = useAuth();
   const [googleClientId, setGoogleClientId] = useState('');
-  const [successMessage, setSuccessMessage] = useState("");
 
-  // Fetch Google Client ID on component mount
-  React.useEffect(() => {
+  // Success Notification Component
+  const SuccessNotification = () => {
+    if (!success.show) return null;
+
+    return (
+      <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+        <div className="animate-fade-in-up bg-white p-6 rounded-xl shadow-2xl border border-green-200 max-w-md mx-4 flex items-center space-x-3">
+          <div className="flex-shrink-0">
+            <svg className="h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Success!</h3>
+            <p className="text-sm text-gray-500">{success.message}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Fetch Google Client ID
+  useEffect(() => {
     const fetchClientId = async () => {
       try {
         const response = await axios.get(
@@ -44,6 +59,16 @@ function Login() {
     fetchClientId();
   }, []);
 
+  // Auto-hide success message
+  useEffect(() => {
+    if (success.show) {
+      const timer = setTimeout(() => {
+        setSuccess({ show: false, message: "" });
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [success.show]);
+
   const handleGoogleSuccess = async (credentialResponse) => {
     setIsLoading(true);
     setError("");
@@ -56,15 +81,17 @@ function Login() {
       if (response.data) {
         localStorage.setItem("user", JSON.stringify(response.data));
         login(response.data);
-        navigate(BASE_URL);
+        setSuccess({
+          show: true,
+          message: "Successfully Logged In !! Welcome back.."
+        });
+        setTimeout(() => navigate(BASE_URL), 2000);
       } else {
         setError("Login Failed: User data missing");
-        console.error("User data not found in the response");
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Google Login Failed";
       setError(errorMessage);
-      console.error("Google Login error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -72,19 +99,17 @@ function Login() {
 
   const handleGoogleFailure = () => {
     setError("Google login failed. Please try again.");
-    console.log("Google login failed");
   };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError(""); // Clear error when user types
+    setError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-	setSuccessMessage("");
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/login`,
@@ -94,34 +119,32 @@ function Login() {
       if (response.data) {
         localStorage.setItem("user", JSON.stringify(response.data));
         login(response.data);
-		setSuccessMessage("Logged in successfully!");
-      // Optionally, wait a moment before redirecting to show the message
-      setTimeout(() => {
-        navigate(BASE_URL);
-      }, 1500);
+        setSuccess({
+          show: true,
+          message: "Login successful! Taking you to your account..."
+        });
+        setTimeout(() => navigate(BASE_URL), 2000);
       } else {
         setError("Login Failed: User data missing");
-        console.error("User data not found in the response");
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Login Failed";
       setError(errorMessage);
-      console.error("Login error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-	const handleOrcidLogin = () => {
-		// Redirect to ORCID authorization page
-		window.location.href = ORCID_AUTH_URL;
-	};
+  const handleOrcidLogin = () => {
+    window.location.href = ORCID_AUTH_URL;
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-      {/* Glassmorphism Card Container */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4 relative">
+      <SuccessNotification />
+      
       <div className="w-full max-w-4xl flex flex-col lg:flex-row rounded-3xl overflow-hidden shadow-2xl">
-        {/* Branding Panel - Gradient Background */}
+        {/* Branding Panel */}
         <div className="bg-gradient-to-br from-teal-600 to-cyan-500 p-8 lg:p-12 flex flex-col justify-center items-center lg:items-start text-white lg:w-2/5">
           <div className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl mb-8">
             <img
@@ -154,7 +177,7 @@ function Login() {
           </div>
         </div>
 
-        {/* Login Form Panel */}
+        {/* Form Panel */}
         <div className="bg-white p-8 lg:p-12 flex flex-col justify-center lg:w-3/5">
           <div className="max-w-md mx-auto w-full">
             <h2 className="text-3xl font-bold text-gray-900 mb-1">Welcome back</h2>
@@ -165,12 +188,6 @@ function Login() {
                 {error}
               </div>
             )}
-
-			{successMessage && (
-				<div className="mb-4 p-3 bg-green-50 text-green-700 rounded-lg text-sm">
-					{successMessage}
-				</div>
-			)}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
@@ -232,50 +249,52 @@ function Login() {
               </div>
             </div>
 
-					<div className="flex flex-col items-center gap-4 mt-4">
-						<button
-							type="button"
-							onClick={handleOrcidLogin}
-							className="flex items-center justify-center w-full bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
-						>
-							<SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
-							Sign in with ORCID
-						</button>
+            <div className="flex flex-col gap-4 mt-6">
+              {/* ORCID Login */}
+              <button
+                onClick={handleOrcidLogin}
+                className="flex items-center justify-center w-full bg-white text-[#212121] font-semibold py-3 px-4 rounded-xl border border-[#e0e0e0] hover:border-[#00acc1] transition-all"
+              >
+                <SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
+                Sign in with ORCID
+              </button>
 
-						{googleClientId ? (
-							<GoogleOAuthProvider clientId={googleClientId}>
-								<GoogleLogin
-									onSuccess={handleGoogleSuccess}
-									onError={handleGoogleFailure}
-									useOneTap
-									theme="filled_blue"
-									size="medium"
-									shape="pill"
-									text="continue_with"
-									width="200"
-								/>
-							</GoogleOAuthProvider>
-						) : (
-							<button
-								type="button"
-								className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
-								disabled
-							>
-								<FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
-								Loading...
-							</button>
-						)}
-					</div>
-				</div>
+              {/* Google Login */}
+              {googleClientId ? (
+                <GoogleOAuthProvider clientId={googleClientId}>
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleFailure}
+                    useOneTap
+                    theme="outline"
+                    size="large"
+                    shape="pill"
+                    text="continue_with"
+                    width="100%"
+                  />
+                </GoogleOAuthProvider>
+              ) : (
+                <button
+                  type="button"
+                  className="flex items-center justify-center w-full bg-white text-[#212121] font-semibold py-3 px-4 rounded-xl border border-[#e0e0e0] hover:border-[#4285F4] transition-all"
+                  disabled
+                >
+                  <FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
+                  Loading Google...
+                </button>
+              )}
+            </div>
 
-				<div className="mt-6 text-center">
-					<p className="text-[#64748b] text-sm">
-						&copy; 2025 PaperSphere. All rights reserved.
-					</p>
-				</div>
-			</form>
-		</div>
-	);
+            <div className="mt-6 text-center">
+              <p className="text-[#64748b] text-sm">
+                &copy; {new Date().getFullYear()} Synergy World Press. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default Login;
