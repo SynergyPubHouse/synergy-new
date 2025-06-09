@@ -2,203 +2,228 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+const BASE_URL = '';
 
 function Register() {
-	const [formData, setFormData] = useState({
-		title: "",
-		firstName: "",
-		middleName: "",
-		lastName: "",
-		email: "",
-		username: "",
-		password: "",
-		confirmPassword: "",
-	});
+  const [formData, setFormData] = useState({
+    title: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    email: "",
+    username: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
-	const [errorMessage, setErrorMessage] = useState("");
-	const navigate = useNavigate();
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setErrorMessage("");
+  };
 
-	const handleChange = (e) => {
-		setFormData({ ...formData, [e.target.name]: e.target.value });
-	};
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    if (formData.password !== formData.confirmPassword) {
+      setErrorMessage("Passwords do not match!");
+      setIsLoading(false);
+      return;
+    }
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`,
+        formData
+      );
+      alert("Registration Successful!");
+      navigate(`${BASE_URL}/login`);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Registration Failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-	const handleSubmit = async (e) => {
-		e.preventDefault();
-		if (formData.password !== formData.confirmPassword) {
-			setErrorMessage("Passwords do not match!");
-			return;
-		}
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-5xl bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+        <div className="flex flex-col md:flex-row">
+          {/* Branding Panel */}
+          <div className="md:w-2/5 bg-gradient-to-br from-teal-600 to-cyan-500 p-8 flex flex-col items-center justify-center text-white">
+            <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl mb-6">
+              <img
+                src="/images/SynergyLogo.png"
+                alt="Logo"
+                className="w-16 h-16 object-contain"
+              />
+            </div>
+            <h1 className="text-2xl font-bold mb-2 text-center">Synergy World Press</h1>
+            <p className="text-sm text-cyan-100 text-center opacity-90">
+              Join our community of scholars and researchers
+            </p>
+            <div className="mt-8 hidden md:block">
+              <div className="flex items-center mb-3">
+                <div className="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center mr-2">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <span className="text-xs">Secure registration</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center mr-2">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <span className="text-xs">Instant access to journals</span>
+              </div>
+            </div>
+          </div>
 
-		try {
-			await axios.post(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/register`,
-				formData
-			);
-			alert("Registration Successful!");
-			navigate(`${BASE_URL}/login`);
-		} catch (error) {
-			setErrorMessage(
-				error.response?.data?.message || "Registration Failed"
-			);
-		}
-	};
+          {/* Form Panel */}
+          <div className="md:w-3/5 p-6 md:p-8">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">Create your account</h2>
+            
+            {errorMessage && (
+              <div className="mb-4 p-2 bg-red-50 text-red-600 rounded text-xs">
+                {errorMessage}
+              </div>
+            )}
 
-	return (
-		<div className="flex items-center justify-center min-h-screen bg-[#f8fafc] p-4">
-			<form
-				onSubmit={handleSubmit}
-				className="mt-15 bg-white p-8 rounded-2xl shadow-lg w-full max-w-lg space-y-6 border border-[#e2e8f0]"
-			>
-				<h2 className="text-4xl font-extrabold text-[#496580] mb-4 text-center">
-					Register
-				</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+                  <select
+                    name="title"
+                    value={formData.title}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                  >
+                    <option value="">Select</option>
+                    <option value="Mr">Mr</option>
+                    <option value="Mrs">Mrs</option>
+                    <option value="Miss">Miss</option>
+                    <option value="Dr">Dr</option>
+                    <option value="Prof">Prof</option>
+                  </select>
+                </div>
+                
+                <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">First Name</label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Middle</label>
+                    <input
+                      type="text"
+                      name="middleName"
+                      value={formData.middleName}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Last Name</label>
+                    <input
+                      type="text"
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
 
-				<div>
-					<label className="block text-sm font-medium text-[#496580] mb-1">
-						Title
-					</label>
-					<select
-						name="title"
-						value={formData.title}
-						onChange={handleChange}
-						className="w-full px-4 py-2 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none"
-					>
-						<option value="">Select Title</option>
-						<option value="Mr">Mr</option>
-						<option value="Mrs">Mrs</option>
-						<option value="Miss">Miss</option>
-						<option value="Dr">Dr</option>
-						<option value="Er">Er</option>
-					</select>
-				</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Username</label>
+                  <input
+                    type="text"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                  />
+                </div>
+              </div>
 
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div>
-						<label className="block text-sm font-medium text-[#496580] mb-1">
-							First Name
-						</label>
-						<input
-							type="text"
-							name="firstName"
-							placeholder="First Name"
-							value={formData.firstName}
-							onChange={handleChange}
-							required
-							className="w-full px-4 py-2 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none"
-						/>
-					</div>
-					<div>
-						<label className="block text-sm font-medium text-[#496580] mb-1">
-							Middle Name
-						</label>
-						<input
-							type="text"
-							name="middleName"
-							placeholder="Middle Name"
-							value={formData.middleName}
-							onChange={handleChange}
-							className="w-full px-4 py-2 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none"
-						/>
-					</div>
-				</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Confirm Password</label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                  />
+                </div>
+              </div>
 
-				<div>
-					<label className="block text-sm font-medium text-[#496580] mb-1">
-						Last Name
-					</label>
-					<input
-						type="text"
-						name="lastName"
-						placeholder="Last Name"
-						value={formData.lastName}
-						onChange={handleChange}
-						required
-						className="w-full px-4 py-2 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none"
-					/>
-				</div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium py-2 px-4 rounded transition-colors mt-4 flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : null}
+                Register Account
+              </button>
+            </form>
 
-				<div>
-					<label className="block text-sm font-medium text-[#496580] mb-1">
-						Email
-					</label>
-					<input
-						type="email"
-						name="email"
-						placeholder="Email"
-						value={formData.email}
-						onChange={handleChange}
-						required
-						className="w-full px-4 py-2 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none"
-					/>
-				</div>
-
-				<div>
-					<label className="block text-sm font-medium text-[#496580] mb-1">
-						Username
-					</label>
-					<input
-						type="text"
-						name="username"
-						placeholder="Username"
-						value={formData.username}
-						onChange={handleChange}
-						required
-						className="w-full px-4 py-2 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none"
-					/>
-				</div>
-
-				<div>
-					<label className="block text-sm font-medium text-[#496580] mb-1">
-						Password
-					</label>
-					<input
-						type="password"
-						name="password"
-						placeholder="Password"
-						value={formData.password}
-						onChange={handleChange}
-						required
-						className="w-full px-4 py-2 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none"
-					/>
-				</div>
-
-				<div>
-					<label className="block text-sm font-medium text-[#496580] mb-1">
-						Confirm Password
-					</label>
-					<input
-						type="password"
-						name="confirmPassword"
-						placeholder="Re-enter Password"
-						value={formData.confirmPassword}
-						onChange={handleChange}
-						required
-						className="w-full px-4 py-2 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none"
-					/>
-				</div>
-
-				{errorMessage && (
-					<p className="text-red-500 text-sm text-center">
-						{errorMessage}
-					</p>
-				)}
-
-				<button
-					type="submit"
-					className="w-full bg-[#496580] hover:bg-[#3a5269] text-white font-semibold py-3 px-4 rounded-lg transition-all shadow-lg hover:shadow-[#496580]/30"
-				>
-					Register
-				</button>
-
-				<div className="mt-4 text-center">
-					<p className="text-[#64748b] text-sm">
-						&copy; 2025 PaperSphere. All rights reserved.
-					</p>
-				</div>
-			</form>
-		</div>
-	);
+            <div className="mt-6 text-center text-xs text-gray-500">
+              Already have an account?{' '}
+              <a href={`${BASE_URL}/login`} className="text-cyan-600 hover:underline">
+                Sign in
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default Register;

@@ -52,6 +52,7 @@ const JICS_URL = '/journal/jics';
 // const BASE_URL = '/';
 function AppContent() {
     const location = useLocation();
+    const hideNavFooter = location.pathname === "/login" || location.pathname === "/register";
     const [user, setUser] = React.useState(null);
     const [isLoading, setIsLoading] = React.useState(true);
 
@@ -94,7 +95,7 @@ function AppContent() {
     return (
         <AuthContext.Provider value={{ user, login, logout }}>
             {/* {!hideNavbar && <Navbar />} */}
-            <Navbar />
+    {!hideNavFooter && <Navbar />}
             <Routes>
                 {/* Landing Page */}
                 <Route path="/" element={<LandingPage />} />
@@ -174,7 +175,7 @@ function AppContent() {
                 />
                 <Route path={`${JICS_URL}/my-submissions`} element={<MySubmissions />} />
             </Routes>
-            <Footer />
+    {!hideNavFooter && <Footer />}
         </AuthContext.Provider>
     );
 }
