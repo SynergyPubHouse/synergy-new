@@ -128,8 +128,9 @@ function AppContent() {
 
 
 
-
-                <Route path="/books*" element={<PageNotAvailable />} />
+                <Route path="/orcid-callback" element={<OrcidCallback />} />
+                
+                <Route path="/books" element={<PageNotAvailable />} />
 
                 {/* Journal Management Routes */}
                 {/* <Route path={BASE_URL} element={<HomePage />} /> */}

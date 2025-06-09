@@ -13,7 +13,8 @@ const app = express();
 const allowedOrigins = [
   "https://www.synergyworldpress.com",
   "https://synergyworldpress.com",
-  "http://localhost:5173" // Include both www and non-www versions
+  "http://localhost:5173",
+  "https://orcid.org" // Include both www and non-www versions
 ];
 
 const corsOptions = {

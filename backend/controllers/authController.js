@@ -300,7 +300,7 @@ exports.orcidCallback = async (req, res) => {
         // Exchange authorization code for access token
         const tokenResponse = await axios.post(
             'https://orcid.org/oauth/token',
-            `client_id=${process.env.ORCID_CLIENT_ID}&client_secret=${process.env.ORCID_CLIENT_SECRET}&grant_type=authorization_code&code=${code}`,
+            `client_id=${process.env.ORCID_CLIENT_ID}&client_secret=${process.env.ORCID_CLIENT_SECRET}&grant_type=authorization_code&code=${code}&redirect_uri={'https://www.synergyworldpress.com/orcid-callback'}`,
             {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'

@@ -10,7 +10,7 @@ const BASE_URL = '/';
 
 // ORCID OAuth configuration
 const ORCID_CLIENT_ID = import.meta.env.VITE_ORCID_CLIENT_ID;
-const ORCID_REDIRECT_URI = `${window.location.origin}${BASE_URL}/orcid-callback`;
+const ORCID_REDIRECT_URI = `${window.location.origin}${BASE_URL}orcid-callback`;
 const ORCID_AUTH_URL = `https://orcid.org/oauth/authorize?client_id=${ORCID_CLIENT_ID}&response_type=code&scope=/authenticate&redirect_uri=${encodeURIComponent(ORCID_REDIRECT_URI)}`;
 
 function Login() {
@@ -53,7 +53,7 @@ function Login() {
         setGoogleClientId(response.data.clientId);
       } catch (error) {
         console.error("Failed to fetch Google Client ID:", error);
-        setError("Failed to initialize Google login. Please refresh the page.");
+        // setError("Failed to initialize Google login. Please refresh the page."); fr
       }
     };
     fetchClientId();
@@ -260,7 +260,9 @@ function Login() {
               </button>
 
               {/* Google Login */}
-              {googleClientId ? (
+              {/* {googleClientId ? ( */}
+                <div className="flex justify-center">
+    <div className="w-full">
                 <GoogleOAuthProvider clientId={googleClientId}>
                   <GoogleLogin
                     onSuccess={handleGoogleSuccess}
@@ -273,6 +275,9 @@ function Login() {
                     width="100%"
                   />
                 </GoogleOAuthProvider>
+                </div>
+                </div>
+{/*                 
               ) : (
                 <button
                   type="button"
@@ -282,7 +287,7 @@ function Login() {
                   <FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
                   Loading Google...
                 </button>
-              )}
+              )} */}
             </div>
 
             <div className="mt-6 text-center">
