@@ -75,7 +75,7 @@ function Reviewers() {
           className="py-20 bg-white text-center"
         >
           <h2 className="text-3xl font-bold text-[#496580]">
-            Why Become a PaperSphere Reviewer?
+            Why Become a Synergy World Press Reviewer?
           </h2>
           <p className="mt-4 text-lg text-[#496580] max-w-3xl mx-auto">
             As a reviewer, you will play a crucial role in maintaining the quality and integrity of academic research. Here are some benefits:
@@ -173,7 +173,7 @@ function Reviewers() {
             Ready to Join Us?
           </h2>
           <p className="mt-4 text-lg text-[#496580]">
-            Take the first step towards becoming a PaperSphere Reviewer today.
+            Take the first step towards becoming a Synergy World Press Reviewer today.
           </p>
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}

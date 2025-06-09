@@ -23,9 +23,9 @@ const Navbar = () => {
   };
 
   const navItems = [
-    { name: 'Publish With Us', path: `${BASE_URL}publish` },
+    // { name: 'Publish With Us', path: `${BASE_URL}publish` },
     // { name: 'For Reviewers', path: `${BASE_URL}/reviewer` },
-    { name: 'Track Your Research', path: `${BASE_URL}track` }
+    // { name: 'Track Your Research', path: `${BASE_URL}track` }
   ];
 
   useEffect(() => {

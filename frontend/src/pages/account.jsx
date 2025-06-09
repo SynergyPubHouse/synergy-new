@@ -192,7 +192,7 @@ function MyAccount() {
           className="mt-10"
         >
           <a
-            href="mailto:support@papersphere.com"
+            href="mailto:support@synergyworldpress.com"
             className="px-8 py-4 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold text-lg rounded-xl shadow-md transition-all duration-300 transform hover:scale-105"
           >
             Contact Support

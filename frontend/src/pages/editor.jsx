@@ -75,7 +75,7 @@ function Editors() {
 					className="py-20 bg-white text-center"
 				>
 					<h2 className="text-3xl font-bold text-[#496580]">
-						Why Become a PaperSphere Editor?
+						Why Become a Synergy World Press Editor?
 					</h2>
 					<p className="mt-4 text-lg text-[#496580] max-w-3xl mx-auto">
 						As an editor, you will play a crucial role in
@@ -179,7 +179,7 @@ function Editors() {
 						Ready to Join Us?
 					</h2>
 					<p className="mt-4 text-lg text-[#496580]">
-						Take the first step towards becoming a PaperSphere
+						Take the first step towards becoming a Synergy World Press
 						Editor today.
 					</p>
 					<motion.div

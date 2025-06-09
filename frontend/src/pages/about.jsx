@@ -12,7 +12,7 @@ function AboutUs() {
         "Advisor to multiple startups in the tech industry.",
       ],
       thoughts:
-        "I believe that technology has the power to transform the world. At PaperSphere, we are committed to creating a platform that empowers researchers and accelerates the pace of innovation.",
+        "I believe that technology has the power to transform the world. At Synergy World Press, we are committed to creating a platform that empowers researchers and accelerates the pace of innovation.",
     },
     {
       name: "Dr. Meenu Gupta",
@@ -24,7 +24,7 @@ function AboutUs() {
         "Keynote speaker at international conferences on biotechnology.",
       ],
       thoughts:
-        "Research is the foundation of progress. At PaperSphere, we aim to create a platform that bridges the gap between researchers and the global community, fostering collaboration and innovation.",
+        "Research is the foundation of progress. At Synergy World Press, we aim to create a platform that bridges the gap between researchers and the global community, fostering collaboration and innovation.",
     },
   ];
 
@@ -46,7 +46,7 @@ function AboutUs() {
           transition={{ duration: 1, delay: 0.5 }}
           className="mt-4 text-lg text-[#212121] max-w-2xl"
         >
-          Learn more about our mission, vision, and the brilliant minds behind PaperSphere.
+          Learn more about our mission, vision, and the brilliant minds behind Synergy World Press.
         </motion.p>
       </section>
 
@@ -61,7 +61,7 @@ function AboutUs() {
           <h2 className="text-3xl font-bold text-[#00796b] mb-8">Our Goals</h2>
           <div className="space-y-6">
             <p className="text-lg text-[#212121]">
-              At PaperSphere, our mission is to revolutionize the way research is published and shared. We aim to create a platform that empowers researchers, fosters collaboration, and accelerates the dissemination of knowledge.
+              At Synergy World Press, our mission is to revolutionize the way research is published and shared. We aim to create a platform that empowers researchers, fosters collaboration, and accelerates the dissemination of knowledge.
             </p>
             <p className="text-lg text-[#212121]">
               Our goals include:

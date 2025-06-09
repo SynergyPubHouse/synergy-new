@@ -152,7 +152,7 @@ function MySubscriptions() {
           className="mt-10"
         >
           <a
-            href="mailto:support@papersphere.com"
+            href="mailto:support@synergyworldpress.com"
             className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
           >
             Contact Support

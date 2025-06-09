@@ -111,6 +111,8 @@ const JICSJournal = () => (
             path="/review/transparency"
             element={<TransparencyMeasures />}
           />
+		  {/* Catch-All Route for invalid /journal/jics/* paths */}
+      	  <Route path="*" element={<Navigate to="/journal/jics" replace />} />
         </Routes>
       </div>
     </main>

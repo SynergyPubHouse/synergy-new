@@ -51,6 +51,16 @@ const AuthContext = createContext(null);
 // const JICS_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
 const JICS_URL = '/journal/jics';
 // const BASE_URL = '/';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
 function AppContent() {
     const location = useLocation();
     const hideNavFooter = location.pathname === "/login" || location.pathname === "/register";
@@ -180,6 +190,7 @@ function AppContent() {
                     }
                 />
                 <Route path={`${JICS_URL}/my-submissions`} element={<MySubmissions />} />
+                <Route path="*" element={<PageNotAvailable />} />
             </Routes>
     {!hideNavFooter && <Footer />}
         </AuthContext.Provider>
@@ -192,6 +203,7 @@ export const useAuth = () => React.useContext(AuthContext);
 function App() {
     return (
         <Router>
+             <ScrollToTop />
             <AppContent />
         </Router>
     );

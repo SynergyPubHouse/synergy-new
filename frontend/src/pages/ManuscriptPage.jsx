@@ -5,7 +5,7 @@ import { useAuth } from "../App";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { useNavigate } from "react-router-dom";
 
-const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+const BASE_URL = '/journal/jics';
 
 const ManuscriptPage = () => {
 	const { user } = useAuth();
@@ -873,7 +873,7 @@ const ManuscriptPage = () => {
 				<motion.button
 					type="button"
 					onClick={handleNext}
-					className="mt-4 px-8 py-3 bg-[#496580] text-white font-semibold text-lg rounded-lg shadow-lg hover:bg-[#3a5269] transition-all duration-300 transform hover:scale-105 block ml-auto"
+					className="mt-4 px-8 py-3 bg-[#00796b] text-white font-semibold text-lg rounded-lg shadow-lg hover:bg-[#00acc1] transition-all duration-300 transform hover:scale-105 block ml-auto"
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 				>
@@ -890,7 +890,7 @@ const ManuscriptPage = () => {
 				<motion.button
 					type="button"
 					onClick={handlePrev}
-					className="mt-4 px-6 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269] transition-colors block mr-auto"
+					className="mt-4 px-6 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269] transition-colors block mr-auto"
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 				>
@@ -943,8 +943,8 @@ const ManuscriptPage = () => {
 	};
 
 	return (
-		<div className="min-h-screen bg-[#f8fafc] p-6 text-[#1a365d]">
-			<h1 className="mt-20 text-3xl font-bold text-center text-[#496580] mb-6">
+		<div className="min-h-screen bg-[#f8fafc] p-6 text-[#212121]">
+			<h1 className="mt-20 text-3xl font-bold text-center text-[#00796b] mb-6">
 				Submit Manuscript
 			</h1>
 
@@ -956,11 +956,11 @@ const ManuscriptPage = () => {
 							className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mx-2 
 						${
 							currentSection === i + 1
-								? "bg-[#496580] text-white cursor-default"
+								? "bg-[#00796b] text-white cursor-default"
 								: completedSections.includes(i + 1)
-								? "bg-[#BAFFF5] text-[#496580] cursor-pointer"
+								? "bg-[#BAFFF5] text-[#00796b] cursor-pointer"
 								: i + 1 <= Math.max(...completedSections) + 1
-								? "bg-[#e2e8f0] text-[#496580] cursor-pointer"
+								? "bg-[#e2e8f0] text-[#00796b] cursor-pointer"
 								: "bg-gray-300 text-gray-500 cursor-not-allowed"
 						}`}
 							whileHover={{
@@ -997,7 +997,7 @@ const ManuscriptPage = () => {
 								transition={{ duration: 0.5 }}
 							>
 								<motion.div
-									className="h-1 bg-[#496580] absolute left-0"
+									className="h-1 bg-[#00796b] absolute left-0"
 									initial={{ width: 0 }}
 									animate={{ width: `${progress}%` }}
 									transition={{ duration: 0.5 }}
@@ -1010,7 +1010,7 @@ const ManuscriptPage = () => {
 
 			<form
 				onSubmit={handleSubmit}
-				className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-lg border border-[#d1d5db]"
+				className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-lg border border-[#e0e0e0]"
 			>
 				<AnimatePresence mode="wait">
 					{currentSection === 1 && (
@@ -1022,7 +1022,7 @@ const ManuscriptPage = () => {
 							exit="exit"
 							className="mb-6 p-6 bg-white shadow-lg rounded-lg"
 						>
-							<label className="block text-lg font-semibold text-[#496580] mb-4 text-center">
+							<label className="block text-lg font-semibold text-[#00796b] mb-4 text-center">
 								Type of Article
 							</label>
 							<div className="flex justify-center">
@@ -1030,7 +1030,7 @@ const ManuscriptPage = () => {
 									name="type"
 									value={formData.type}
 									onChange={handleInputChange}
-									className="px-4 py-2 rounded-lg bg-white text-[#496580] border border-[#d1d5db] focus:outline-none focus:ring-2 focus:ring-[#496580]"
+									className="px-4 py-2 rounded-lg bg-white text-[#00796b] border border-[#e0e0e0] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
 								>
 									<option value="">Select Type</option>
 									<option value="Review Article">
@@ -1059,7 +1059,7 @@ const ManuscriptPage = () => {
 						>
 							<div className="flex space-x-4">
 								<div className="w-1/2">
-									<h3 className="text-lg font-semibold mb-4 text-[#496580]">
+									<h3 className="text-lg font-semibold mb-4 text-[#00796b]">
 										Required Documents
 									</h3>
 									<div className="space-y-2">
@@ -1078,7 +1078,7 @@ const ManuscriptPage = () => {
 													readOnly // Make it read-only
 													className="mr-2 cursor-default"
 												/>
-												<span className="capitalize text-[#496580]">
+												<span className="capitalize text-[#00796b]">
 													{doc}
 												</span>
 											</div>
@@ -1086,7 +1086,7 @@ const ManuscriptPage = () => {
 									</div>
 								</div>
 								<div className="w-1/2">
-									<h3 className="text-lg font-semibold mb-4 text-[#496580]">
+									<h3 className="text-lg font-semibold mb-4 text-[#00796b]">
 										Upload Files (DOCX only)
 									</h3>
 									{[
@@ -1106,15 +1106,15 @@ const ManuscriptPage = () => {
 													}
 													className="mr-2"
 												/>
-												<label className="flex flex-col items-center justify-center w-full h-32 border-2 border-[#d1d5db] border-dashed rounded-lg cursor-pointer bg-white hover:bg-[#f0f9ff]">
+												<label className="flex flex-col items-center justify-center w-full h-32 border-2 border-[#e0e0e0] border-dashed rounded-lg cursor-pointer bg-white hover:bg-[#e0f7fa]">
 													<div className="flex flex-col items-center justify-center pt-5 pb-6">
-														<p className="mb-2 text-sm text-[#496580]">
+														<p className="mb-2 text-sm text-[#00796b]">
 															<span className="font-semibold">
 																Click to upload
 															</span>{" "}
 															or drag and drop
 														</p>
-														<p className="text-xs text-[#496580]">
+														<p className="text-xs text-[#00796b]">
 															Upload {doc} (DOCX
 															only)
 														</p>
@@ -1134,7 +1134,7 @@ const ManuscriptPage = () => {
 												</label>
 											</div>
 											{files[doc] && (
-												<p className="mt-2 text-sm text-[#496580]">
+												<p className="mt-2 text-sm text-[#00796b]">
 													{files[doc].name}
 												</p>
 											)}
@@ -1161,7 +1161,7 @@ const ManuscriptPage = () => {
 								<motion.button
 									type="button"
 									onClick={handleNext}
-									className="mt-4 px-6 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269] transition-colors block"
+									className="mt-4 px-6 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269] transition-colors block"
 									disabled={
 										!Object.values(uploadedFiles).every(
 											Boolean
@@ -1184,12 +1184,12 @@ const ManuscriptPage = () => {
 							exit="exit"
 							className="mb-4"
 						>
-							<label className="block font-medium mb-2 text-[#496580]">
+							<label className="block font-medium mb-2 text-[#00796b]">
 								Classification:
 							</label>
 							<div className="relative" ref={dropdownRef}>
 								<div
-									className="cursor-pointer p-2 border border-[#d1d5db] rounded-lg bg-white text-[#496580]"
+									className="cursor-pointer p-2 border border-[#e0e0e0] rounded-lg bg-white text-[#00796b]"
 									onClick={() =>
 										setIsDropdownOpen(!isDropdownOpen)
 									}
@@ -1200,10 +1200,10 @@ const ManuscriptPage = () => {
 								</div>
 								{isDropdownOpen && (
 									<div
-										className="absolute z-10 mt-2 w-full bg-white border border-[#d1d5db] rounded-lg shadow-lg max-h-60 overflow-y-auto 
+										className="absolute z-10 mt-2 w-full bg-white border border-[#e0e0e0] rounded-lg shadow-lg max-h-60 overflow-y-auto 
 							[&::-webkit-scrollbar]:w-2
-							[&::-webkit-scrollbar-track]:bg-[#f0f9ff]
-							[&::-webkit-scrollbar-thumb]:bg-[#496580]
+							[&::-webkit-scrollbar-track]:bg-[#e0f7fa]
+							[&::-webkit-scrollbar-thumb]:bg-[#00796b]
 							[&::-webkit-scrollbar-thumb]:rounded-full"
 									>
 										{classificationOptions.map((option) => (
@@ -1214,7 +1214,7 @@ const ManuscriptPage = () => {
 														option
 													)
 														? "bg-[#BAFFF5]"
-														: "hover:bg-[#f0f9ff]"
+														: "hover:bg-[#e0f7fa]"
 												}`}
 												onClick={(e) => {
 													e.stopPropagation();
@@ -1240,7 +1240,7 @@ const ManuscriptPage = () => {
 													onChange={handleInputChange}
 													className="mr-2"
 												/>
-												<label className="ml-2 text-[#496580]">
+												<label className="ml-2 text-[#00796b]">
 													{option}
 												</label>
 											</div>
@@ -1265,7 +1265,7 @@ const ManuscriptPage = () => {
 							exit="exit"
 							className="mb-4"
 						>
-							<label className="block font-medium mb-2 text-[#496580]">
+							<label className="block font-medium mb-2 text-[#00796b]">
 								Additional Information (All terms must be
 								accepted):
 							</label>
@@ -1281,7 +1281,7 @@ const ManuscriptPage = () => {
 										onChange={handleInputChange}
 										className="mr-2"
 									/>
-									<span className="text-[#496580]">
+									<span className="text-[#00796b]">
 										Accept Term {i + 1}
 									</span>
 								</div>
@@ -1302,7 +1302,7 @@ const ManuscriptPage = () => {
 							exit="exit"
 							className="mb-4"
 						>
-							<label className="block font-medium mb-2 text-[#496580]">
+							<label className="block font-medium mb-2 text-[#00796b]">
 								Comments:
 							</label>
 							<textarea
@@ -1310,7 +1310,7 @@ const ManuscriptPage = () => {
 								value={formData.comments}
 								onChange={handleInputChange}
 								rows={4}
-								className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]"
+								className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b]"
 							></textarea>
 							<div className="flex justify-between">
 								{renderBackButton(5)}
@@ -1328,7 +1328,7 @@ const ManuscriptPage = () => {
 							exit="exit"
 						>
 							<div className="mb-4">
-								<label className="block font-medium mb-2 text-[#496580]">
+								<label className="block font-medium mb-2 text-[#00796b]">
 									Title:
 								</label>
 								<input
@@ -1336,12 +1336,12 @@ const ManuscriptPage = () => {
 									name="title"
 									value={formData.title}
 									onChange={handleInputChange}
-									className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]"
+									className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b]"
 								/>
 							</div>
 
 							<div className="mb-4">
-								<label className="block font-medium mb-2 text-[#496580]">
+								<label className="block font-medium mb-2 text-[#00796b]">
 									Keywords:
 								</label>
 								<input
@@ -1349,12 +1349,12 @@ const ManuscriptPage = () => {
 									name="keywords"
 									value={formData.keywords}
 									onChange={handleInputChange}
-									className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]"
+									className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b]"
 								/>
 							</div>
 
 							<div className="mb-4">
-								<label className="block font-medium mb-2 text-[#496580]">
+								<label className="block font-medium mb-2 text-[#00796b]">
 									Abstract:
 								</label>
 								<textarea
@@ -1362,16 +1362,16 @@ const ManuscriptPage = () => {
 									value={formData.abstract}
 									onChange={handleInputChange}
 									rows={4}
-									className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]"
+									className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b]"
 								></textarea>
 							</div>
 
 							<div className="mb-4">
-								<label className="block font-medium mb-2 text-[#496580]">
+								<label className="block font-medium mb-2 text-[#00796b]">
 									Author:
 								</label>
 								{user && (
-									<div className="w-full border border-[#d1d5db] rounded-lg p-2 bg-white text-[#496580]">
+									<div className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b]">
 										{user.title} {user.firstName}{" "}
 										{user.middleName
 											? `${user.middleName} `
@@ -1386,38 +1386,38 @@ const ManuscriptPage = () => {
 							<button
 								type="button"
 								onClick={handleAddAuthors}
-								className="mt-2 px-4 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269]"
+								className="mt-2 px-4 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269]"
 							>
 								Add Co-Authors
 							</button>
 
 							{/* Selected authors list */}
 							<div className="mt-4">
-								<h3 className="text-lg font-semibold mb-4 text-[#496580]">
+								<h3 className="text-lg font-semibold mb-4 text-[#00796b]">
 									Authors List:
 								</h3>
-								<div className="bg-white rounded-lg overflow-hidden border border-[#d1d5db]">
-									<table className="min-w-full divide-y divide-[#d1d5db]">
-										<thead className="bg-[#f0f9ff]">
+								<div className="bg-white rounded-lg overflow-hidden border border-[#e0e0e0]">
+									<table className="min-w-full divide-y divide-[#e0e0e0]">
+										<thead className="bg-[#e0f7fa]">
 											<tr>
-												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#00796b] uppercase tracking-wider">
 													Move
 												</th>
-												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#00796b] uppercase tracking-wider">
 													Name
 												</th>
-												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#00796b] uppercase tracking-wider">
 													Email
 												</th>
-												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#00796b] uppercase tracking-wider">
 													Roles
 												</th>
-												<th className="px-4 py-3 text-left text-xs font-medium text-[#496580] uppercase tracking-wider">
+												<th className="px-4 py-3 text-left text-xs font-medium text-[#00796b] uppercase tracking-wider">
 													Actions
 												</th>
 											</tr>
 										</thead>
-										<tbody className="divide-y divide-[#d1d5db]">
+										<tbody className="divide-y divide-[#e0e0e0]">
 											{selectedAuthors.map(
 												(authorId, index) => {
 													const author = authors.find(
@@ -1433,7 +1433,7 @@ const ManuscriptPage = () => {
 													return (
 														<tr
 															key={authorId}
-															className="text-[#496580]"
+															className="text-[#00796b]"
 														>
 															<td className="px-4 py-3">
 																<div className="flex space-x-1">
@@ -1447,7 +1447,7 @@ const ManuscriptPage = () => {
 																			index ===
 																			0
 																		}
-																		className="bg-[#e2e8f0] hover:bg-[#d1d5db] text-[#496580] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+																		className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
 																	>
 																		↑
 																	</button>
@@ -1462,7 +1462,7 @@ const ManuscriptPage = () => {
 																			selectedAuthors.length -
 																				1
 																		}
-																		className="bg-[#e2e8f0] hover:bg-[#d1d5db] text-[#496580] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+																		className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
 																	>
 																		↓
 																	</button>
@@ -1483,7 +1483,7 @@ const ManuscriptPage = () => {
 																		author.lastName
 																	}
 																	{author.academicDegree && (
-																		<span className="text-[#64748b]">
+																		<span className="text-[#9e9e9e]">
 																			,{" "}
 																			{
 																				author.academicDegree
@@ -1505,7 +1505,7 @@ const ManuscriptPage = () => {
 																		Author
 																	</div>
 																	{isCorrespondingAuthor && (
-																		<div className="text-[#496580] text-xs mt-1">
+																		<div className="text-[#00796b] text-xs mt-1">
 																			Corresponding
 																			Author
 																		</div>
@@ -1534,8 +1534,8 @@ const ManuscriptPage = () => {
 																			}
 																			className={`px-3 py-1 rounded text-sm transition-colors ${
 																				isCorrespondingAuthor
-																					? "bg-[#BAFFF5] text-[#496580] cursor-default"
-																					: "bg-[#496580] hover:bg-[#3a5269] text-white"
+																					? "bg-[#BAFFF5] text-[#00796b] cursor-default"
+																					: "bg-[#00796b] hover:bg-[#3a5269] text-white"
 																			}`}
 																			disabled={
 																				isCorrespondingAuthor
@@ -1560,7 +1560,7 @@ const ManuscriptPage = () => {
 							{/* Modal for selecting authors */}
 							{isAuthorModalOpen && (
 								<div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-									<div className="bg-white p-4 rounded text-[#1a365d] w-[500px]">
+									<div className="bg-white p-4 rounded text-[#212121] w-[500px]">
 										<div className="flex justify-between items-center mb-2">
 											<h3 className="font-bold">
 												Add New Author
@@ -1569,7 +1569,7 @@ const ManuscriptPage = () => {
 												onClick={() =>
 													setIsAuthorModalOpen(false)
 												}
-												className="text-[#64748b] hover:text-[#1a365d]"
+												className="text-[#9e9e9e] hover:text-[#212121]"
 											>
 												×
 											</button>
@@ -1589,7 +1589,7 @@ const ManuscriptPage = () => {
 													onChange={
 														handleNewAuthorChange
 													}
-													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
 													required
 												>
 													<option value="">
@@ -1627,7 +1627,7 @@ const ManuscriptPage = () => {
 													onChange={
 														handleNewAuthorChange
 													}
-													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
 													required
 												/>
 											</div>
@@ -1643,7 +1643,7 @@ const ManuscriptPage = () => {
 													onChange={
 														handleNewAuthorChange
 													}
-													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
 												/>
 											</div>
 
@@ -1661,7 +1661,7 @@ const ManuscriptPage = () => {
 													onChange={
 														handleNewAuthorChange
 													}
-													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
 													required
 												/>
 											</div>
@@ -1679,7 +1679,7 @@ const ManuscriptPage = () => {
 													onChange={
 														handleNewAuthorChange
 													}
-													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
 												/>
 											</div>
 
@@ -1698,7 +1698,7 @@ const ManuscriptPage = () => {
 														onChange={
 															handleNewAuthorChange
 														}
-														className={`w-full border rounded px-2 py-1 text-sm border-[#d1d5db] ${
+														className={`w-full border rounded px-2 py-1 text-sm border-[#e0e0e0] ${
 															isEmailVerified
 																? "border-green-500"
 																: ""
@@ -1729,7 +1729,7 @@ const ManuscriptPage = () => {
 													onChange={
 														handleNewAuthorChange
 													}
-													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
 													required
 												/>
 											</div>
@@ -1747,7 +1747,7 @@ const ManuscriptPage = () => {
 													onChange={
 														handleNewAuthorChange
 													}
-													className="w-full border rounded px-2 py-1 text-sm border-[#d1d5db]"
+													className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
 													required
 												>
 													<option value="">
@@ -1793,14 +1793,14 @@ const ManuscriptPage = () => {
 															false
 														)
 													}
-													className="px-3 py-1 bg-[#e2e8f0] text-[#496580] rounded text-sm hover:bg-[#d1d5db]"
+													className="px-3 py-1 bg-[#e2e8f0] text-[#00796b] rounded text-sm hover:bg-[#e0e0e0]"
 												>
 													Cancel
 												</button>
 												<button
 													type="button"
 													onClick={handleAddNewAuthor}
-													className="px-3 py-1 bg-[#496580] text-white rounded text-sm hover:bg-[#3a5269]"
+													className="px-3 py-1 bg-[#00796b] text-white rounded text-sm hover:bg-[#3a5269]"
 												>
 													Add Author
 												</button>
@@ -1811,11 +1811,11 @@ const ManuscriptPage = () => {
 							)}
 
 							<div className="mb-4">
-								<span className="block font-medium mb-2 text-[#496580]">
+								<span className="block font-medium mb-2 text-[#00796b]">
 									Funding:
 								</span>
 								<div className="flex items-center gap-4">
-									<label className="flex items-center text-[#496580]">
+									<label className="flex items-center text-[#00796b]">
 										<input
 											type="radio"
 											name="funding"
@@ -1826,7 +1826,7 @@ const ManuscriptPage = () => {
 										/>
 										Yes
 									</label>
-									<label className="flex items-center text-[#496580]">
+									<label className="flex items-center text-[#00796b]">
 										<input
 											type="radio"
 											name="funding"
@@ -1846,7 +1846,7 @@ const ManuscriptPage = () => {
 									<button
 										type="button"
 										onClick={handleSaveAndSubmitLater}
-										className="mt-4 px-6 py-2 bg-[#BAFFF5] text-[#496580] rounded-lg hover:bg-[#a8e6dc]"
+										className="mt-4 px-6 py-2 bg-[#BAFFF5] text-[#00796b] rounded-lg hover:bg-[#a8e6dc]"
 									>
 										Save and Submit Later
 									</button>
@@ -1855,7 +1855,7 @@ const ManuscriptPage = () => {
 										onClick={() =>
 											navigate("/journal/jics/my-submissions")
 										}
-										className="mt-4 px-6 py-2 bg-[#496580] text-white rounded-lg hover:bg-[#3a5269]"
+										className="mt-4 px-6 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269]"
 									>
 										Proceed
 									</button>

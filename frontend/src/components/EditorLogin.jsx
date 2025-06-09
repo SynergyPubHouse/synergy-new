@@ -116,7 +116,7 @@ function EditorLogin() {
 
 				<div className="mt-6 text-center">
 					<p className="text-[#496580] text-sm">
-						&copy; 2025 PaperSphere. All rights reserved.
+						&copy; 2025 Synergyworldress. All rights reserved.
 					</p>
 				</div>
 			</form>

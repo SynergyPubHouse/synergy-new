@@ -1,7 +1,7 @@
 import { FaTwitter, FaLinkedin, FaGithub, FaEnvelope } from "react-icons/fa";
 import { Link } from "react-router-dom";
 
-const BASE_URL = "/journal/Journal-of-Intelligent-Computing-Systems";
+const BASE_URL = "";
 
 function Footer() {
   return (
@@ -25,11 +25,14 @@ function Footer() {
             <h3 className="text-xl font-bold text-white mb-4">Quick Links</h3>
             <ul className="space-y-2">
               {[
-                { name: "Publish With Us", path: "/publish" },
-                { name: "For Editors", path: "/editors" },
-                { name: "For Reviewers", path: "/reviewers" },
-                { name: "Track Research", path: "/track" },
-                { name: "Contact Us", path: "/contact" },
+                 { name: "JICS", path: "/journal/jics" },
+                 { name: "About Us", path: "/about" },
+                 { name: "Developers", path: "/team" },
+                // { name: "Publish With Us", path: "/publish" },
+                // { name: "For Editors", path: "/editors" },
+                // { name: "For Reviewers", path: "/reviewers" },
+                // { name: "Track Research", path: "/track" },
+                { name: "Contact Us", path: "/contactus" },
               ].map((link) => (
                 <li key={link.path}>
                   <Link
@@ -48,9 +51,9 @@ function Footer() {
             <h3 className="text-xl font-bold text-white mb-4">Legal</h3>
             <ul className="space-y-2">
               {[
-                { name: "Terms of Service", path: "/terms" },
+                { name: "Terms of Service", path: "/termsofservice" },
                 { name: "Privacy Policy", path: "/privacy" },
-                { name: "Cookie Policy", path: "/cookies" },
+                // { name: "Cookie Policy", path: "/cookies" },
               ].map((link) => (
                 <li key={link.path}>
                   <Link

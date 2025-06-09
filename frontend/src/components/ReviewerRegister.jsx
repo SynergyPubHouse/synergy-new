@@ -221,7 +221,7 @@ function ReviewerRegister() {
 
 				<div className="mt-4 text-center">
 					<p className="text-[#64748b] text-sm">
-						&copy; 2025 PaperSphere. All rights reserved.
+						&copy; 2025 Synergy World Press. All rights reserved.
 					</p>
 				</div>
 			</form>

@@ -71,7 +71,7 @@ function ContactUs() {
               <FaEnvelope className="text-[#00acc1] text-2xl mx-auto" />
               <h3 className="text-lg font-semibold text-[#00796b] mt-3">Email Us</h3>
               <p className="mt-2 text-[#212121]">
-                support@papersphere.com<br />
+                support@synergyworldpress.com<br />
                 Response within 24 hours
               </p>
             </motion.div>

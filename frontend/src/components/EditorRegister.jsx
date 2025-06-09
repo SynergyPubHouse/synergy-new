@@ -219,7 +219,7 @@ function EditorRegister() {
 
 				<div className="mt-4 text-center">
 					<p className="text-[#496580] text-sm">
-						&copy; 2025 PaperSphere. All rights reserved.
+						&copy; 2025 Synergy World Press. All rights reserved.
 					</p>
 				</div>
 			</form>

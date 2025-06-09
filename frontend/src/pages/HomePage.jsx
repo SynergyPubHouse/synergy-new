@@ -30,7 +30,7 @@ function HomePage() {
 					transition={{ duration: 1 }}
 					className="text-4xl md:text-7xl font-extrabold text-[#496580] font-serif tracking-wide drop-shadow-lg"
 				>
-					PaperSphere
+					Synergy World Press
 				</motion.h1>
 
 				<motion.p
@@ -72,7 +72,7 @@ function HomePage() {
 					className="py-20 bg-white text-center"
 				>
 					<h2 className="text-3xl font-bold text-[#496580]">
-						Why Choose PaperSphere?
+						Why Choose Synergy World Press?
 					</h2>
 					<p className="mt-4 text-lg text-[#496580] max-w-3xl mx-auto">
 						Our platform simplifies the research lifecycle with
@@ -120,7 +120,7 @@ function HomePage() {
 					className="py-20 bg-[#f8fafc] text-center"
 				>
 					<h2 className="text-3xl font-bold text-[#496580]">
-						Join PaperSphere Today
+						Join Synergy World Press Today
 					</h2>
 					<p className="mt-4 text-lg text-[#496580]">
 						Enhance your research journey with our powerful tools
@@ -150,12 +150,12 @@ function HomePage() {
 						</h2>
 						<p className="mt-4 text-lg text-[#496580]">
 							Hear from researchers and academics who have
-							transformed their work with PaperSphere.
+							transformed their work with Synergy World Press.
 						</p>
 						<div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8 px-6 md:px-20">
 							<div className="p-6 bg-[#f0f9ff] rounded-lg shadow-md">
 								<p className="text-[#496580] italic">
-									"PaperSphere has revolutionized the way I
+									"Synergy World Press has revolutionized the way I
 									submit and review papers. The platform is
 									intuitive and efficient!"
 								</p>
@@ -176,7 +176,7 @@ function HomePage() {
 							<div className="p-6 bg-[#f0f9ff] rounded-lg shadow-md">
 								<p className="text-[#496580] italic">
 									"Collaborating with other researchers has
-									never been easier. PaperSphere is a
+									never been easier. Synergy World Press is a
 									game-changer!"
 								</p>
 								<p className="mt-4 font-semibold text-[#496580]">
@@ -239,7 +239,7 @@ function HomePage() {
 						</h2>
 						<p className="mt-4 text-lg text-[#496580]">
 							A step-by-step guide to getting started with
-							PaperSphere.
+							Synergy World Press.
 						</p>
 						<div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-8 px-6 md:px-20">
 							<div className="p-6 bg-[#f0f9ff] rounded-lg shadow-md">
@@ -288,7 +288,7 @@ function HomePage() {
 							Ready to Transform Your Research?
 						</h2>
 						<p className="mt-4 text-lg text-[#496580]">
-							Join thousands of researchers who trust PaperSphere
+							Join thousands of researchers who trust Synergy World Press
 							for their academic needs.
 						</p>
 						<Link
