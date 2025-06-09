@@ -296,27 +296,38 @@ exports.orcidCallback = async (req, res) => {
                 error: 'Missing ORCID credentials'
             });
         }
-
+const ORCID_REDIRECT_URI = `https://synergyworldpress.com/orcid-callback`;
         // Exchange authorization code for access token
-        const tokenResponse = await axios.post(
-            'https://orcid.org/oauth/token',
-            `client_id=${process.env.ORCID_CLIENT_ID}&client_secret=${process.env.ORCID_CLIENT_SECRET}&grant_type=authorization_code&code=${code}&redirect_uri=https://www.synergyworldpress.com/orcid-callback`,
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            }
-        );
+const tokenResponse = await axios.post(
+  'https://orcid.org/oauth/token',
+  new URLSearchParams({
+    client_id: process.env.ORCID_CLIENT_ID,
+    client_secret: process.env.ORCID_CLIENT_SECRET,
+    grant_type: 'authorization_code',
+    code: code,
+    redirect_uri: ORCID_REDIRECT_URI // Use same variable as frontend
+  }),
+  {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  }
+).catch(err => {
+  console.error('ORCID Token Error:', err.response.data);
+  throw err;
+});
+
 
         const { access_token, orcid } = tokenResponse.data;
 
         // Get user information from ORCID
-        const userResponse = await axios.get(`https://api.orcid.org/v3.0/${orcid}/person`, {
-            headers: {
-                'Authorization': `Bearer ${access_token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+const userResponse = await axios.get(`https://api.orcid.org/v3.0/${orcid}/person`, {
+    headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Accept': 'application/vnd.orcid+json' // OR use 'application/json' if you prefer JSON
+    }
+});
+
 
         const orcidData = userResponse.data;
         const email = orcidData.emails?.[0]?.email;
