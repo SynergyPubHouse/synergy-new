@@ -8,6 +8,17 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 const BASE_URL = '/';
 
+
+// ORCID OAuth configuration
+const ORCID_CLIENT_ID = import.meta.env.VITE_ORCID_CLIENT_ID;
+const ORCID_REDIRECT_URI = `${window.location.origin}${BASE_URL}/orcid-callback`;
+const ORCID_AUTH_URL = `https://orcid.org/oauth/authorize?client_id=${ORCID_CLIENT_ID}&response_type=code&scope=/authenticate&redirect_uri=${encodeURIComponent(ORCID_REDIRECT_URI)}`;
+
+// Debug logging
+console.log('Frontend ORCID Client ID:', ORCID_CLIENT_ID);
+console.log('Frontend ORCID Redirect URI:', ORCID_REDIRECT_URI);
+console.log('Frontend ORCID Auth URL:', ORCID_AUTH_URL);
+
 function Login() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
@@ -101,30 +112,10 @@ function Login() {
     }
   };
 
-  const handleOrcidLogin = async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/orcid`
-      );
-      
-      if (response.data) {
-        localStorage.setItem("user", JSON.stringify(response.data));
-        login(response.data);
-        navigate(BASE_URL);
-      } else {
-        setError("Login Failed: User data missing");
-        console.error("User data not found in the response");
-      }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || "ORCID Login Failed";
-      setError(errorMessage);
-      console.error("ORCID Login error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+	const handleOrcidLogin = () => {
+		// Redirect to ORCID authorization page
+		window.location.href = ORCID_AUTH_URL;
+	};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
@@ -241,57 +232,50 @@ function Login() {
               </div>
             </div>
 
-            {/* Social Login Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-				{googleClientId ? (
-					<div className="w-full">
-					<GoogleOAuthProvider clientId={googleClientId}>
-						<div className="flex items-center justify-center w-full bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-all">
-						<FaGoogle className="w-5 h-5 mr-2 text-[#4285F4]" />
-						<GoogleLogin
-							onSuccess={handleGoogleSuccess}
-							onError={handleGoogleFailure}
-							text="continue_with"
-							theme="outline"
-							shape="pill"
-							size="medium"
-							width="100%"
-							ux_mode="popup"
-						/>
-						</div>
-					</GoogleOAuthProvider>
+					<div className="flex flex-col items-center gap-4 mt-4">
+						<button
+							type="button"
+							onClick={handleOrcidLogin}
+							className="flex items-center justify-center w-full bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
+						>
+							<SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
+							Sign in with ORCID
+						</button>
+
+						{googleClientId ? (
+							<GoogleOAuthProvider clientId={googleClientId}>
+								<GoogleLogin
+									onSuccess={handleGoogleSuccess}
+									onError={handleGoogleFailure}
+									useOneTap
+									theme="filled_blue"
+									size="medium"
+									shape="pill"
+									text="continue_with"
+									width="200"
+								/>
+							</GoogleOAuthProvider>
+						) : (
+							<button
+								type="button"
+								className="flex items-center bg-white text-[#1a365d] font-semibold py-2 px-4 rounded-xl border border-[#cbd5e1] hover:border-[#496580] transition-all"
+								disabled
+							>
+								<FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
+								Loading...
+							</button>
+						)}
 					</div>
-				) : (
-					<button
-					type="button"
-					className="flex items-center justify-center w-full bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-all"
-					disabled
-					>
-					<FaGoogle className="w-5 h-5 mr-2 text-[#4285F4]" />
-					Loading...
-					</button>
-				)}
+				</div>
 
-				<button
-					onClick={handleOrcidLogin}
-					disabled={isLoading}
-					className="flex items-center justify-center w-full bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-xl border border-gray-200 hover:border-[#a6ce39] transition-all"
-				>
-					<SiOrcid className="w-5 h-5 mr-2 text-[#a6ce39]" />
-					ORCID
-				</button>
-			</div>
-
-
-            {/* Footer */}
-            <div className="mt-8 text-center text-sm text-gray-500">
-              <p>&copy; {new Date().getFullYear()} Synergy World Press. All rights reserved.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+				<div className="mt-6 text-center">
+					<p className="text-[#64748b] text-sm">
+						&copy; 2025 PaperSphere. All rights reserved.
+					</p>
+				</div>
+			</form>
+		</div>
+	);
 }
 
 export default Login;

@@ -34,6 +34,7 @@ import MySubmissions from "./pages/MySubmissions";
 import ReviewerRegister from "./components/ReviewerRegister";
 import ReviewerLogin from "./components/ReviewerLogin";
 import ReviewerDashboard from "./components/ReviewerDashboard";
+import OrcidCallback from "./components/OrcidCallback";
 // Import Peer Review Pages
 import InitialEditorialScreening from "./pages/peer-review/InitialEditorialScreening";
 import DoubleBlindPeerReview from "./pages/peer-review/DoubleBlindPeerReview";
