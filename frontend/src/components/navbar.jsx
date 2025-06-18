@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaBars, FaTimes, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../App';
 
-const BASE_URL = '/';
+const BASE_URL = '';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -46,9 +46,15 @@ const Navbar = () => {
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto flex justify-between items-center">
-        <Link to={BASE_URL} className="text-2xl font-bold hover:text-[#BAFFF5] transition-colors">
-          Synergy World Press
-        </Link>
+<Link to='/' className="flex items-center hover:opacity-80 transition-opacity">
+  <img 
+    src="/images/SWP-bgremove.png" 
+    alt="Synergy World Press Logo" 
+    className="h-10 w-auto rounded-md" 
+  /> 
+</Link>
+
+
 
         <div className="hidden md:flex gap-8">
           {navItems.map((item) => (
@@ -105,13 +111,13 @@ const Navbar = () => {
                     </div>
                     <hr className="border-[#e0e0e0] my-2" />
                     <Link
-                      to={`${BASE_URL}account`}
+                      to={`${BASE_URL}/account`}
                       className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
                     >
                       My Account
                     </Link>
                     <Link
-                      to={`${BASE_URL}subscriptions`}
+                      to={`${BASE_URL}/subscriptions`}
                       className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
                     >
                       My Subscriptions

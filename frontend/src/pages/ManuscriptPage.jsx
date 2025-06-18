@@ -38,6 +38,8 @@ const ManuscriptPage = () => {
 		declaration: false,
 	});
 
+	const [dragOver, setDragOver] = useState(false);
+
 	const [selectedFiles, setSelectedFiles] = useState([]);
 	const [completedSections, setCompletedSections] = useState([]);
 
@@ -1106,32 +1108,69 @@ const ManuscriptPage = () => {
 													}
 													className="mr-2"
 												/>
-												<label className="flex flex-col items-center justify-center w-full h-32 border-2 border-[#e0e0e0] border-dashed rounded-lg cursor-pointer bg-white hover:bg-[#e0f7fa]">
-													<div className="flex flex-col items-center justify-center pt-5 pb-6">
-														<p className="mb-2 text-sm text-[#00796b]">
-															<span className="font-semibold">
-																Click to upload
-															</span>{" "}
-															or drag and drop
-														</p>
-														<p className="text-xs text-[#00796b]">
-															Upload {doc} (DOCX
-															only)
-														</p>
-													</div>
-													<input
-														type="file"
-														name={doc}
-														accept=".docx,.pdf"
-														onChange={(e) =>
-															handleFileChange(
-																e,
-																doc
-															)
-														}
-														className="hidden"
-													/>
-												</label>
+<label 
+  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white ${
+    dragOver ? "border-[#00796b] bg-[#e0f7fa]" : "border-[#e0e0e0] hover:bg-[#e0f7fa]"
+  }`}
+  onDragEnter={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }}
+  onDragOver={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }}
+  onDragLeave={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }}
+  onDrop={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    
+    // Check if files were dropped
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      
+      // Check file type
+      const validTypes = ['.docx', '.pdf'];
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      
+      if (validTypes.includes(`.${fileExtension}`)) {
+        // Create a synthetic event to reuse your existing handler
+        const syntheticEvent = {
+          target: {
+            files: e.dataTransfer.files,
+            name: doc
+          }
+        };
+        handleFileChange(syntheticEvent, doc);
+      } else {
+        alert('Please upload only DOCX or PDF files');
+      }
+    }
+  }}
+>
+  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+    <p className="mb-2 text-sm text-[#00796b]">
+      <span className="font-semibold">Click to upload</span> or drag and drop
+    </p>
+    <p className="text-xs text-[#00796b]">
+      Upload {doc} (DOCX or PDF)
+    </p>
+  </div>
+  <input
+    type="file"
+    name={doc}
+    accept=".docx,.pdf"
+    onChange={(e) => handleFileChange(e, doc)}
+    className="hidden"
+  />
+</label>
 											</div>
 											{files[doc] && (
 												<p className="mt-2 text-sm text-[#00796b]">

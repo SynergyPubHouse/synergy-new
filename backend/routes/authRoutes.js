@@ -20,6 +20,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/google", googleAuth);
 router.get("/google-client-id", getGoogleClientId);
+
 router.post("/orcid/callback", orcidCallback);
 
 // Protected routes

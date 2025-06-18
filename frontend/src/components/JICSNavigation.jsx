@@ -31,7 +31,7 @@ const JICSNavigation = () => {
         },
         {
           label: "Article Download",
-          path: "/sample.docx",
+          path: "#",
           icon: (
             <svg
               className="w-5 h-5 ml-2"
@@ -48,6 +48,7 @@ const JICSNavigation = () => {
             </svg>
           ),
           download: true,
+          disabled: true,
         },
       ],
     },
@@ -233,19 +234,28 @@ const JICSNavigation = () => {
                             </a>
                           );
                         }
-                        if (dropdownItem.download) {
+                        if (dropdownItem.disabled) {
                           return (
-                            <a
+                            <div
                               key={dropdownItem.label}
-                              href={dropdownItem.path}
-                              download
-                              className="flex items-center px-6 py-3 text-base text-[#212121] hover:bg-[#e0f7fa] hover:text-[#00796b] transition-colors duration-200"
+                              title="Download Disabled"
+                              className="flex items-center justify-between px-6 py-3 text-base rounded cursor-not-allowed hover:bg-red-100 transition"
                             >
-                              {dropdownItem.label}
-                              {dropdownItem.icon}
-                            </a>
+                              <span className="flex">
+                                {/* Ban Icon */}
+
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M18.364 5.636l-12.728 12.728M5.636 5.636l12.728 12.728"
+                                  />
+                                {dropdownItem.label}
+                              </span>
+                            </div>
                           );
                         }
+
                         return (
                           <Link
                             key={dropdownItem.label}

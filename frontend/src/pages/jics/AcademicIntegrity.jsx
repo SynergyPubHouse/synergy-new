@@ -1,7 +1,7 @@
 import React from 'react';
 
 const AcademicIntegrity = () => (
-  <section className="bg-white max-w-3xl mx-auto my-8 rounded-2xl shadow-md border border-[#e0e0e0] p-8">
+  <section className=" max-w-3xl mx-auto my-8 p-8">
     <h2 className="text-3xl font-extrabold text-[#00796b] mb-6 tracking-tight">
       Commitment to Academic Integrity
     </h2>

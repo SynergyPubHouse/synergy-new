@@ -28,9 +28,8 @@ const JICSJournal = () => (
             <img
               src="/images/JICSLogo.png"
               alt="JICS Logo"
-              className="w-28 h-36 md:w-36 md:h-48 object-contain bg-white border-4 border-[#00acc1] rounded-2xl shadow-lg group-hover:shadow-xl transition-all duration-300"
+              className="w-28 h-36 md:w-36 md:h-48 object-contain bg-white  rounded-md shadow-lg group-hover:shadow-xl transition-all duration-300"
             />
-            <span className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-[#00acc1] opacity-70 border-4 border-white"></span>
           </Link>
           {/* Title, Description, and Button */}
           <div className="flex-1 flex flex-col md:flex-row justify-between items-center gap-6">
@@ -73,7 +72,7 @@ const JICSJournal = () => (
 
     {/* Main Content */}
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-      <div className="bg-white rounded-2xl shadow-sm border border-[#e0e0e0] p-8">
+      <div className="p-8">
         <Routes>
           <Route
             path="/"

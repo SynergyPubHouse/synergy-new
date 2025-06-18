@@ -9,10 +9,8 @@ const Header = () => (
           <img
             src="/images/SynergyLogo.png"
             alt="Synergy World Press Logo"
-            className="w-32 h-32 md:w-40 md:h-40 object-contain bg-white border-4 border-[#00acc1] rounded-2xl shadow-lg"
+            className="w-32 h-32 md:w-40 md:h-40 object-contain bg-white rounded-xl shadow-lg"
           />
-          {/* Decorative Dot Accent */}
-          <span className="absolute -bottom-3 -right-3 w-8 h-8 rounded-full bg-[#00acc1] opacity-70 border-4 border-white"></span>
         </div>
       </div>
 

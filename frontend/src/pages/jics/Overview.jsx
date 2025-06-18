@@ -1,7 +1,7 @@
 import React from 'react';
 
 const Overview = () => (
-  <section className="bg-white max-w-3xl mx-auto my-8 rounded-2xl shadow-md border border-[#e0e0e0] p-8">
+  <section className="max-w-3xl mx-auto my-8 p-8">
     <h2 className="text-3xl font-extrabold text-[#00796b] mb-6 tracking-tight">
       Journal Overview
     </h2>
@@ -15,6 +15,15 @@ const Overview = () => (
       <p className="text-[#212121] text-lg leading-relaxed text-justify">
         There are no publication or article processing charges (APCs). We are committed to supporting open-access publishing while ensuring that authors face no financial barriers in disseminating their work.
       </p>
+
+      {/* Editor-in-Chief Line */}
+      <p className="text-left text-[#424242] font-medium pt-4 text-lg">
+        <span className="italic font-bold text-xl">Editor-in-Chief</span>
+        <br />
+        Dr. Meenu Gupta
+      </p>
+
+
     </div>
   </section>
 );
