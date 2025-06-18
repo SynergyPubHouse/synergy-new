@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../App";
 import { FaGoogle, FaArrowRight } from "react-icons/fa";
 import { SiOrcid } from "react-icons/si";
@@ -19,6 +19,8 @@ function Login() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState({ show: false, message: "" });
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from || '/';
   const { login } = useAuth();
   const [googleClientId, setGoogleClientId] = useState('');
 
@@ -85,7 +87,7 @@ function Login() {
           show: true,
           message: "Successfully Logged In !! Welcome back.."
         });
-        setTimeout(() => navigate(BASE_URL), 2000);
+        setTimeout(() => navigate(from, { replace: true }), 2000); // Redirect back
       } else {
         setError("Login Failed: User data missing");
       }
@@ -123,7 +125,7 @@ function Login() {
           show: true,
           message: "Login successful! Taking you to your account..."
         });
-        setTimeout(() => navigate(BASE_URL), 2000);
+        setTimeout(() => navigate(from, { replace: true }), 2000); // Redirect back
       } else {
         setError("Login Failed: User data missing");
       }

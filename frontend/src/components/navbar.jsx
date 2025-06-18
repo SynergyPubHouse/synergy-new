@@ -141,7 +141,8 @@ const Navbar = () => {
           ) : (
             <div className="hidden md:flex gap-4">
               <Link
-                to={`/login`}
+                to="/login" 
+                state={{ from: location.pathname }} 
                 className="text-white font-semibold px-4 py-2 rounded-md border-2 border-[#00acc1] hover:bg-[#00acc1] hover:text-white transition-colors"
               >
                 Login

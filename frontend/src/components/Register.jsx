@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const BASE_URL = '';
 
@@ -38,7 +38,7 @@ function Register() {
         formData
       );
       alert("Registration Successful!");
-      navigate(`${BASE_URL}/login`);
+      navigate(from, { replace: true }); // Redirect back to previous page
     } catch (error) {
       setErrorMessage(error.response?.data?.message || "Registration Failed");
     } finally {
