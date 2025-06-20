@@ -9,6 +9,7 @@ const User = require("../models/User");
 const Reviewer = require("../models/Reviewer");
 const mongoose = require("mongoose");
 const os = require("os");
+const { PythonShell } = require('python-shell');
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
@@ -25,14 +26,14 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 100 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /pdf|doc|docx/;
+    const allowedTypes = /docx/;
     const extname = allowedTypes.test(
       path.extname(file.originalname).toLowerCase()
     );
     if (extname) {
       return cb(null, true);
     }
-    cb(new Error("Only Word documents and PDFs are allowed!"));
+    cb(new Error("Only Word documents (.docx) are allowed!"));
   },
 }).fields([
   { name: "manuscript", maxCount: 1 },
@@ -131,9 +132,42 @@ exports.createManuscript = async (req, res) => {
         });
       }
 
+      // Extract text from manuscript using Python docx2txt
+      const manuscriptPath = req.files["manuscript"][0].path;
+      let manuscriptText = '';
+      try {
+        const extractText = () => new Promise((resolve, reject) => {
+          PythonShell.run(
+            path.join(__dirname, '../utils/textExtractor.py'),
+            { args: [manuscriptPath] },
+            function (err, results) {
+              if (err) return reject(err);
+              resolve(results ? results.join('\n') : '');
+            }
+          );
+        });
+        manuscriptText = await extractText();
+      } catch (err) {
+        console.error('Text extraction failed:', err);
+        manuscriptText = '';
+      }
+      // Convert manuscript to PDF using Python docx2pdf
+      const convertToPdf = () => new Promise((resolve, reject) => {
+        const outputPdf = manuscriptPath.replace(/\.docx?$/, '.pdf');
+        PythonShell.run(
+          path.join(__dirname, '../utils/convertToPdf.py'),
+          { args: [manuscriptPath, outputPdf] },
+          function (err) {
+            if (err) return reject(err);
+            resolve(outputPdf);
+          }
+        );
+      });
+      const manuscriptPdfPath = await convertToPdf();
+
       // Create merged PDF with form data table
       const mergedPdfResult = await createMergedPDFWithTable(
-        req.files["manuscript"][0].path,
+        manuscriptPdfPath,
         req.files["coverLetter"][0].path,
         req.files["declaration"][0].path,
         {
@@ -148,7 +182,7 @@ exports.createManuscript = async (req, res) => {
 
       // Upload all files to Google Drive
       const [manuscriptUrl, coverLetterUrl, declarationUrl, mergedUrl] = await Promise.all([
-        uploadFile(req.files["manuscript"][0].path, `manuscript_${Date.now()}_${path.basename(req.files["manuscript"][0].originalname)}`),
+        uploadFile(manuscriptPdfPath, `manuscript_${Date.now()}_${path.basename(req.files["manuscript"][0].originalname)}`),
         uploadFile(req.files["coverLetter"][0].path, `cover_letter_${Date.now()}_${path.basename(req.files["coverLetter"][0].originalname)}`),
         uploadFile(req.files["declaration"][0].path, `declaration_${Date.now()}_${path.basename(req.files["declaration"][0].originalname)}`),
         uploadFile(mergedPdfResult.localPath, `merged_manuscript_${Date.now()}.pdf`)
@@ -163,6 +197,7 @@ exports.createManuscript = async (req, res) => {
         declarationFile: declarationUrl.webViewLink,
         mergedFileUrl: mergedUrl.webViewLink,
         status: "Pending",
+        extractedText: manuscriptText, // Store extracted text
       };
 
       const manuscript = new Manuscript(manuscriptData);
