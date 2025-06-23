@@ -1,7 +1,23 @@
 const PDFMerger = require("pdf-merger-js"); // Ensure you have this package installed
-const { convertToPdf } = require("./pdfUtils"); // Import the PDF conversion utility
+const { PythonShell } = require('python-shell');
 const { uploadFile } = require("./googleDrive"); // Import the Google Drive upload function
 const fs = require("fs").promises; // Use promises for file system operations
+const path = require("path");
+
+// Helper to convert DOCX to PDF using Python
+async function convertDocxToPdfPython(docxPath) {
+	return new Promise((resolve, reject) => {
+		const outputPdf = docxPath.replace(/\.docx?$/, '.pdf');
+		PythonShell.run(
+			path.join(__dirname, 'convertToPdf.py'),
+			{ args: [docxPath, outputPdf] },
+			function (err) {
+				if (err) return reject(err);
+				resolve(outputPdf);
+			}
+		);
+	});
+}
 
 const mergeDocs = async (files, formData) => {
 	const merger = new PDFMerger();
@@ -10,9 +26,12 @@ const mergeDocs = async (files, formData) => {
 	const tablePdfPath = await createTablePdf(formData);
 	await merger.add(tablePdfPath); // Add the table PDF
 
-	// Convert and add each DOCX file to the merger
+	// Convert DOCX to PDF using Python, add PDFs
 	for (const file of files) {
-		const pdfFilePath = await convertToPdf(file); // Convert DOCX to PDF
+		let pdfFilePath = file;
+		if (file.endsWith('.doc') || file.endsWith('.docx')) {
+			pdfFilePath = await convertDocxToPdfPython(file);
+		}
 		await merger.add(pdfFilePath); // Add the converted PDF
 	}
 
@@ -28,8 +47,10 @@ const mergeDocs = async (files, formData) => {
 	// Clean up temporary files
 	await fs.unlink(tablePdfPath); // Remove the temporary table PDF
 	for (const file of files) {
-		const pdfFilePath = await convertToPdf(file);
-		await fs.unlink(pdfFilePath); // Remove the converted PDF files
+		if (file.endsWith('.doc') || file.endsWith('.docx')) {
+			const pdfFilePath = file.replace(/\.docx?$/, '.pdf');
+			await fs.unlink(pdfFilePath).catch(() => {}); // Remove the converted PDF files
+		}
 	}
 
 	return webViewLink; // Return the Google Drive link
