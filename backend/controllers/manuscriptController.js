@@ -9,6 +9,8 @@ const User = require("../models/User");
 const Reviewer = require("../models/Reviewer");
 const mongoose = require("mongoose");
 const os = require("os");
+const { PythonShell } = require('python-shell');
+const fsSync = require('fs'); // Add at the top if not already
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
@@ -17,7 +19,8 @@ const storage = multer.diskStorage({
     cb(null, os.tmpdir());
   },
   filename: function (req, file, cb) {
-    cb(null, `temp_${Date.now()}${path.extname(file.originalname)}`);
+    // Add fieldname to ensure uniqueness
+    cb(null, `temp_${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
   },
 });
 
@@ -25,14 +28,14 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 100 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /pdf|doc|docx/;
+    const allowedTypes = /docx/;
     const extname = allowedTypes.test(
       path.extname(file.originalname).toLowerCase()
     );
     if (extname) {
       return cb(null, true);
     }
-    cb(new Error("Only Word documents and PDFs are allowed!"));
+    cb(new Error("Only Word documents (.docx) are allowed!"));
   },
 }).fields([
   { name: "manuscript", maxCount: 1 },
@@ -46,7 +49,6 @@ async function cleanupFiles(filePaths) {
     try {
       if (filePath) {
         await fs.unlink(filePath);
-        console.log(`Cleaned up temporary file: ${filePath}`);
       }
     } catch (error) {
       console.error(`Error cleaning up file ${filePath}:`, error);
@@ -54,17 +56,137 @@ async function cleanupFiles(filePaths) {
   }
 }
 
+// Helper: Check if a file is a valid PDF
+function isValidPdf(filePath) {
+  try {
+    if (!fsSync.existsSync(filePath)) return false;
+    const stat = fsSync.statSync(filePath);
+    if (stat.size < 100) return false;
+    const fd = fsSync.openSync(filePath, 'r');
+    const buffer = Buffer.alloc(5);
+    fsSync.readSync(fd, buffer, 0, 5, 0);
+    fsSync.closeSync(fd);
+    return buffer.toString() === '%PDF-';
+  } catch (e) {
+    return false;
+  }
+}
+
+// Helper: Convert DOCX to PDF
+async function convertDocxToPdf(docxPath) {
+  const pythonPath = 'python'; // Change to full path if needed
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, '../utils/convertToPdf.py');
+    const outputPdf = docxPath.replace(/\.docx?$/, '.pdf');
+    const shell = new PythonShell(
+      scriptPath,
+      { args: [docxPath, outputPdf], pythonPath }
+    );
+    let output = [];
+    let errorOutput = [];
+    shell.on('message', (message) => {
+      output.push(message);
+    });
+    shell.on('stderr', (stderr) => {
+      console.error('[convertDocxToPdf] PythonShell stderr:', stderr);
+      errorOutput.push(stderr);
+    });
+    shell.on('error', (err) => {
+      console.error('[convertDocxToPdf] PythonShell error event:', err);
+    });
+    shell.end(async (err, code, signal) => {
+      if (err) {
+        console.error('[convertDocxToPdf] PythonShell end error:', err);
+        if (errorOutput.length > 0) {
+          console.error('[convertDocxToPdf] PythonShell stderr collected:', errorOutput.join('\n'));
+        }
+        return reject(err);
+      }
+      // Wait for the PDF to exist and be non-empty
+      let tries = 0;
+      const maxTries = 10;
+      const waitMs = 300;
+      while (tries < maxTries) {
+        try {
+          if (fsSync.existsSync(outputPdf) && fsSync.statSync(outputPdf).size > 100) {
+            break;
+          }
+        } catch (e) {}
+        await new Promise(res => setTimeout(res, waitMs));
+        tries++;
+      }
+      if (!fsSync.existsSync(outputPdf) || fsSync.statSync(outputPdf).size < 100) {
+        return reject(new Error('PDF file was not created or is empty after conversion.'));
+      }
+      resolve(outputPdf);
+    });
+  });
+}
+
+// Helper: Extract text from DOCX
+async function extractTextFromDocx(docxPath) {
+  const pythonPath = 'python'; // Change to full path if needed
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, '../utils/textExtractor.py');
+    const shell = new PythonShell(
+      scriptPath,
+      { args: [docxPath], pythonPath }
+    );
+    let output = [];
+    let errorOutput = [];
+    shell.on('message', (message) => {
+      output.push(message);
+    });
+    shell.on('stderr', (stderr) => {
+      console.error('[extractTextFromDocx] PythonShell stderr:', stderr);
+      errorOutput.push(stderr);
+    });
+    shell.on('error', (err) => {
+      console.error('[extractTextFromDocx] PythonShell error event:', err);
+    });
+    shell.end((err, code, signal) => {
+      if (err) {
+        console.error('[extractTextFromDocx] PythonShell end error:', err);
+        if (errorOutput.length > 0) {
+          console.error('[extractTextFromDocx] PythonShell stderr collected:', errorOutput.join('\n'));
+        }
+        return reject(err);
+      }
+      const finalText = output.join('\n');
+      if (output.length === 0 && errorOutput.length > 0) {
+        console.error('[extractTextFromDocx] No output, but stderr present:', errorOutput.join('\n'));
+      }
+      resolve(finalText);
+    });
+  });
+}
+
+// Helper: Merge multiple PDFs (using pdf-lib)
+async function mergePdfs(pdfPaths, outputPath) {
+  const mergedPdf = await PDFDocument.create();
+  for (const pdfPath of pdfPaths) {
+    const pdfBytes = await fs.readFile(pdfPath);
+    const pdf = await PDFDocument.load(pdfBytes);
+    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+    copiedPages.forEach((page) => mergedPdf.addPage(page));
+  }
+  const mergedPdfBytes = await mergedPdf.save();
+  await fs.writeFile(outputPath, mergedPdfBytes);
+  return outputPath;
+}
+
 exports.createManuscript = async (req, res) => {
   let tempFiles = [];
-  
   try {
     upload(req, res, async (err) => {
       if (err) {
+        console.error("[createManuscript] Multer error:", err);
         return res.status(400).json({ message: err.message });
       }
 
       // Check if all required files are present
       if (!req.files["manuscript"] || !req.files["coverLetter"] || !req.files["declaration"]) {
+        console.error("[createManuscript] Missing required files.");
         return res.status(400).json({ 
           success: false, 
           message: "All three files (manuscript, cover letter, and declaration) are required" 
@@ -84,7 +206,7 @@ exports.createManuscript = async (req, res) => {
           const additionalInfoArray = JSON.parse(req.body.additionalInfo);
           req.body.additionalInfo = additionalInfoArray.join(", ");
         } catch (e) {
-          console.error("Error parsing additionalInfo:", e);
+          console.error("[createManuscript] Error parsing additionalInfo:", e);
         }
       }
 
@@ -107,7 +229,7 @@ exports.createManuscript = async (req, res) => {
             throw new Error(`Invalid author ID: ${id}`);
           }
         } catch (error) {
-          console.error("Error converting author ID:", error);
+          console.error("[createManuscript] Error converting author ID:", error);
           return res.status(400).json({
             success: false,
             message: `Invalid author ID format: ${id}`
@@ -124,35 +246,92 @@ exports.createManuscript = async (req, res) => {
           throw new Error(`Invalid corresponding author ID: ${correspondingAuthorId || req.user._id}`);
         }
       } catch (error) {
-        console.error("Error converting corresponding author ID:", error);
+        console.error("[createManuscript] Error converting corresponding author ID:", error);
         return res.status(400).json({
           success: false,
           message: `Invalid corresponding author ID format: ${correspondingAuthorId || req.user._id}`
         });
       }
 
-      // Create merged PDF with form data table
-      const mergedPdfResult = await createMergedPDFWithTable(
-        req.files["manuscript"][0].path,
-        req.files["coverLetter"][0].path,
-        req.files["declaration"][0].path,
-        {
-          ...req.body,
-          authors: authorObjectIds,
-          correspondingAuthor: correspondingAuthorObjectId
+      // Extract text from all three uploaded DOCX files
+      const manuscriptPath = req.files["manuscript"][0].path;
+      const coverLetterPath = req.files["coverLetter"][0].path;
+      const declarationPath = req.files["declaration"][0].path;
+      let manuscriptText = '', coverLetterText = '', declarationText = '';
+      try {
+        manuscriptText = await extractTextFromDocx(manuscriptPath);
+      } catch (err) {
+        console.error('[createManuscript] Manuscript text extraction failed:', err);
+        manuscriptText = '';
+      }
+      try {
+        coverLetterText = await extractTextFromDocx(coverLetterPath);
+      } catch (err) {
+        console.error('[createManuscript] Cover letter text extraction failed:', err);
+        coverLetterText = '';
+      }
+      try {
+        declarationText = await extractTextFromDocx(declarationPath);
+      } catch (err) {
+        console.error('[createManuscript] Declaration text extraction failed:', err);
+        declarationText = '';
+      }
+      // Convert all DOCX files to PDF before proceeding
+      let manuscriptPdfPath, coverLetterPdfPath, declarationPdfPath;
+      try {
+        manuscriptPdfPath = await convertDocxToPdf(manuscriptPath);
+        if (!isValidPdf(manuscriptPdfPath)) {
+          console.error('[createManuscript] Manuscript PDF is invalid!');
+          return res.status(500).json({ success: false, message: 'Manuscript PDF is invalid after conversion.' });
         }
-      );
+        coverLetterPdfPath = await convertDocxToPdf(coverLetterPath);
+        if (!isValidPdf(coverLetterPdfPath)) {
+          console.error('[createManuscript] Cover letter PDF is invalid!');
+          return res.status(500).json({ success: false, message: 'Cover letter PDF is invalid after conversion.' });
+        }
+        declarationPdfPath = await convertDocxToPdf(declarationPath);
+        if (!isValidPdf(declarationPdfPath)) {
+          console.error('[createManuscript] Declaration PDF is invalid!');
+          return res.status(500).json({ success: false, message: 'Declaration PDF is invalid after conversion.' });
+        }
+      } catch (err) {
+        console.error('[createManuscript] DOCX to PDF conversion failed:', err);
+        return res.status(500).json({ success: false, message: 'DOCX to PDF conversion failed.' });
+      }
 
-      // Track the merged PDF for cleanup
-      tempFiles.push(mergedPdfResult.localPath);
+      // Create merged PDF with form data table (use the converted PDFs)
+      let mergedPdfResult;
+      try {
+        mergedPdfResult = await createMergedPDFWithTable(
+          manuscriptPdfPath,
+          coverLetterPdfPath,
+          declarationPdfPath,
+          {
+            ...req.body,
+            authors: authorObjectIds,
+            correspondingAuthor: correspondingAuthorObjectId
+          }
+        );
+        // Track the merged PDF for cleanup
+        tempFiles.push(mergedPdfResult.localPath);
+      } catch (err) {
+        console.error('[createManuscript] Merged PDF creation failed:', err);
+        return res.status(500).json({ success: false, message: 'Merged PDF creation failed.' });
+      }
 
       // Upload all files to Google Drive
-      const [manuscriptUrl, coverLetterUrl, declarationUrl, mergedUrl] = await Promise.all([
-        uploadFile(req.files["manuscript"][0].path, `manuscript_${Date.now()}_${path.basename(req.files["manuscript"][0].originalname)}`),
-        uploadFile(req.files["coverLetter"][0].path, `cover_letter_${Date.now()}_${path.basename(req.files["coverLetter"][0].originalname)}`),
-        uploadFile(req.files["declaration"][0].path, `declaration_${Date.now()}_${path.basename(req.files["declaration"][0].originalname)}`),
-        uploadFile(mergedPdfResult.localPath, `merged_manuscript_${Date.now()}.pdf`)
-      ]);
+      let manuscriptUrl, coverLetterUrl, declarationUrl, mergedUrl;
+      try {
+        [manuscriptUrl, coverLetterUrl, declarationUrl, mergedUrl] = await Promise.all([
+          uploadFile(manuscriptPdfPath, `manuscript_${Date.now()}_${path.basename(req.files["manuscript"][0].originalname)}`),
+          uploadFile(coverLetterPdfPath, `cover_letter_${Date.now()}_${path.basename(req.files["coverLetter"][0].originalname)}`),
+          uploadFile(declarationPdfPath, `declaration_${Date.now()}_${path.basename(req.files["declaration"][0].originalname)}`),
+          uploadFile(mergedPdfResult.localPath, `merged_manuscript_${Date.now()}.pdf`)
+        ]);
+      } catch (err) {
+        console.error('[createManuscript] File upload to Google Drive failed:', err);
+        return res.status(500).json({ success: false, message: 'File upload to Google Drive failed.' });
+      }
 
       const manuscriptData = {
         ...req.body,
@@ -163,45 +342,63 @@ exports.createManuscript = async (req, res) => {
         declarationFile: declarationUrl.webViewLink,
         mergedFileUrl: mergedUrl.webViewLink,
         status: "Pending",
+        extractedText: manuscriptText, // Store extracted text
+        coverLetterText: coverLetterText, // Store cover letter text
+        declarationText: declarationText, // Store declaration text
       };
 
-      const manuscript = new Manuscript(manuscriptData);
-      await manuscript.save();
+      let manuscript;
+      try {
+        manuscript = new Manuscript(manuscriptData);
+        await manuscript.save();
+      } catch (err) {
+        console.error('[createManuscript] Manuscript save failed:', err);
+        return res.status(500).json({ success: false, message: 'Manuscript save failed.' });
+      }
 
       // Update all authors' manuscripts array and roles
-      for (const authorId of authors) {
-        await User.findByIdAndUpdate(
-          authorId,
-          {
-            $addToSet: {
-              manuscripts: manuscript._id,
-              roles: authorId === correspondingAuthorId ? ["author", "corresponding_author"] : ["author"]
-            }
-          },
-          { new: true }
-        );
+      try {
+        for (const authorId of authors) {
+          await User.findByIdAndUpdate(
+            authorId,
+            {
+              $addToSet: {
+                manuscripts: manuscript._id,
+                roles: authorId === correspondingAuthorId ? ["author", "corresponding_author"] : ["author"]
+              }
+            },
+            { new: true }
+          );
+        }
+      } catch (err) {
+        console.error('[createManuscript] Author update failed:', err);
       }
 
       // Clean up all temporary files
-      await cleanupFiles(tempFiles);
-      tempFiles = []; // Clear the array after successful cleanup
+      try {
+        await cleanupFiles(tempFiles);
+        tempFiles = []; // Clear the array after successful cleanup
+      } catch (err) {
+        console.error('[createManuscript] Cleanup failed:', err);
+      }
 
       res.status(201).json({
         success: true,
         data: manuscript,
         mergedPdfUrl: manuscriptData.mergedFileUrl,
+        extractedText: manuscriptText,
+        coverLetterText: coverLetterText,
+        declarationText: declarationText,
       });
     });
   } catch (error) {
-    console.error("Error in createManuscript:", error);
-    
+    console.error("[createManuscript] Error in createManuscript:", error);
     // Clean up any remaining temporary files in case of error
     if (tempFiles.length > 0) {
       await cleanupFiles(tempFiles).catch(cleanupError => {
-        console.error("Error during cleanup after failure:", cleanupError);
+        console.error("[createManuscript] Error during cleanup after failure:", cleanupError);
       });
     }
-    
     res.status(500).json({
       success: false,
       message: error.message,
@@ -658,3 +855,65 @@ exports.getManuscriptById = async (req, res) => {
     });
   }
 };
+
+// Endpoint: Build and download merged PDF (table + manuscript + cover letter + declaration)
+exports.buildAndDownloadPdf = async (req, res) => {
+  let tempFiles = [];
+  try {
+    upload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({ message: err.message });
+      }
+      if (!req.files["manuscript"] || !req.files["coverLetter"] || !req.files["declaration"]) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "All three files (manuscript, cover letter, and declaration) are required" 
+        });
+      }
+      // Track all temporary files for cleanup
+      tempFiles = [
+        req.files["manuscript"][0].path,
+        req.files["coverLetter"][0].path,
+        req.files["declaration"][0].path
+      ];
+      // Convert DOCX files to PDF
+      const manuscriptPdf = await convertDocxToPdf(req.files["manuscript"][0].path);
+      const coverLetterPdf = await convertDocxToPdf(req.files["coverLetter"][0].path);
+      const declarationPdf = await convertDocxToPdf(req.files["declaration"][0].path);
+      tempFiles.push(manuscriptPdf, coverLetterPdf, declarationPdf);
+      // Extract text from manuscript
+      const manuscriptText = await extractTextFromDocx(req.files["manuscript"][0].path);
+      // Create table PDF (reuse your existing function)
+      const tablePdfResult = await createMergedPDFWithTable(
+        manuscriptPdf,
+        coverLetterPdf,
+        declarationPdf,
+        req.body // or the relevant form data
+      );
+      const tablePdfPath = tablePdfResult.localPath;
+      tempFiles.push(tablePdfPath);
+      // Merge all four PDFs
+      const mergedPdfPath = path.join(os.tmpdir(), `final_merged_${Date.now()}.pdf`);
+      await mergePdfs([
+        tablePdfPath,
+        manuscriptPdf,
+        coverLetterPdf,
+        declarationPdf
+      ], mergedPdfPath);
+      tempFiles.push(mergedPdfPath);
+      // Send merged PDF for download
+      res.download(mergedPdfPath, 'merged_manuscript.pdf', async (err) => {
+        // Clean up all temporary files after download (or error)
+        await cleanupFiles(tempFiles);
+      });
+    });
+  } catch (error) {
+    if (tempFiles.length > 0) {
+      await cleanupFiles(tempFiles).catch(() => {});
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports.convertDocxToPdf = convertDocxToPdf;
+module.exports.isValidPdf = isValidPdf;
