@@ -12,5 +12,6 @@ router.get("/manuscripts/:manuscriptId", auth, manuscriptController.getManuscrip
 router.delete("/manuscripts/:manuscriptId", auth, manuscriptController.withdrawManuscript);
 router.put("/manuscripts/:manuscriptId/assign-reviewers", auth, manuscriptController.assignReviewers);
 router.put("/manuscripts/:manuscriptId/status", auth, manuscriptController.updateManuscriptStatus);
+router.post("/manuscripts/extract", auth, manuscriptController.extractManuscriptInfo);
 
 module.exports = router;

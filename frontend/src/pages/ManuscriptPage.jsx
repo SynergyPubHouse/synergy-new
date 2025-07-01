@@ -67,6 +67,9 @@ const ManuscriptPage = () => {
 
 	const [isEmailVerified, setIsEmailVerified] = useState(false);
 
+	const [extractionDone, setExtractionDone] = useState(false);
+	const [lastExtractedFile, setLastExtractedFile] = useState(null);
+
 	const classificationOptions = [
 		"Science and Technology – Engineering, Science & Technology (All Branch)",
 		"Pharmacy All – Pharmacy (All Branch)",
@@ -412,13 +415,48 @@ const ManuscriptPage = () => {
 		setCompletedSections([]);
 	};
 
-	const handleNext = () => {
+	const extractTitleAndAbstract = async () => {
+		if (!files.manuscript || extractionDone) return;
+		try {
+			const data = new FormData();
+			data.append('manuscript', files.manuscript);
+			const response = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/extract`,
+				data,
+				{
+					headers: {
+						'Content-Type': 'multipart/form-data',
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			if (response.data.extractedTitle) {
+				setFormData((prev) => ({ ...prev, title: response.data.extractedTitle }));
+			}
+			if (response.data.extractedAbstract) {
+				setFormData((prev) => ({ ...prev, abstract: response.data.extractedAbstract }));
+			}
+			if (response.data.extractedKeywords) {
+				setFormData((prev) => ({ ...prev, keywords: response.data.extractedKeywords }));
+			}
+			setExtractionDone(true);
+			setLastExtractedFile(files.manuscript.name);
+		} catch (error) {
+			console.error('Error extracting title/abstract/keywords:', error);
+		}
+	};
+
+	const handleNext = async () => {
 		if (validateSection(currentSection)) {
+			// If moving from section 2 to 3, trigger extraction
+			if (currentSection === 2 && files.manuscript && !extractionDone) {
+				await extractTitleAndAbstract();
+			}
 			setCompletedSections((prev) => [...prev, currentSection]);
 			setCurrentSection((prev) => Math.min(prev + 1, totalSections));
 		} else {
 			alert(
-				"Please complete all required fields in this section before proceeding."
+				'Please complete all required fields in this section before proceeding.'
 			);
 		}
 	};
@@ -437,8 +475,8 @@ const ManuscriptPage = () => {
 			setCurrentSection(step);
 		} else {
 			alert(
-				"Please complete the current section before proceeding to step " +
-					step
+				"Please complete the current section before proceeding to step "
+					+ step
 			);
 		}
 	};
@@ -492,6 +530,14 @@ const ManuscriptPage = () => {
 					},
 				}
 			);
+
+			// Auto-fill title and abstract if extracted
+			if (response.data.extractedTitle) {
+				setFormData((prev) => ({ ...prev, title: response.data.extractedTitle }));
+			}
+			if (response.data.extractedAbstract) {
+				setFormData((prev) => ({ ...prev, abstract: response.data.extractedAbstract }));
+			}
 
 			if (response.data.success) {
 				alert("Manuscript submitted successfully!");
@@ -943,6 +989,14 @@ const ManuscriptPage = () => {
 			setSelectedAuthors(newAuthors);
 		}
 	};
+
+	// Reset extraction state if manuscript file changes
+	useEffect(() => {
+		if (files.manuscript && files.manuscript.name !== lastExtractedFile) {
+			setExtractionDone(false);
+		}
+		// eslint-disable-next-line
+	}, [files.manuscript]);
 
 	return (
 		<div className="min-h-screen bg-[#f8fafc] p-6 text-[#212121]">

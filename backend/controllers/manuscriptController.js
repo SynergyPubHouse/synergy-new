@@ -80,7 +80,7 @@ async function convertDocxToPdf(docxPath) {
     const outputPdf = docxPath.replace(/\.docx?$/, '.pdf');
     const shell = new PythonShell(
       scriptPath,
-      { args: [docxPath, outputPdf], pythonPath }
+      { args: [docxPath, outputPdf], pythonPath, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }
     );
     let output = [];
     let errorOutput = [];
@@ -125,12 +125,12 @@ async function convertDocxToPdf(docxPath) {
 
 // Helper: Extract text from DOCX
 async function extractTextFromDocx(docxPath) {
-  const pythonPath = 'python'; // Change to full path if needed
+  const pythonPath = 'python';
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(__dirname, '../utils/textExtractor.py');
     const shell = new PythonShell(
       scriptPath,
-      { args: [docxPath], pythonPath }
+      { args: [docxPath], pythonPath, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }
     );
     let output = [];
     let errorOutput = [];
@@ -152,11 +152,16 @@ async function extractTextFromDocx(docxPath) {
         }
         return reject(err);
       }
-      const finalText = output.join('\n');
-      if (output.length === 0 && errorOutput.length > 0) {
-        console.error('[extractTextFromDocx] No output, but stderr present:', errorOutput.join('\n'));
+      // Join output and parse JSON
+      const finalText = output.join('');
+      let parsed;
+      try {
+        parsed = JSON.parse(finalText);
+      } catch (e) {
+        console.error('[extractTextFromDocx] Failed to parse JSON:', e, finalText);
+        return reject(new Error('Failed to parse extracted text as JSON'));
       }
-      resolve(finalText);
+      resolve(parsed);
     });
   });
 }
@@ -258,20 +263,30 @@ exports.createManuscript = async (req, res) => {
       const coverLetterPath = req.files["coverLetter"][0].path;
       const declarationPath = req.files["declaration"][0].path;
       let manuscriptText = '', coverLetterText = '', declarationText = '';
+      let manuscriptTitle = '', manuscriptAbstract = '', manuscriptKeywords = '';
       try {
-        manuscriptText = await extractTextFromDocx(manuscriptPath);
+        const result = await extractTextFromDocx(manuscriptPath);
+        manuscriptText = result.full_text || '';
+        manuscriptTitle = result.title || '';
+        manuscriptAbstract = result.abstract || '';
+        manuscriptKeywords = result.keywords || '';
+        console.log('[createManuscript] Extracted manuscript title:', manuscriptTitle);
+        console.log('[createManuscript] Extracted manuscript abstract:', manuscriptAbstract);
+        console.log('[createManuscript] Extracted manuscript keywords:', manuscriptKeywords);
       } catch (err) {
         console.error('[createManuscript] Manuscript text extraction failed:', err);
         manuscriptText = '';
       }
       try {
-        coverLetterText = await extractTextFromDocx(coverLetterPath);
+        const result = await extractTextFromDocx(coverLetterPath);
+        coverLetterText = result.full_text || '';
       } catch (err) {
         console.error('[createManuscript] Cover letter text extraction failed:', err);
         coverLetterText = '';
       }
       try {
-        declarationText = await extractTextFromDocx(declarationPath);
+        const result = await extractTextFromDocx(declarationPath);
+        declarationText = result.full_text || '';
       } catch (err) {
         console.error('[createManuscript] Declaration text extraction failed:', err);
         declarationText = '';
@@ -345,6 +360,9 @@ exports.createManuscript = async (req, res) => {
         extractedText: manuscriptText, // Store extracted text
         coverLetterText: coverLetterText, // Store cover letter text
         declarationText: declarationText, // Store declaration text
+        extractedTitle: manuscriptTitle,
+        extractedAbstract: manuscriptAbstract,
+        extractedKeywords: manuscriptKeywords,
       };
 
       let manuscript;
@@ -389,6 +407,9 @@ exports.createManuscript = async (req, res) => {
         extractedText: manuscriptText,
         coverLetterText: coverLetterText,
         declarationText: declarationText,
+        extractedTitle: manuscriptTitle,
+        extractedAbstract: manuscriptAbstract,
+        extractedKeywords: manuscriptKeywords,
       });
     });
   } catch (error) {
@@ -913,6 +934,46 @@ exports.buildAndDownloadPdf = async (req, res) => {
     }
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+exports.extractManuscriptInfo = async (req, res) => {
+  // Use multer to handle the file upload
+  const multer = require('multer');
+  const os = require('os');
+  const path = require('path');
+  const fs = require('fs').promises;
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, os.tmpdir());
+    },
+    filename: function (req, file, cb) {
+      cb(null, `temp_extract_${Date.now()}${path.extname(file.originalname)}`);
+    },
+  });
+  const upload = multer({ storage: storage }).single('manuscript');
+
+  upload(req, res, async function (err) {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No manuscript file uploaded.' });
+    }
+    try {
+      const result = await extractTextFromDocx(req.file.path);
+      // Clean up the temp file
+      await fs.unlink(req.file.path);
+      return res.status(200).json({
+        success: true,
+        extractedTitle: result.title || '',
+        extractedAbstract: result.abstract || '',
+        extractedKeywords: result.keywords || '',
+        extractedText: result.full_text || ''
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Extraction failed.', error: error.message });
+    }
+  });
 };
 
 module.exports.convertDocxToPdf = convertDocxToPdf;
