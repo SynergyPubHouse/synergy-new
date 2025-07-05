@@ -295,7 +295,9 @@ const ManuscriptPage = () => {
 	// Check authentication on mount
 	useEffect(() => {
 		if (!user || !user.token) {
-			navigate("/login");
+			    navigate("/login", {
+					state: { from: location.pathname },
+					});
 		}
 	}, [user, navigate]);
 
@@ -579,6 +581,7 @@ const ManuscriptPage = () => {
 	}, []);
 
 	// Add a new function to handle save and submit later
+
 	const handleSaveAndSubmitLater = async (e) => {
 		e.preventDefault();
 
@@ -654,7 +657,9 @@ const ManuscriptPage = () => {
 			console.error("Error saving manuscript:", error);
 			if (error.response?.status === 401) {
 				alert("Your session has expired. Please log in again.");
-				navigate("/login");
+					navigate("/login", {
+						state: { from: location.pathname },
+					});
 			} else {
 				alert(
 					"Save failed: " +
@@ -663,6 +668,202 @@ const ManuscriptPage = () => {
 			}
 		}
 	};
+
+
+	const [manuscriptId, setManuscriptId] = useState(null);
+
+		// Add a new function to handle save and submit later
+	const proceedbeforebuildpdf = async (e) => {
+		e.preventDefault();
+
+		if (!user?.token) {
+			alert("Please log in to submit a manuscript");
+			return;
+		}
+
+		// Validate all sections
+		for (let section = 1; section <= 6; section++) {
+			if (!validateSection(section)) {
+				alert(
+					`Please complete all required fields in Section ${section}`
+				);
+				setCurrentSection(section);
+				return;
+			}
+		}
+
+		// Check if all required files are present
+		if (!files.manuscript || !files.coverLetter || !files.declaration) {
+			alert(
+				"Please upload all required files: manuscript, cover letter, and declaration"
+			);
+			setCurrentSection(2); // Navigate to the files section
+			return;
+		}
+
+		const data = new FormData();
+		Object.keys(formData).forEach((key) => {
+			if (key === "additionalInfo") {
+				data.append(key, JSON.stringify(formData[key]));
+			} else {
+				data.append(key, formData[key]);
+			}
+		});
+
+		// Append files
+		if (files.manuscript) {
+			data.append("manuscript", files.manuscript);
+		}
+		if (files.coverLetter) {
+			data.append("coverLetter", files.coverLetter);
+		}
+		if (files.declaration) {
+			data.append("declaration", files.declaration);
+		}
+
+		// Add authors data
+		data.append("authors", JSON.stringify(selectedAuthors));
+		data.append("correspondingAuthorId", correspondingAuthorId);
+
+try {
+  const response = await axios.post(
+    `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts`,
+    data,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${user.token}`,
+      },
+    }
+  );
+
+  if (response.data.success && response.data.data && response.data.data._id) {
+	  const id = response.data.data._id;
+	  setManuscriptId(id);
+
+  // Update status to "Under Review"
+  await axios.put(
+    `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${id}/status`,
+    { status: "Under Review" },
+    {
+      headers: {
+        Authorization: `Bearer ${user.token}`,
+      },
+    }
+  );
+    alert("Manuscript saved successfully!");
+	setIsBuildingPdf(false);
+	setPdfUrl(response.data.mergedPdfUrl);
+	setAcceptOrRejectPdf(true);
+    // clearForm();
+    return {
+      manuscriptId: response.data.data._id,
+      mergedFileUrl: response.data.mergedPdfUrl
+    };
+  } else {
+    throw new Error(response.data?.message || "Submission failed");
+  }
+} catch (error) {
+  console.error("Error saving manuscript:", error);
+  if (error.response?.status === 401) {
+    alert("Your session has expired. Please log in again.");
+	navigate("/login", {
+		state: { from: location.pathname },
+	});
+  } else {
+    alert(
+      "Save failed: " +
+        (error.response?.data?.message || error.message)
+    );
+  }
+}
+	};
+
+const handleAcceptPdf = async () => {
+  await axios.put(
+    `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
+    { status: "Accepted" },
+    {
+      headers: {
+        Authorization: `Bearer ${user.token}`,
+      },
+    }
+  );
+  setAcceptOrRejectPdf(false);
+};
+
+const handleRejectPdf = async () => {
+	  await axios.put(
+    `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
+    { status: "Rejected" },
+    {
+      headers: {
+        Authorization: `Bearer ${user.token}`,
+      },
+    }
+  );
+  setAcceptOrRejectPdf(false);
+};
+
+
+
+
+  const handleBuildPdf = (manuscriptId, mergedFileUrl) => {
+    if (mergedFileUrl) {
+      window.open(mergedFileUrl, "_blank");
+      setPdfBuiltManuscripts((prev) => new Set([...prev, manuscriptId]));
+    } else {
+      alert("PDF is not available yet.");
+    }
+  };
+  const [pdfBuiltManuscripts, setPdfBuiltManuscripts] = useState(new Set());
+  const [isBuildingPdf, setIsBuildingPdf] = useState(false);
+const [pdfUrl, setPdfUrl] = useState(null);
+const [buildError, setBuildError] = useState(null);
+const [AcceptOrRejectPdf, setAcceptOrRejectPdf] = useState(false);
+
+
+const handleProceedAndBuildPdf = async (e) => {
+  setIsBuildingPdf(true);
+  setPdfUrl(null);
+  setBuildError(null);
+
+  // Save manuscript
+  const result = await proceedbeforebuildpdf(e);
+  if (!result) {
+    setIsBuildingPdf(false);
+    setBuildError("Failed to save manuscript.");
+    return;
+  }
+
+  // Poll for PDF
+  let attempts = 0;
+  let url = null;
+  while (attempts < 12) { // Poll for up to 1 minute (12 x 5s)
+    const resp = await axios.get(
+      `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${result.manuscriptId}`,
+      { headers: { Authorization: `Bearer ${user.token}` } }
+    );
+    url = resp.data.manuscript.mergedFileUrl;
+    if (url) break;
+    await new Promise(res => setTimeout(res, 5000)); // wait 5 seconds
+    attempts++;
+  }
+
+  setIsBuildingPdf(false);
+  if (url) {
+    setPdfUrl(url);
+    // Optionally: handleBuildPdf(result.manuscriptId, url);
+  } else {
+    setBuildError("PDF is not available yet. Please try again later.");
+  }
+};
+
+
+
+
+
+
 
 	const buildPdf = async (e) => {
 		e.preventDefault();
@@ -1935,23 +2136,62 @@ const ManuscriptPage = () => {
 
 							<div className="flex justify-between">
 								{renderBackButton(6)}
+
 								<div className="flex space-x-4">
-									<button
+									{!pdfUrl && 
+									(<button
 										type="button"
 										onClick={handleSaveAndSubmitLater}
 										className="mt-4 px-6 py-2 bg-[#BAFFF5] text-[#00796b] rounded-lg hover:bg-[#a8e6dc]"
 									>
 										Save and Submit Later
-									</button>
-									<button
-										type="button"
-										onClick={() =>
-											navigate("/journal/jics/my-submissions")
-										}
-										className="mt-4 px-6 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269]"
-									>
-										Proceed
-									</button>
+									</button>)}
+  {!pdfUrl && (
+  <button
+    type="button"
+    onClick={handleProceedAndBuildPdf}
+    disabled={isBuildingPdf}
+    className="mt-4 px-6 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269]"
+  >
+    {isBuildingPdf ? "Building PDF..." : "Proceed and Build PDF"}
+  </button>
+  )}
+
+  {pdfUrl && (
+    <button
+      type="button"
+      onClick={() => window.open(pdfUrl, "_blank")}
+      className="mt-4 px-6 py-2 bg-[#00acc1] text-white rounded-lg hover:bg-[#00796b]"
+    >
+      View PDF
+    </button>
+  )}
+
+  {/* {buildError && (
+    <div className="mt-2 text-red-500">{buildError}</div>
+  )} */}
+
+    {AcceptOrRejectPdf && (
+    <button
+      type="button"
+      onClick={handleAcceptPdf}
+      className="mt-4 px-6 py-2 bg-[#00acc1] text-white rounded-lg hover:bg-[#00796b]"
+    >
+       Accept
+    </button>
+  )}
+{AcceptOrRejectPdf && (
+    <button
+      type="button"
+      onClick={handleRejectPdf}
+      className="mt-4 px-6 py-2 bg-[#00acc1] text-white rounded-lg hover:bg-[#00796b]"
+    >
+      Reject
+    </button>
+  )}
+  
+
+
 								</div>
 							</div>
 						</motion.div>

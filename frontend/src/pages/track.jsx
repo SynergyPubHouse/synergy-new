@@ -65,11 +65,12 @@ function TrackResearch() {
 						</Link>
 						<Link
 							to="/login"
+							state={{ from: location.pathname }}
 							className="px-8 py-4 bg-white hover:bg-gray-100 text-[#496580] font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 						>
 							Login
 						</Link>
-					</motion.div>
+					</motion.div>               
 				)}
 			</section>
 

@@ -1,4 +1,6 @@
 import React, { useState, createContext, useContext, useEffect } from "react";
+
+
 import {
     BrowserRouter as Router,
     Route,
@@ -41,7 +43,6 @@ import DoubleBlindPeerReview from "./pages/peer-review/DoubleBlindPeerReview";
 import FeedbackAndRevisions from "./pages/peer-review/FeedbackAndRevisions";
 import FinalEvaluationAndAcceptance from "./pages/peer-review/FinalEvaluationAndAcceptance";
 import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationIntegrityAndTimeline";
-
 
 
 import PageNotAvailable from "./pages/pagenotavailable";
@@ -184,12 +185,19 @@ function AppContent() {
                         user ? <ProfilePage /> : <Navigate to={`${JICS_URL}/login`} replace />
                     }
                 />
-                <Route
-                    path={`${JICS_URL}/submit`}
-                    element={
-                        user ? <ManuscriptPage /> : <Navigate to={`/login`} replace />
-                    }
-                />
+
+
+<Route
+  path={`${JICS_URL}/submit`}
+  element={
+    user ? (
+      <ManuscriptPage />
+    ) : (
+      <Navigate to="/login" state={{ from: location.pathname }} replace />
+    )
+  }
+/>
+
                 <Route path={`${JICS_URL}/my-submissions`} element={<MySubmissions />} />
                 <Route path="*" element={<PageNotAvailable />} />
             </Routes>

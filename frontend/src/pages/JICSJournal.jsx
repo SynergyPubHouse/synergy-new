@@ -3,6 +3,7 @@ import { Link, Routes, Route, Navigate } from "react-router-dom";
 import JICSNavigation from "../components/JICSNavigation";
 import Overview from "./jics/Overview";
 import AimsAndScope from "./jics/AimsAndScope";
+import EditorialBoard from './jics/EditorialBoard';
 import AcademicIntegrity from "./jics/AcademicIntegrity";
 import SubmissionGuidelines from "./jics/SubmissionGuidelines";
 import ManuscriptTemplate from "./jics/ManuscriptTemplate";
@@ -80,6 +81,7 @@ const JICSJournal = () => (
           />
           <Route path="/about/overview" element={<Overview />} />
           <Route path="/about/aims-scope" element={<AimsAndScope />} />
+          <Route path="/about/editorial-board" element={<EditorialBoard />} />
           <Route
             path="/about/integrity"
             element={<AcademicIntegrity />}

@@ -62,15 +62,17 @@ const Navigation = () => {
     setClickedAuthorLogin(false); // Reset on menu toggle
   };
 
-  const handleAuthorLoginClick = (e) => {
-    if (user) {
-      e.preventDefault();
-      setClickedAuthorLogin(true);
-      setTimeout(() => setClickedAuthorLogin(false), 3000);
-    } else {
-      navigate("/login");
-    }
-  };
+const handleAuthorLoginClick = (e) => {
+  if (user) {
+    e.preventDefault();
+    setClickedAuthorLogin(true);
+    setTimeout(() => setClickedAuthorLogin(false), 3000);
+  } else {
+    navigate("/login", {
+      state: { from: location.pathname },
+    });
+  }
+};
 
   return (
     <nav

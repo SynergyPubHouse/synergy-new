@@ -16,6 +16,7 @@ const JICSNavigation = () => {
       path: "/journal/jics/about/overview",
       dropdown: [
         { label: "Overview", path: "/journal/jics/about/overview" },
+        { label: "Editorial Board", path: "/journal/jics/about/editorial-board" },
         { label: "Aims and Scope", path: "/journal/jics/about/aims-scope" },
         { label: "Academic Integrity", path: "/journal/jics/about/integrity" },
       ],
@@ -106,7 +107,7 @@ const JICSNavigation = () => {
       dropdown: [
         {
           label: "Follow on LinkedIn",
-          path: "https://www.linkedin.com/in/synergy-world-414230368/",
+          path: "https://www.linkedin.com/company/synergy-world-press/about/?viewAsMember=true",
           icon: (
             <svg
               className="w-5 h-5 ml-2"
