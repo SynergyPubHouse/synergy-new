@@ -69,12 +69,14 @@ app.use((req, res, next) => {
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/auth/editor", require("./routes/editorRoutes"));
 app.use("/api/auth/reviewer", require("./routes/reviewerRoutes"));
-app.use("/api", require("./routes/manuscriptRoutes"));
+
 
 // Root route to confirm backend is working
 app.get('/', (req, res) => {
   res.send('Backend is working');
 });
+
+app.use("/api", require("./routes/manuscriptRoutes"));
 
 // Error Handling
 app.use(notFound);
@@ -92,4 +94,20 @@ const server = app.listen(PORT, () => {
 process.on("unhandledRejection", (err) => {
   console.log(`Error: ${err.message}`);
   server.close(() => process.exit(1));
+});
+
+
+// Debug: Show all registered routes
+console.log('Registered routes:');
+app._router.stack.forEach((r) => {
+  if (r.route && r.route.path) {
+    console.log(r.route.path);
+  } else if (r.name === 'router') {
+    // For mounted routers
+    r.handle.stack.forEach((s) => {
+      if (s.route && s.route.path) {
+        console.log(s.route.path);
+      }
+    });
+  }
 });

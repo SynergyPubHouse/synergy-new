@@ -11,7 +11,7 @@ const BASE_URL = '/';
 // ORCID OAuth configuration
 const ORCID_CLIENT_ID = import.meta.env.VITE_ORCID_CLIENT_ID;
 const ORCID_REDIRECT_URI = `https://synergyworldpress.com/orcid-callback`;
-const ORCID_AUTH_URL = `https://orcid.org/oauth/authorize?client_id=${ORCID_CLIENT_ID}&response_type=code&scope=openid&&redirect_uri=${encodeURIComponent(ORCID_REDIRECT_URI)}`;
+const ORCID_AUTH_URL = `https://orcid.org/oauth/authorize?client_id=${ORCID_CLIENT_ID}&response_type=code&scope=/authenticate%20/read-limited&redirect_uri=${encodeURIComponent(ORCID_REDIRECT_URI)}`;
 // https://orcid.org/oauth/authorize?client_id=APP-18X9GYBBBH1I4WR3&response_type=code&scope=openid&&redirect_uri=${encodeURIComponent(https://synergyworldpress.com/orcid-callback)}
 function Login() {
   const [formData, setFormData] = useState({ email: "", password: "" });
