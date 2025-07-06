@@ -2,5 +2,5 @@ services:
   - type: web
     name: synergy-world-press
     env: docker
-    dockerfilePath: ./Dockerfile
     plan: free
+    dockerfilePath: ./Dockerfile
