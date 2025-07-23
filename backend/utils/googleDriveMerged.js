@@ -2,6 +2,9 @@ const { google } = require("googleapis");
 const fs = require("fs");
 const path = require("path");
 
+// Load environment variables
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
+
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
 
 // Initialize Google Auth
@@ -33,6 +36,7 @@ try {
 
 	drive = google.drive({ version: "v3", auth });
 	console.log("Google Drive authentication initialized successfully");
+	console.log("Service Account:", credentials.client_email);
 } catch (error) {
 	console.error(
 		"Failed to initialize Google Drive authentication:",
@@ -41,14 +45,24 @@ try {
 	throw error;
 }
 
-// Configuration
-const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || null; // Folder or Shared Drive ID
-const SHARED_DRIVE_ID = process.env.SHARED_DRIVE_ID || null; // Set this if using shared drive
+// Configuration - Use your shared folder ID
+const MERGED_PDF_FOLDER_ID =
+	process.env.GOOGLE_DRIVE_MERGED_FOLDER ||
+	process.env.GOOGLE_DRIVE_FOLDER_ID ||
+	"1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4";
 
-async function uploadFile(filePath, fileName, fileType = "merged") {
+console.log("Environment check:");
+console.log(
+	"GOOGLE_DRIVE_MERGED_FOLDER:",
+	process.env.GOOGLE_DRIVE_MERGED_FOLDER
+);
+console.log("GOOGLE_DRIVE_FOLDER_ID:", process.env.GOOGLE_DRIVE_FOLDER_ID);
+console.log("Final MERGED_PDF_FOLDER_ID:", MERGED_PDF_FOLDER_ID);
+
+async function uploadMergedPdf(filePath, fileName) {
 	try {
 		console.log(
-			`[GoogleDrive] Starting upload: ${filePath} -> ${fileName} (type: ${fileType})`
+			`[GoogleDriveMerged] Starting upload: ${filePath} -> ${fileName}`
 		);
 
 		// Verify file exists and is readable
@@ -61,37 +75,14 @@ async function uploadFile(filePath, fileName, fileType = "merged") {
 			throw new Error(`File is empty: ${filePath}`);
 		}
 
-		console.log(`[GoogleDrive] File size: ${fileStats.size} bytes`);
-
-		// Determine target folder based on file type
-		let targetFolderId = DRIVE_FOLDER_ID; // Default to main folder
-
-		switch (fileType) {
-			case "manuscript":
-				targetFolderId =
-					process.env.GOOGLE_DRIVE_MANUSCRIPTS_FOLDER ||
-					DRIVE_FOLDER_ID;
-				break;
-			case "coverLetter":
-				targetFolderId =
-					process.env.GOOGLE_DRIVE_COVERLETTERS_FOLDER ||
-					DRIVE_FOLDER_ID;
-				break;
-			case "declaration":
-				targetFolderId =
-					process.env.GOOGLE_DRIVE_DECLARATIONS_FOLDER ||
-					DRIVE_FOLDER_ID;
-				break;
-			case "merged":
-				targetFolderId =
-					process.env.GOOGLE_DRIVE_MERGED_FOLDER || DRIVE_FOLDER_ID;
-				break;
-		}
+		console.log(`[GoogleDriveMerged] File size: ${fileStats.size} bytes`);
+		console.log(
+			`[GoogleDriveMerged] Target folder ID: ${MERGED_PDF_FOLDER_ID}`
+		);
 
 		const fileMetadata = {
 			name: fileName,
-			// Use specific folder based on file type
-			...(targetFolderId && { parents: [targetFolderId] }),
+			parents: [MERGED_PDF_FOLDER_ID], // Your shared folder ID
 		};
 
 		const media = {
@@ -99,13 +90,11 @@ async function uploadFile(filePath, fileName, fileType = "merged") {
 			body: fs.createReadStream(filePath),
 		};
 
-		console.log("[GoogleDrive] Creating file on Google Drive...");
+		console.log("[GoogleDriveMerged] Creating file on Google Drive...");
 		const response = await drive.files.create({
 			resource: fileMetadata,
 			media: media,
 			fields: "id,webViewLink,webContentLink",
-			// Use shared drive support if needed
-			...(SHARED_DRIVE_ID && { supportsAllDrives: true }),
 		});
 
 		if (!response.data.id) {
@@ -114,27 +103,25 @@ async function uploadFile(filePath, fileName, fileType = "merged") {
 			);
 		}
 
-		console.log(`[GoogleDrive] File created with ID: ${response.data.id}`);
+		console.log(
+			`[GoogleDriveMerged] File created with ID: ${response.data.id}`
+		);
 
 		// Make the file publicly readable
-		console.log("[GoogleDrive] Setting file permissions...");
+		console.log("[GoogleDriveMerged] Setting file permissions...");
 		await drive.permissions.create({
 			fileId: response.data.id,
 			requestBody: {
 				role: "reader",
 				type: "anyone",
 			},
-			// Use shared drive support if needed
-			...(SHARED_DRIVE_ID && { supportsAllDrives: true }),
 		});
 
 		// Get the file details with links
-		console.log("[GoogleDrive] Getting file details...");
+		console.log("[GoogleDriveMerged] Getting file details...");
 		const fileData = await drive.files.get({
 			fileId: response.data.id,
 			fields: "id,webViewLink,webContentLink,name,size,mimeType",
-			// Use shared drive support if needed
-			...(SHARED_DRIVE_ID && { supportsAllDrives: true }),
 		});
 
 		const result = {
@@ -143,12 +130,16 @@ async function uploadFile(filePath, fileName, fileType = "merged") {
 			webContentLink: fileData.data.webContentLink,
 			fileName: fileData.data.name,
 			fileSize: fileData.data.size,
+			storageType: "googledrive",
 		};
 
-		console.log("[GoogleDrive] Upload completed successfully:", result);
+		console.log(
+			"[GoogleDriveMerged] Upload completed successfully:",
+			result
+		);
 		return result;
 	} catch (error) {
-		console.error("Error uploading file to Google Drive:", error);
+		console.error("Error uploading merged PDF to Google Drive:", error);
 
 		// Provide more specific error information
 		if (error.response) {
@@ -164,20 +155,36 @@ async function uploadFile(filePath, fileName, fileType = "merged") {
 	}
 }
 
-// Test Google Drive connection
-async function testConnection() {
+// Test Google Drive connection for merged PDF upload
+async function testMergedConnection() {
 	try {
-		console.log("[GoogleDrive] Testing connection...");
+		console.log("[GoogleDriveMerged] Testing connection...");
 		const response = await drive.about.get({
 			fields: "user(displayName,emailAddress),storageQuota(limit,usage)",
 		});
 
-		console.log("[GoogleDrive] Connection successful!");
+		console.log("[GoogleDriveMerged] Connection successful!");
 		console.log("User:", response.data.user);
 		console.log("Storage:", response.data.storageQuota);
+
+		// Test access to the specific folder
+		if (MERGED_PDF_FOLDER_ID) {
+			console.log(
+				`[GoogleDriveMerged] Testing access to folder: ${MERGED_PDF_FOLDER_ID}`
+			);
+			const folderResponse = await drive.files.get({
+				fileId: MERGED_PDF_FOLDER_ID,
+				fields: "id,name,permissions",
+			});
+			console.log("Folder access successful:", folderResponse.data.name);
+		}
+
 		return true;
 	} catch (error) {
-		console.error("[GoogleDrive] Connection test failed:", error.message);
+		console.error(
+			"[GoogleDriveMerged] Connection test failed:",
+			error.message
+		);
 		if (error.response) {
 			console.error("API Response:", error.response.data);
 		}
@@ -185,4 +192,4 @@ async function testConnection() {
 	}
 }
 
-module.exports = { uploadFile, testConnection };
+module.exports = { uploadMergedPdf, testMergedConnection };

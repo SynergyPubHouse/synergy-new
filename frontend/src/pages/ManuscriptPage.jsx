@@ -5,7 +5,7 @@ import { useAuth } from "../App";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { useNavigate } from "react-router-dom";
 
-const BASE_URL = '/journal/jics';
+const BASE_URL = "/journal/jics";
 
 const ManuscriptPage = () => {
 	const { user } = useAuth();
@@ -69,6 +69,7 @@ const ManuscriptPage = () => {
 
 	const [extractionDone, setExtractionDone] = useState(false);
 	const [lastExtractedFile, setLastExtractedFile] = useState(null);
+	const [isExtracting, setIsExtracting] = useState(false);
 
 	const classificationOptions = [
 		"Science and Technology – Engineering, Science & Technology (All Branch)",
@@ -295,9 +296,9 @@ const ManuscriptPage = () => {
 	// Check authentication on mount
 	useEffect(() => {
 		if (!user || !user.token) {
-			    navigate("/login", {
-					state: { from: location.pathname },
-					});
+			navigate("/login", {
+				state: { from: location.pathname },
+			});
 		}
 	}, [user, navigate]);
 
@@ -419,32 +420,45 @@ const ManuscriptPage = () => {
 
 	const extractTitleAndAbstract = async () => {
 		if (!files.manuscript || extractionDone) return;
+
+		setIsExtracting(true);
 		try {
 			const data = new FormData();
-			data.append('manuscript', files.manuscript);
+			data.append("manuscript", files.manuscript);
 			const response = await axios.post(
 				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/extract`,
 				data,
 				{
 					headers: {
-						'Content-Type': 'multipart/form-data',
+						"Content-Type": "multipart/form-data",
 						Authorization: `Bearer ${user.token}`,
 					},
 				}
 			);
 			if (response.data.extractedTitle) {
-				setFormData((prev) => ({ ...prev, title: response.data.extractedTitle }));
+				setFormData((prev) => ({
+					...prev,
+					title: response.data.extractedTitle,
+				}));
 			}
 			if (response.data.extractedAbstract) {
-				setFormData((prev) => ({ ...prev, abstract: response.data.extractedAbstract }));
+				setFormData((prev) => ({
+					...prev,
+					abstract: response.data.extractedAbstract,
+				}));
 			}
 			if (response.data.extractedKeywords) {
-				setFormData((prev) => ({ ...prev, keywords: response.data.extractedKeywords }));
+				setFormData((prev) => ({
+					...prev,
+					keywords: response.data.extractedKeywords,
+				}));
 			}
 			setExtractionDone(true);
 			setLastExtractedFile(files.manuscript.name);
 		} catch (error) {
-			console.error('Error extracting title/abstract/keywords:', error);
+			console.error("Error extracting title/abstract/keywords:", error);
+		} finally {
+			setIsExtracting(false);
 		}
 	};
 
@@ -458,7 +472,7 @@ const ManuscriptPage = () => {
 			setCurrentSection((prev) => Math.min(prev + 1, totalSections));
 		} else {
 			alert(
-				'Please complete all required fields in this section before proceeding.'
+				"Please complete all required fields in this section before proceeding."
 			);
 		}
 	};
@@ -477,8 +491,8 @@ const ManuscriptPage = () => {
 			setCurrentSection(step);
 		} else {
 			alert(
-				"Please complete the current section before proceeding to step "
-					+ step
+				"Please complete the current section before proceeding to step " +
+					step
 			);
 		}
 	};
@@ -535,10 +549,16 @@ const ManuscriptPage = () => {
 
 			// Auto-fill title and abstract if extracted
 			if (response.data.extractedTitle) {
-				setFormData((prev) => ({ ...prev, title: response.data.extractedTitle }));
+				setFormData((prev) => ({
+					...prev,
+					title: response.data.extractedTitle,
+				}));
 			}
 			if (response.data.extractedAbstract) {
-				setFormData((prev) => ({ ...prev, abstract: response.data.extractedAbstract }));
+				setFormData((prev) => ({
+					...prev,
+					abstract: response.data.extractedAbstract,
+				}));
 			}
 
 			if (response.data.success) {
@@ -657,9 +677,9 @@ const ManuscriptPage = () => {
 			console.error("Error saving manuscript:", error);
 			if (error.response?.status === 401) {
 				alert("Your session has expired. Please log in again.");
-					navigate("/login", {
-						state: { from: location.pathname },
-					});
+				navigate("/login", {
+					state: { from: location.pathname },
+				});
 			} else {
 				alert(
 					"Save failed: " +
@@ -669,10 +689,9 @@ const ManuscriptPage = () => {
 		}
 	};
 
-
 	const [manuscriptId, setManuscriptId] = useState(null);
 
-		// Add a new function to handle save and submit later
+	// Add a new function to handle save and submit later
 	const proceedbeforebuildpdf = async (e) => {
 		e.preventDefault();
 
@@ -725,145 +744,166 @@ const ManuscriptPage = () => {
 		data.append("authors", JSON.stringify(selectedAuthors));
 		data.append("correspondingAuthorId", correspondingAuthorId);
 
-try {
-  const response = await axios.post(
-    `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts`,
-    data,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-        Authorization: `Bearer ${user.token}`,
-      },
-    }
-  );
+		try {
+			const response = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts`,
+				data,
+				{
+					headers: {
+						"Content-Type": "multipart/form-data",
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
 
-  if (response.data.success && response.data.data && response.data.data._id) {
-	  const id = response.data.data._id;
-	  setManuscriptId(id);
+			if (
+				response.data.success &&
+				response.data.data &&
+				response.data.data._id
+			) {
+				const id = response.data.data._id;
+				setManuscriptId(id);
 
-  // Update status to "Under Review"
-  await axios.put(
-    `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${id}/status`,
-    { status: "Under Review" },
-    {
-      headers: {
-        Authorization: `Bearer ${user.token}`,
-      },
-    }
-  );
-    alert("Manuscript saved successfully!");
-	setIsBuildingPdf(false);
-	setPdfUrl(response.data.mergedPdfUrl);
-	setAcceptOrRejectPdf(true);
-    // clearForm();
-    return {
-      manuscriptId: response.data.data._id,
-      mergedFileUrl: response.data.mergedPdfUrl
-    };
-  } else {
-    throw new Error(response.data?.message || "Submission failed");
-  }
-} catch (error) {
-  console.error("Error saving manuscript:", error);
-  if (error.response?.status === 401) {
-    alert("Your session has expired. Please log in again.");
-	navigate("/login", {
-		state: { from: location.pathname },
-	});
-  } else {
-    alert(
-      "Save failed: " +
-        (error.response?.data?.message || error.message)
-    );
-  }
-}
+				// Update status to "Under Review"
+				await axios.put(
+					`${
+						import.meta.env.VITE_BACKEND_URL
+					}/api/manuscripts/${id}/status`,
+					{ status: "Under Review" },
+					{
+						headers: {
+							Authorization: `Bearer ${user.token}`,
+						},
+					}
+				);
+				alert("Manuscript saved successfully!");
+				setIsBuildingPdf(false);
+				setPdfUrl(response.data.mergedPdfUrl);
+				setAcceptOrRejectPdf(true);
+				// clearForm();
+				return {
+					manuscriptId: response.data.data._id,
+					mergedFileUrl: response.data.mergedPdfUrl,
+				};
+			} else {
+				throw new Error(response.data?.message || "Submission failed");
+			}
+		} catch (error) {
+			console.error("Error saving manuscript:", error);
+			if (error.response?.status === 401) {
+				alert("Your session has expired. Please log in again.");
+				navigate("/login", {
+					state: { from: location.pathname },
+				});
+			} else {
+				alert(
+					"Save failed: " +
+						(error.response?.data?.message || error.message)
+				);
+			}
+		}
 	};
 
-const handleAcceptPdf = async () => {
-  await axios.put(
-    `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
-    { status: "Accepted" },
-    {
-      headers: {
-        Authorization: `Bearer ${user.token}`,
-      },
-    }
-  );
-  setAcceptOrRejectPdf(false);
-};
+	const handleAcceptPdf = async () => {
+		try {
+			await axios.put(
+				`${
+					import.meta.env.VITE_BACKEND_URL
+				}/api/manuscripts/${manuscriptId}/status`,
+				{ status: "Accepted" },
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			setAcceptOrRejectPdf(false);
+			// Redirect to my submissions page
+			navigate(`${BASE_URL}/my-submissions`);
+		} catch (error) {
+			console.error("Error accepting manuscript:", error);
+			alert("Failed to accept manuscript. Please try again.");
+		}
+	};
 
-const handleRejectPdf = async () => {
-	  await axios.put(
-    `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
-    { status: "Rejected" },
-    {
-      headers: {
-        Authorization: `Bearer ${user.token}`,
-      },
-    }
-  );
-  setAcceptOrRejectPdf(false);
-};
+	const handleRejectPdf = async () => {
+		try {
+			await axios.put(
+				`${
+					import.meta.env.VITE_BACKEND_URL
+				}/api/manuscripts/${manuscriptId}/status`,
+				{ status: "Rejected" },
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			setAcceptOrRejectPdf(false);
+			// Redirect to my submissions page
+			navigate(`${BASE_URL}/my-submissions`);
+		} catch (error) {
+			console.error("Error rejecting manuscript:", error);
+			alert("Failed to reject manuscript. Please try again.");
+		}
+	};
 
+	const handleBuildPdf = (manuscriptId, mergedFileUrl) => {
+		if (mergedFileUrl) {
+			window.open(mergedFileUrl, "_blank");
+			setPdfBuiltManuscripts((prev) => new Set([...prev, manuscriptId]));
+		} else {
+			alert("PDF is not available yet.");
+		}
+	};
+	const [pdfBuiltManuscripts, setPdfBuiltManuscripts] = useState(new Set());
+	const [isBuildingPdf, setIsBuildingPdf] = useState(false);
+	const [pdfUrl, setPdfUrl] = useState(null);
+	const [buildError, setBuildError] = useState(null);
+	const [AcceptOrRejectPdf, setAcceptOrRejectPdf] = useState(false);
+	const [pdfViewed, setPdfViewed] = useState(false);
 
+	const handleProceedAndBuildPdf = async (e) => {
+		setIsBuildingPdf(true);
+		setPdfUrl(null);
+		setBuildError(null);
+		setPdfViewed(false);
 
+		// Save manuscript
+		const result = await proceedbeforebuildpdf(e);
+		if (!result) {
+			setIsBuildingPdf(false);
+			setBuildError("Failed to save manuscript.");
+			return;
+		}
 
-  const handleBuildPdf = (manuscriptId, mergedFileUrl) => {
-    if (mergedFileUrl) {
-      window.open(mergedFileUrl, "_blank");
-      setPdfBuiltManuscripts((prev) => new Set([...prev, manuscriptId]));
-    } else {
-      alert("PDF is not available yet.");
-    }
-  };
-  const [pdfBuiltManuscripts, setPdfBuiltManuscripts] = useState(new Set());
-  const [isBuildingPdf, setIsBuildingPdf] = useState(false);
-const [pdfUrl, setPdfUrl] = useState(null);
-const [buildError, setBuildError] = useState(null);
-const [AcceptOrRejectPdf, setAcceptOrRejectPdf] = useState(false);
+		// Poll for PDF
+		let attempts = 0;
+		let url = null;
+		while (attempts < 12) {
+			// Poll for up to 1 minute (12 x 5s)
+			const resp = await axios.get(
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${
+					result.manuscriptId
+				}`,
+				{ headers: { Authorization: `Bearer ${user.token}` } }
+			);
+			url = resp.data.manuscript.mergedFileUrl;
+			if (url) break;
+			await new Promise((res) => setTimeout(res, 5000)); // wait 5 seconds
+			attempts++;
+		}
 
-
-const handleProceedAndBuildPdf = async (e) => {
-  setIsBuildingPdf(true);
-  setPdfUrl(null);
-  setBuildError(null);
-
-  // Save manuscript
-  const result = await proceedbeforebuildpdf(e);
-  if (!result) {
-    setIsBuildingPdf(false);
-    setBuildError("Failed to save manuscript.");
-    return;
-  }
-
-  // Poll for PDF
-  let attempts = 0;
-  let url = null;
-  while (attempts < 12) { // Poll for up to 1 minute (12 x 5s)
-    const resp = await axios.get(
-      `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${result.manuscriptId}`,
-      { headers: { Authorization: `Bearer ${user.token}` } }
-    );
-    url = resp.data.manuscript.mergedFileUrl;
-    if (url) break;
-    await new Promise(res => setTimeout(res, 5000)); // wait 5 seconds
-    attempts++;
-  }
-
-  setIsBuildingPdf(false);
-  if (url) {
-    setPdfUrl(url);
-    // Optionally: handleBuildPdf(result.manuscriptId, url);
-  } else {
-    setBuildError("PDF is not available yet. Please try again later.");
-  }
-};
-
-
-
-
-
-
+		setIsBuildingPdf(false);
+		if (url) {
+			setPdfUrl(url);
+			setManuscriptId(result.manuscriptId); // Store the manuscript ID
+			setAcceptOrRejectPdf(true); // Show accept/reject buttons after PDF is built
+			// Optionally: handleBuildPdf(result.manuscriptId, url);
+		} else {
+			setBuildError("PDF is not available yet. Please try again later.");
+		}
+	};
 
 	const buildPdf = async (e) => {
 		e.preventDefault();
@@ -1312,8 +1352,46 @@ const handleProceedAndBuildPdf = async (e) => {
 							initial="hidden"
 							animate="visible"
 							exit="exit"
-							className="mb-4"
+							className="mb-4 relative"
 						>
+							{/* Loading Overlay */}
+							{isExtracting && (
+								<div className="absolute inset-0 bg-white bg-opacity-90 z-50 flex items-center justify-center rounded-lg">
+									<div className="text-center">
+										<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-[#00796b] mx-auto mb-4"></div>
+										<div className="text-lg font-semibold text-[#00796b] mb-2">
+											Extracting Text Content...
+										</div>
+										<div className="text-sm text-gray-600">
+											Please wait while we analyze your
+											manuscript
+										</div>
+										<div className="mt-4">
+											<div className="flex justify-center space-x-1">
+												<div
+													className="h-2 w-2 bg-[#00796b] rounded-full animate-bounce"
+													style={{
+														animationDelay: "0ms",
+													}}
+												></div>
+												<div
+													className="h-2 w-2 bg-[#00796b] rounded-full animate-bounce"
+													style={{
+														animationDelay: "150ms",
+													}}
+												></div>
+												<div
+													className="h-2 w-2 bg-[#00796b] rounded-full animate-bounce"
+													style={{
+														animationDelay: "300ms",
+													}}
+												></div>
+											</div>
+										</div>
+									</div>
+								</div>
+							)}
+
 							<div className="flex space-x-4">
 								<div className="w-1/2">
 									<h3 className="text-lg font-semibold mb-4 text-[#00796b]">
@@ -1363,69 +1441,106 @@ const handleProceedAndBuildPdf = async (e) => {
 													}
 													className="mr-2"
 												/>
-<label 
-  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white ${
-    dragOver ? "border-[#00796b] bg-[#e0f7fa]" : "border-[#e0e0e0] hover:bg-[#e0f7fa]"
-  }`}
-  onDragEnter={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(true);
-  }}
-  onDragOver={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(true);
-  }}
-  onDragLeave={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-  }}
-  onDrop={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-    
-    // Check if files were dropped
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      
-      // Check file type
-      const validTypes = ['.docx', '.pdf'];
-      const fileExtension = file.name.split('.').pop().toLowerCase();
-      
-      if (validTypes.includes(`.${fileExtension}`)) {
-        // Create a synthetic event to reuse your existing handler
-        const syntheticEvent = {
-          target: {
-            files: e.dataTransfer.files,
-            name: doc
-          }
-        };
-        handleFileChange(syntheticEvent, doc);
-      } else {
-        alert('Please upload only DOCX or PDF files');
-      }
-    }
-  }}
->
-  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-    <p className="mb-2 text-sm text-[#00796b]">
-      <span className="font-semibold">Click to upload</span> or drag and drop
-    </p>
-    <p className="text-xs text-[#00796b]">
-      Upload {doc} (DOCX or PDF)
-    </p>
-  </div>
-  <input
-    type="file"
-    name={doc}
-    accept=".docx,.pdf"
-    onChange={(e) => handleFileChange(e, doc)}
-    className="hidden"
-  />
-</label>
+												<label
+													className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white ${
+														dragOver
+															? "border-[#00796b] bg-[#e0f7fa]"
+															: "border-[#e0e0e0] hover:bg-[#e0f7fa]"
+													}`}
+													onDragEnter={(e) => {
+														e.preventDefault();
+														e.stopPropagation();
+														setDragOver(true);
+													}}
+													onDragOver={(e) => {
+														e.preventDefault();
+														e.stopPropagation();
+														setDragOver(true);
+													}}
+													onDragLeave={(e) => {
+														e.preventDefault();
+														e.stopPropagation();
+														setDragOver(false);
+													}}
+													onDrop={(e) => {
+														e.preventDefault();
+														e.stopPropagation();
+														setDragOver(false);
+
+														// Check if files were dropped
+														if (
+															e.dataTransfer
+																.files &&
+															e.dataTransfer.files
+																.length > 0
+														) {
+															const file =
+																e.dataTransfer
+																	.files[0];
+
+															// Check file type
+															const validTypes = [
+																".docx",
+																".pdf",
+															];
+															const fileExtension =
+																file.name
+																	.split(".")
+																	.pop()
+																	.toLowerCase();
+
+															if (
+																validTypes.includes(
+																	`.${fileExtension}`
+																)
+															) {
+																// Create a synthetic event to reuse your existing handler
+																const syntheticEvent =
+																	{
+																		target: {
+																			files: e
+																				.dataTransfer
+																				.files,
+																			name: doc,
+																		},
+																	};
+																handleFileChange(
+																	syntheticEvent,
+																	doc
+																);
+															} else {
+																alert(
+																	"Please upload only DOCX or PDF files"
+																);
+															}
+														}
+													}}
+												>
+													<div className="flex flex-col items-center justify-center pt-5 pb-6">
+														<p className="mb-2 text-sm text-[#00796b]">
+															<span className="font-semibold">
+																Click to upload
+															</span>{" "}
+															or drag and drop
+														</p>
+														<p className="text-xs text-[#00796b]">
+															Upload {doc} (DOCX
+															or PDF)
+														</p>
+													</div>
+													<input
+														type="file"
+														name={doc}
+														accept=".docx,.pdf"
+														onChange={(e) =>
+															handleFileChange(
+																e,
+																doc
+															)
+														}
+														className="hidden"
+													/>
+												</label>
 											</div>
 											{files[doc] && (
 												<p className="mt-2 text-sm text-[#00796b]">
@@ -2137,61 +2252,100 @@ const handleProceedAndBuildPdf = async (e) => {
 							<div className="flex justify-between">
 								{renderBackButton(6)}
 
-								<div className="flex space-x-4">
-									{!pdfUrl && 
-									(<button
-										type="button"
-										onClick={handleSaveAndSubmitLater}
-										className="mt-4 px-6 py-2 bg-[#BAFFF5] text-[#00796b] rounded-lg hover:bg-[#a8e6dc]"
-									>
-										Save and Submit Later
-									</button>)}
-  {!pdfUrl && (
-  <button
-    type="button"
-    onClick={handleProceedAndBuildPdf}
-    disabled={isBuildingPdf}
-    className="mt-4 px-6 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269]"
-  >
-    {isBuildingPdf ? "Building PDF..." : "Proceed and Build PDF"}
-  </button>
-  )}
+								<div className="flex flex-col space-y-4">
+									{!pdfUrl && (
+										<button
+											type="button"
+											onClick={handleSaveAndSubmitLater}
+											className="px-6 py-2 bg-[#BAFFF5] text-[#00796b] rounded-lg hover:bg-[#a8e6dc]"
+										>
+											Save and Submit Later
+										</button>
+									)}
 
-  {pdfUrl && (
-    <button
-      type="button"
-      onClick={() => window.open(pdfUrl, "_blank")}
-      className="mt-4 px-6 py-2 bg-[#00acc1] text-white rounded-lg hover:bg-[#00796b]"
-    >
-      View PDF
-    </button>
-  )}
+									<div className="flex space-x-4">
+										{!pdfUrl && (
+											<button
+												type="button"
+												onClick={
+													handleProceedAndBuildPdf
+												}
+												disabled={isBuildingPdf}
+												className="px-6 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269] disabled:bg-gray-400 disabled:cursor-not-allowed"
+											>
+												{isBuildingPdf
+													? "Building PDF..."
+													: "Proceed and Build PDF"}
+											</button>
+										)}
 
-  {/* {buildError && (
-    <div className="mt-2 text-red-500">{buildError}</div>
-  )} */}
+										{pdfUrl && (
+											<button
+												type="button"
+												onClick={() => {
+													window.open(
+														pdfUrl,
+														"_blank"
+													);
+													setPdfViewed(true); // Mark PDF as viewed when clicked
+												}}
+												className="px-6 py-2 bg-[#00acc1] text-white rounded-lg hover:bg-[#00796b]"
+											>
+												View PDF
+											</button>
+										)}
 
-    {AcceptOrRejectPdf && (
-    <button
-      type="button"
-      onClick={handleAcceptPdf}
-      className="mt-4 px-6 py-2 bg-[#00acc1] text-white rounded-lg hover:bg-[#00796b]"
-    >
-       Accept
-    </button>
-  )}
-{AcceptOrRejectPdf && (
-    <button
-      type="button"
-      onClick={handleRejectPdf}
-      className="mt-4 px-6 py-2 bg-[#00acc1] text-white rounded-lg hover:bg-[#00796b]"
-    >
-      Reject
-    </button>
-  )}
-  
+										{AcceptOrRejectPdf && (
+											<button
+												type="button"
+												onClick={handleAcceptPdf}
+												disabled={!pdfViewed}
+												className={`px-6 py-2 rounded-lg ${
+													pdfViewed
+														? "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
+														: "bg-gray-400 text-gray-700 cursor-not-allowed"
+												}`}
+												title={
+													!pdfViewed
+														? "Please view the PDF first"
+														: "Accept the manuscript"
+												}
+											>
+												Accept
+											</button>
+										)}
 
+										{AcceptOrRejectPdf && (
+											<button
+												type="button"
+												onClick={handleRejectPdf}
+												disabled={!pdfViewed}
+												className={`px-6 py-2 rounded-lg ${
+													pdfViewed
+														? "bg-red-600 text-white hover:bg-red-700 cursor-pointer"
+														: "bg-gray-400 text-gray-700 cursor-not-allowed"
+												}`}
+												title={
+													!pdfViewed
+														? "Please view the PDF first"
+														: "Reject the manuscript"
+												}
+											>
+												Reject
+											</button>
+										)}
+									</div>
 
+									{/* Show message when accept/reject buttons are visible but PDF not viewed */}
+									{AcceptOrRejectPdf && !pdfViewed && (
+										<div className="text-sm text-orange-600 bg-orange-50 p-2 rounded-md border border-orange-200">
+											<span className="font-medium">
+												⚠️ Important:
+											</span>{" "}
+											Please view the PDF before accepting
+											or rejecting the manuscript.
+										</div>
+									)}
 								</div>
 							</div>
 						</motion.div>
