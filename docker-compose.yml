@@ -1,0 +1,135 @@
+version: "3.8"
+
+services:
+    # MongoDB Database
+    mongodb:
+        image: mongo:6.0
+        container_name: synergy-mongodb
+        restart: unless-stopped
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: admin
+            MONGO_INITDB_ROOT_PASSWORD: password123
+            MONGO_INITDB_DATABASE: synergy-world-press
+        ports:
+            - "27017:27017"
+        volumes:
+            - mongodb_data:/data/db
+            - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+        networks:
+            - synergy-network
+
+    # Backend Service (Development)
+    backend-dev:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile.dev
+        container_name: synergy-backend-dev
+        restart: unless-stopped
+        ports:
+            - "5000:5000"
+        volumes:
+            - ./backend:/app/backend
+            - /app/backend/node_modules
+            - ./backend/uploads:/app/backend/uploads
+        environment:
+            - NODE_ENV=development
+            - MONGO_URI=mongodb://admin:password123@mongodb:27017/synergy-world-press?authSource=admin
+            - JWT_SECRET=86aa472c0f95b28de7e9c700c170c74ac1019baaf1be82c6cfeced4788eaaddd8649edcb1934e1562c823b402643cf533b84a59c72ec9230c843c5f0d4a26724
+            - GOOGLE_CLIENT_ID=535987113890-a29juotrj2v2c5lj56ot6cqe4kge4sam.apps.googleusercontent.com
+            - ORCID_CLIENT_ID=APP-5755KPXN4H7PWAYU
+            - ORCID_CLIENT_SECRET=fd757db3-47d8-44f4-ba97-2045bb8c46ff
+            - USE_GOOGLE_DRIVE=false
+            - BASE_URL=http://localhost:5000
+            - GOOGLE_DRIVE_FOLDER_ID=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+            - GOOGLE_DRIVE_MANUSCRIPTS_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+            - GOOGLE_DRIVE_COVERLETTERS_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+            - GOOGLE_DRIVE_DECLARATIONS_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+            - GOOGLE_DRIVE_MERGED_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+        depends_on:
+            - mongodb
+        networks:
+            - synergy-network
+        profiles:
+            - dev
+
+    # Frontend Service (Development)
+    frontend-dev:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile.dev
+        container_name: synergy-frontend-dev
+        restart: unless-stopped
+        ports:
+            - "5173:5173"
+        volumes:
+            - ./frontend:/app/frontend
+            - /app/frontend/node_modules
+        environment:
+            - VITE_BACKEND_URL=http://localhost:5000
+            - VITE_GOOGLE_CLIENT_ID=535987113890-a29juotrj2v2c5lj56ot6cqe4kge4sam.apps.googleusercontent.com
+            - VITE_ORCID_CLIENT_ID=APP-5755KPXN4H7PWAYU
+        depends_on:
+            - backend-dev
+        networks:
+            - synergy-network
+        profiles:
+            - dev
+
+    # Production Application
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: synergy-app
+        restart: unless-stopped
+        ports:
+            - "5000:5000"
+        volumes:
+            - ./backend/uploads:/app/backend/uploads
+            - ./backend/google-credentials.json:/app/backend/google-credentials.json:ro
+        environment:
+            - NODE_ENV=production
+            - MONGO_URI=mongodb://admin:password123@mongodb:27017/synergy-world-press?authSource=admin
+            - JWT_SECRET=86aa472c0f95b28de7e9c700c170c74ac1019baaf1be82c6cfeced4788eaaddd8649edcb1934e1562c823b402643cf533b84a59c72ec9230c843c5f0d4a26724
+            - GOOGLE_CLIENT_ID=535987113890-a29juotrj2v2c5lj56ot6cqe4kge4sam.apps.googleusercontent.com
+            - ORCID_CLIENT_ID=APP-5755KPXN4H7PWAYU
+            - ORCID_CLIENT_SECRET=fd757db3-47d8-44f4-ba97-2045bb8c46ff
+            - USE_GOOGLE_DRIVE=false
+            - BASE_URL=http://localhost:5000
+            - GOOGLE_DRIVE_FOLDER_ID=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+            - GOOGLE_DRIVE_MANUSCRIPTS_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+            - GOOGLE_DRIVE_COVERLETTERS_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+            - GOOGLE_DRIVE_DECLARATIONS_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+            - GOOGLE_DRIVE_MERGED_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+        depends_on:
+            - mongodb
+        networks:
+            - synergy-network
+        profiles:
+            - prod
+
+    # Nginx for production (optional)
+    nginx:
+        image: nginx:alpine
+        container_name: synergy-nginx
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./ssl:/etc/nginx/ssl:ro
+        depends_on:
+            - app
+        networks:
+            - synergy-network
+        profiles:
+            - prod
+
+volumes:
+    mongodb_data:
+        driver: local
+
+networks:
+    synergy-network:
+        driver: bridge
