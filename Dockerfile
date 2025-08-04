@@ -8,7 +8,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install frontend dependencies
-RUN npm ci --only=production
+RUN npm ci 
 
 # Copy the rest of the frontend code
 COPY frontend/ ./
@@ -39,7 +39,7 @@ COPY backend/requirements.txt ./backend/
 
 # Install backend dependencies
 WORKDIR /app/backend
-RUN npm ci --only=production
+RUN npm ci 
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -m spacy download en_core_web_sm
 

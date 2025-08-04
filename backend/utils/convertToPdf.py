@@ -96,11 +96,12 @@
 #     success = convert_to_pdf(input_file, output_file)
 #     sys.exit(0 if success else 1)
 
-
+import shutil
 import sys
 import os
 import subprocess
 from pathlib import Path
+import platform
 
 
 def convert_to_pdf(input_file, output_file=None):
@@ -119,47 +120,36 @@ def convert_to_pdf(input_file, output_file=None):
         else os.path.dirname(os.path.abspath(output_file))
     )
 
-    # LibreOffice executable paths (try multiple locations)
-    libreoffice_paths = [
-        r"C:\Program Files\LibreOffice\program\soffice.bin",
-        r"C:\Program Files\LibreOffice\program\soffice.exe",
-        r"C:\Program Files (x86)\LibreOffice\program\soffice.bin",
-        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-        "libreoffice",  # In case it's in PATH
-        "soffice",  # Alternative command name
-    ]
-
-    libreoffice_exe = None
-    for path in libreoffice_paths:
-        if os.path.exists(path):
-            libreoffice_exe = path
-            break
+    def find_libreoffice():
+        system = platform.system()
+        if system == "Windows":
+            possible_paths = [
+                r"C:\Program Files\LibreOffice\program\soffice.exe",
+                r"C:\Program Files\LibreOffice\program\soffice.bin",
+                r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+                r"C:\Program Files (x86)\LibreOffice\program\soffice.bin"
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    return path
         else:
-            # Try to find it using where command
-            try:
-                result = subprocess.run(["where", path], capture_output=True, text=True)
-                if result.returncode == 0:
-                    libreoffice_exe = result.stdout.strip().split("\n")[0]
-                    break
-            except:
-                continue
+            for cmd in ["libreoffice", "soffice"]:
+                path = shutil.which(cmd)
+                if path:
+                    return path
+        return None
+
+    libreoffice_exe = find_libreoffice()
 
     if not libreoffice_exe:
-        print(
-            "LibreOffice not found. Please ensure LibreOffice is installed.",
-            file=sys.stderr,
-        )
+        print("LibreOffice not found. Please ensure LibreOffice is installed.", file=sys.stderr)
         return False
 
     print(f"Using LibreOffice at: {libreoffice_exe}")
 
     try:
-        # Create a temporary working directory for LibreOffice
         temp_dir = os.path.join(os.path.dirname(input_file), "temp_conversion")
         os.makedirs(temp_dir, exist_ok=True)
-
-        # Copy input file to temp directory to avoid path issues
-        import shutil
 
         temp_input = os.path.join(temp_dir, os.path.basename(input_file))
         shutil.copy2(input_file, temp_input)
@@ -188,53 +178,31 @@ def convert_to_pdf(input_file, output_file=None):
             timeout=60,
         )
 
-        # Print LibreOffice output for debugging
         if result.stdout:
             print(f"LibreOffice stdout: {result.stdout}")
         if result.stderr:
             print(f"LibreOffice stderr: {result.stderr}")
 
-        # Check if output file was generated in temp directory
         temp_pdf = os.path.join(temp_dir, Path(temp_input).with_suffix(".pdf").name)
 
         if os.path.exists(temp_pdf) and os.path.getsize(temp_pdf) > 0:
-            # Determine final output path
-            if output_file:
-                final_output = os.path.abspath(output_file)
-            else:
-                final_output = str(Path(input_file).with_suffix(".pdf"))
-
-            # Move the generated PDF to the final location
+            final_output = os.path.abspath(output_file) if output_file else str(Path(input_file).with_suffix(".pdf"))
             shutil.move(temp_pdf, final_output)
-
-            # Clean up temp directory
-            try:
-                shutil.rmtree(temp_dir)
-            except:
-                pass
-
+            shutil.rmtree(temp_dir, ignore_errors=True)
             print(f"Conversion successful! PDF created at: {final_output}")
             return True
         else:
             print("PDF was not created or is empty", file=sys.stderr)
-            # Clean up temp directory
-            try:
-                shutil.rmtree(temp_dir)
-            except:
-                pass
+            shutil.rmtree(temp_dir, ignore_errors=True)
             return False
 
     except subprocess.TimeoutExpired:
         print("LibreOffice conversion timed out", file=sys.stderr)
         return False
     except subprocess.CalledProcessError as e:
-        print(
-            f"LibreOffice command failed with exit code {e.returncode}", file=sys.stderr
-        )
-        if e.stdout:
-            print(f"stdout: {e.stdout}", file=sys.stderr)
-        if e.stderr:
-            print(f"stderr: {e.stderr}", file=sys.stderr)
+        print(f"LibreOffice command failed with exit code {e.returncode}", file=sys.stderr)
+        print(f"stdout: {e.stdout}", file=sys.stderr)
+        print(f"stderr: {e.stderr}", file=sys.stderr)
         return False
     except Exception as e:
         print(f"Unexpected error: {str(e)}", file=sys.stderr)
@@ -243,13 +211,10 @@ def convert_to_pdf(input_file, output_file=None):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(
-            "Usage: python convertToPdf.py <input_file> [output_file]", file=sys.stderr
-        )
+        print("Usage: python convertToPdf.py <input_file> [output_file]", file=sys.stderr)
         sys.exit(1)
 
     input_file = sys.argv[1]
     output_file = sys.argv[2] if len(sys.argv) > 2 else None
-
     success = convert_to_pdf(input_file, output_file)
     sys.exit(0 if success else 1)
