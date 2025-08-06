@@ -12,6 +12,8 @@ const mongoose = require("mongoose");
 const os = require("os");
 const { PythonShell } = require("python-shell");
 const fsSync = require("fs"); // Add at the top if not already
+// At the top of manuscriptController.js
+const { uploadToCloudinary } = require("../utils/cloudinary");
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
@@ -480,77 +482,62 @@ exports.createManuscript = async (req, res) => {
 
 			// Upload files: all files to local storage for now
 			// Google Drive service account has storage quota limitations
-			const localFileUploadManager = new FileUploadManager();
-			localFileUploadManager.useGoogleDrive = false;
+			// const localFileUploadManager = new FileUploadManager();
+			// localFileUploadManager.useGoogleDrive = false;
 
-			let manuscriptUrl, coverLetterUrl, declarationUrl, mergedUrl;
-			try {
-				console.log(
-					"[createManuscript] Uploading files to local storage..."
-				);
+let manuscriptUpload, coverLetterUpload, declarationUpload, mergedUpload;
+try {
+    console.log("[createManuscript] Uploading files to Cloudinary...");
 
-				// Upload all PDFs to local storage
-				[manuscriptUrl, coverLetterUrl, declarationUrl, mergedUrl] =
-					await Promise.all([
-						localFileUploadManager.uploadFile(
-							manuscriptPdfPath,
-							`manuscript_${Date.now()}_${path.basename(
-								req.files["manuscript"][0].originalname
-							)}`,
-							"manuscript"
-						),
-						localFileUploadManager.uploadFile(
-							coverLetterPdfPath,
-							`cover_letter_${Date.now()}_${path.basename(
-								req.files["coverLetter"][0].originalname
-							)}`,
-							"coverLetter"
-						),
-						localFileUploadManager.uploadFile(
-							declarationPdfPath,
-							`declaration_${Date.now()}_${path.basename(
-								req.files["declaration"][0].originalname
-							)}`,
-							"declaration"
-						),
-						localFileUploadManager.uploadFile(
-							mergedPdfResult.localPath,
-							`merged_manuscript_${Date.now()}.pdf`,
-							"merged"
-						),
-					]);
+    // Upload all PDFs to Cloudinary
+    [manuscriptUpload, coverLetterUpload, declarationUpload, mergedUpload] =
+        await Promise.all([
+            uploadToCloudinary(
+                manuscriptPdfPath,
+                "manuscripts" // Folder in Cloudinary
+            ),
+            uploadToCloudinary(
+                coverLetterPdfPath,
+                "coverLetters" // Folder in Cloudinary
+            ),
+            uploadToCloudinary(
+                declarationPdfPath,
+                "declarations" // Folder in Cloudinary
+            ),
+            uploadToCloudinary(
+                mergedPdfResult.localPath,
+                "merged_manuscripts", // Folder in Cloudinary
+                "raw" // Use 'raw' for PDF files to get a direct link
+            ),
+        ]);
 
-				console.log(
-					"[createManuscript] All files uploaded successfully to local storage"
-				);
-			} catch (err) {
-				console.error("[createManuscript] File upload failed:", err);
-				return res.status(500).json({
-					success: false,
-					message: "File upload failed.",
-				});
-			}
+    console.log("[createManuscript] All files uploaded successfully to Cloudinary");
+} catch (err) {
+    console.error("[createManuscript] Cloudinary upload failed:", err);
+    return res.status(500).json({
+        success: false,
+        message: "File upload to Cloudinary failed.",
+    });
+}
 
-			const manuscriptData = {
-				...req.body,
-				authors: authorObjectIds,
-				correspondingAuthor: correspondingAuthorObjectId,
-				manuscriptFile:
-					manuscriptUrl.webViewLink || manuscriptUrl.webContentLink,
-				coverLetterFile:
-					coverLetterUrl.webViewLink || coverLetterUrl.webContentLink,
-				declarationFile:
-					declarationUrl.webViewLink || declarationUrl.webContentLink,
-				mergedFileUrl:
-					mergedUrl.webViewLink || mergedUrl.webContentLink,
-				status: "Pending",
-				extractedText: manuscriptText, // Store extracted text
-				coverLetterText: coverLetterText, // Store cover letter text
-				declarationText: declarationText, // Store declaration text
-				extractedTitle: manuscriptTitle,
-				extractedAbstract: manuscriptAbstract,
-				extractedKeywords: manuscriptKeywords,
-			};
+
+const manuscriptData = {
+    ...req.body,
+    authors: authorObjectIds,
+    correspondingAuthor: correspondingAuthorObjectId,
+    // Use the secure_url from the Cloudinary response
+    manuscriptFile: manuscriptUpload.secure_url,
+    coverLetterFile: coverLetterUpload.secure_url,
+    declarationFile: declarationUpload.secure_url,
+    mergedFileUrl: mergedUpload.secure_url,
+    status: "Pending",
+    extractedText: manuscriptText,
+    coverLetterText: coverLetterText,
+    declarationText: declarationText,
+    extractedTitle: manuscriptTitle,
+    extractedAbstract: manuscriptAbstract,
+    extractedKeywords: manuscriptKeywords,
+};
 
 			let manuscript;
 			try {

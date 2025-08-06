@@ -49,6 +49,9 @@ if not exist "backend\.env" (
         echo GOOGLE_DRIVE_COVERLETTERS_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
         echo GOOGLE_DRIVE_DECLARATIONS_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
         echo GOOGLE_DRIVE_MERGED_FOLDER=1FxiUnrnUn6HfaiB0s-ch6ChaEiDnj1E4
+        echo CLOUDINARY_CLOUD_NAME=di6piyfu8
+        echo CLOUDINARY_API_KEY=922369985173375
+        echo CLOUDINARY_API_SECRET=6_fECoSBG4pAA7I0BVnJD8VzwCk
     ) > backend\.env
 )
 

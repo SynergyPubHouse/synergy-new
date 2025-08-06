@@ -3,6 +3,7 @@
     "cookie-parser": "^1.4.7",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.4.3",
+    "multer": "^2.0.2",
     "pdf-merger-js": "^5.1.2",
     "react-beautiful-dnd": "^13.1.1",
     "react-icons": "^5.4.0"
