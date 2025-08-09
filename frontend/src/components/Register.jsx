@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../App"; // 1. Import useAuth to access the login function
 
 const BASE_URL = '';
 
@@ -18,6 +19,11 @@ function Register() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation(); // 2. Initialize useLocation
+  const { login } = useAuth(); // 3. Get the login function from your Auth context
+  
+  // 4. Define the 'from' variable, defaulting to the homepage
+  const from = location.state?.from || '/';
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,20 +33,35 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage(""); // Clear previous errors
+
     if (formData.password !== formData.confirmPassword) {
       setErrorMessage("Passwords do not match!");
       setIsLoading(false);
       return;
     }
+
     try {
-      await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`,
+      // 5. Capture the response from the POST request
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`, 
         formData
       );
-      alert("Registration Successful!");
-      navigate(from, { replace: true }); // Redirect back to previous page
+
+      // 6. Check for data in the response and perform automatic login
+      if (response.data) {
+        login(response.data); // Update the application's auth state
+        localStorage.setItem("user", JSON.stringify(response.data)); // Persist session
+        navigate(from, { replace: true }); // Redirect to the previous page or homepage
+      } else {
+        // Fallback if backend registers user but doesn't send back data
+        setErrorMessage("Registration successful, but auto-login failed. Please sign in.");
+      }
+      
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || "Registration Failed");
+      // 7. Provide a more robust error message
+      setErrorMessage(error.response?.data?.message || "Registration Failed. Please try again.");
+      
     } finally {
       setIsLoading(false);
     }

@@ -6,13 +6,14 @@ import { FaGoogle, FaArrowRight } from "react-icons/fa";
 import { SiOrcid } from "react-icons/si";
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
-const BASE_URL = '/';
-
-// ORCID OAuth configuration
+// Directly import the Client ID from frontend environment variables
+// Ensure you have a .env file with VITE_GOOGLE_CLIENT_ID="your-id"
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const ORCID_CLIENT_ID = import.meta.env.VITE_ORCID_CLIENT_ID;
+
 const ORCID_REDIRECT_URI = `https://synergyworldpress.com/orcid-callback`;
 const ORCID_AUTH_URL = `https://orcid.org/oauth/authorize?client_id=${ORCID_CLIENT_ID}&response_type=code&scope=/authenticate%20/read-limited&redirect_uri=${encodeURIComponent(ORCID_REDIRECT_URI)}`;
-// https://orcid.org/oauth/authorize?client_id=APP-18X9GYBBBH1I4WR3&response_type=code&scope=openid&&redirect_uri=${encodeURIComponent(https://synergyworldpress.com/orcid-callback)}
+
 function Login() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +23,8 @@ function Login() {
   const location = useLocation();
   const from = location.state?.from || '/';
   const { login } = useAuth();
-  const [googleClientId, setGoogleClientId] = useState('');
+  
+  // NO LONGER NEEDED: const [googleClientId, setGoogleClientId] = useState('');
 
   // Success Notification Component
   const SuccessNotification = () => {
@@ -45,21 +47,7 @@ function Login() {
     );
   };
 
-  // Fetch Google Client ID
-  useEffect(() => {
-    const fetchClientId = async () => {
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/auth/google-client-id`
-        );
-        setGoogleClientId(response.data.clientId);
-      } catch (error) {
-        console.error("Failed to fetch Google Client ID:", error);
-        // setError("Failed to initialize Google login. Please refresh the page."); fr
-      }
-    };
-    fetchClientId();
-  }, []);
+  // NO LONGER NEEDED: The useEffect to fetch the client ID is removed.
 
   // Auto-hide success message
   useEffect(() => {
@@ -87,7 +75,7 @@ function Login() {
           show: true,
           message: "Successfully Logged In !! Welcome back.."
         });
-        setTimeout(() => navigate(from, { replace: true }), 2000); // Redirect back
+        setTimeout(() => navigate(from, { replace: true }), 2000);
       } else {
         setError("Login Failed: User data missing");
       }
@@ -125,7 +113,7 @@ function Login() {
           show: true,
           message: "Login successful! Taking you to your account..."
         });
-        setTimeout(() => navigate(from, { replace: true }), 2000); // Redirect back
+        setTimeout(() => navigate(from, { replace: true }), 2000);
       } else {
         setError("Login Failed: User data missing");
       }
@@ -253,43 +241,31 @@ function Login() {
 
             <div className="flex flex-col gap-4 mt-6">
               {/* ORCID Login */}
-              <button
+              {/* <button
                 onClick={handleOrcidLogin}
                 className="flex items-center justify-center w-full bg-white text-[#212121] font-semibold py-3 px-4 rounded-xl border border-[#e0e0e0] hover:border-[#00acc1] transition-all"
               >
                 <SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
                 Sign in with ORCID
-              </button>
+              </button> */}
 
-              {/* Google Login */}
-              {/* {googleClientId ? ( */}
-                <div className="flex justify-center">
-    <div className="w-full">
-                <GoogleOAuthProvider clientId={googleClientId}>
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={handleGoogleFailure}
-                    useOneTap
-                    theme="outline"
-                    size="large"
-                    shape="pill"
-                    text="continue_with"
-                    width="100%"
-                  />
-                </GoogleOAuthProvider>
+              {/* Google Login now renders instantly */}
+              <div className="flex justify-center">
+                <div className="w-full">
+                  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={handleGoogleFailure}
+                      useOneTap
+                      theme="outline"
+                      size="large"
+                      shape="pill"
+                      text="continue_with"
+                      width="100%"
+                    />
+                  </GoogleOAuthProvider>
                 </div>
-                </div>
-{/*                 
-              ) : (
-                <button
-                  type="button"
-                  className="flex items-center justify-center w-full bg-white text-[#212121] font-semibold py-3 px-4 rounded-xl border border-[#e0e0e0] hover:border-[#4285F4] transition-all"
-                  disabled
-                >
-                  <FaGoogle className="w-6 h-6 mr-2 text-[#4285F4]" />
-                  Loading Google...
-                </button>
-              )} */}
+              </div>
             </div>
 
             <div className="mt-6 text-center">

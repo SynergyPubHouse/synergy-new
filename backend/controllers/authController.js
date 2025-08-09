@@ -225,7 +225,9 @@ exports.googleAuth = async (req, res) => {
     });
     
     const payload = ticket.getPayload();
-    const { sub: googleId, email, name, picture } = payload;
+	    const { sub: googleId, email, given_name, family_name, picture } = payload; // Use given_name and family_name
+
+    // const { sub: googleId, email, name, picture } = payload;
 
     // Check if user exists
     let user = await User.findOne({ 
@@ -238,8 +240,10 @@ exports.googleAuth = async (req, res) => {
     if (!user) {
       // Create new user with Google info
       user = await User.create({
-        firstName: name.split(' ')[0],
-        lastName: name.split(' ').slice(1).join(' '),
+        firstName: given_name,
+        // Use family_name, but if it's missing, use a placeholder (like a period)
+        // to satisfy the 'required' rule.
+        lastName: family_name || ".",
         email,
         googleId,
         username: email.split('@')[0] + '_' + googleId.slice(0, 4),
