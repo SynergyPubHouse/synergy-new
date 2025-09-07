@@ -400,53 +400,55 @@ const MySubmissions = () => {
 										>
 											Withdrawal
 										</button>
-										<div className="w-full relative group">
-											<button
-												onClick={(e) => {
-													if (
+										{manuscript.status !== "Rejected" && (
+											<div className="w-full relative group">
+												<button
+													onClick={(e) => {
+														if (
+															!pdfBuiltManuscripts.has(
+																manuscript._id
+															)
+														) {
+															e.preventDefault();
+															alert(
+																"Please build PDF first to unlock this button"
+															);
+															return;
+														}
+														handleAccept(
+															manuscript._id
+														);
+													}}
+													className={`w-full px-4 py-2 ${
+														manuscript.status ===
+															"Under Review" ||
 														!pdfBuiltManuscripts.has(
 															manuscript._id
 														)
-													) {
-														e.preventDefault();
-														alert(
-															"Please build PDF first to unlock this button"
-														);
-														return;
+															? "bg-gray-300 text-gray-500 cursor-not-allowed"
+															: "bg-green-500 hover:bg-green-600 text-white"
+													} font-semibold rounded-lg transition-colors`}
+													disabled={
+														manuscript.status ===
+															"Under Review" ||
+														!pdfBuiltManuscripts.has(
+															manuscript._id
+														)
 													}
-													handleAccept(
-														manuscript._id
-													);
-												}}
-												className={`w-full px-4 py-2 ${
-													manuscript.status ===
-														"Under Review" ||
-													!pdfBuiltManuscripts.has(
-														manuscript._id
-													)
-														? "bg-gray-300 text-gray-500 cursor-not-allowed"
-														: "bg-green-500 hover:bg-green-600 text-white"
-												} font-semibold rounded-lg transition-colors`}
-												disabled={
-													manuscript.status ===
-														"Under Review" ||
-													!pdfBuiltManuscripts.has(
-														manuscript._id
-													)
-												}
-											>
-												Send to Editor
-											</button>
-											{!pdfBuiltManuscripts.has(
-												manuscript._id
-											) && (
-												<div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-													Build PDF to unlock this
-													button
-													<div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black"></div>
-												</div>
-											)}
-										</div>
+												>
+													Send to Editor
+												</button>
+												{!pdfBuiltManuscripts.has(
+													manuscript._id
+												) && (
+													<div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+														Build PDF to unlock this
+														button
+														<div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black"></div>
+													</div>
+												)}
+											</div>
+										)}
 										<button
 											onClick={() =>
 												handleNotesClick(manuscript._id)

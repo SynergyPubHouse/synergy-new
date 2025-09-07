@@ -972,15 +972,25 @@ exports.updateManuscriptStatus = async (req, res) => {
 		const { manuscriptId } = req.params;
 		const { status } = req.body;
 
+		// First, get the current manuscript to check its current status
+		const currentManuscript = await Manuscript.findById(manuscriptId);
+		if (!currentManuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		// Prevent any status changes if the manuscript is already rejected
+		if (currentManuscript.status === "Rejected") {
+			return res.status(403).json({
+				message:
+					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
+			});
+		}
+
 		const manuscript = await Manuscript.findByIdAndUpdate(
 			manuscriptId,
 			{ status },
 			{ new: true }
 		);
-
-		if (!manuscript) {
-			return res.status(404).json({ message: "Manuscript not found" });
-		}
 
 		res.status(200).json({
 			success: true,
