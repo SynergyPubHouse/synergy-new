@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App"; // Assuming you have an Auth context
 
-const BASE = "/journal/Journal-of-Intelligent-Computing-Systems";
+const BASE = "/journal/jics";
 
 function TrackResearch() {
 	const { user } = useAuth(); // Fetch user details from Auth context
@@ -70,7 +70,7 @@ function TrackResearch() {
 						>
 							Login
 						</Link>
-					</motion.div>               
+					</motion.div>
 				)}
 			</section>
 

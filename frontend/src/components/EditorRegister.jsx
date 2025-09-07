@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+const BASE_URL = "/journal/jics";
 
 function EditorRegister() {
 	const [formData, setFormData] = useState({

@@ -57,7 +57,9 @@ function EditorDashboard() {
 				console.log("Fetching reviewers with token:", user.token); // Debug log
 				setIsLoading(true);
 				const response = await axios.get(
-					`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/reviewers`,
+					`${
+						import.meta.env.VITE_BACKEND_URL
+					}/api/auth/editor/reviewers`,
 					{
 						headers: {
 							Authorization: `Bearer ${user.token}`,
@@ -677,7 +679,7 @@ function EditorDashboard() {
 																					  "Under Review"
 																					? "bg-yellow-500"
 																					: note.action ===
-																					  "Accepted"
+																					  "Accepted by Author(you)"
 																					? "bg-green-500"
 																					: "bg-blue-500"
 																			} text-white`}

@@ -3,7 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 
-const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+const BASE_URL = "/journal/jics";
 
 function EditorLogin() {
 	const [formData, setFormData] = useState({

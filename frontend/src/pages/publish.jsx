@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
-const BASE = "/journal/Journal-of-Intelligent-Computing-Systems";
+const BASE = "/journal/jics";
 
 function Publish() {
 	return (

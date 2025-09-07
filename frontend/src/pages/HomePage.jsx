@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App"; // Import the same useAuth hook used in Navbar
 
-const BASE_URL = "/journal/Journal-of-Intelligent-Computing-Systems";
+const BASE_URL = "/journal/jics";
 
 function HomePage() {
 	const { user } = useAuth(); // Get the user object from the authentication context
@@ -155,9 +155,9 @@ function HomePage() {
 						<div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8 px-6 md:px-20">
 							<div className="p-6 bg-[#f0f9ff] rounded-lg shadow-md">
 								<p className="text-[#496580] italic">
-									"Synergy World Press has revolutionized the way I
-									submit and review papers. The platform is
-									intuitive and efficient!"
+									"Synergy World Press has revolutionized the
+									way I submit and review papers. The platform
+									is intuitive and efficient!"
 								</p>
 								<p className="mt-4 font-semibold text-[#496580]">
 									- Dr. Jane Doe, Researcher
@@ -238,8 +238,8 @@ function HomePage() {
 							How It Works
 						</h2>
 						<p className="mt-4 text-lg text-[#496580]">
-							A step-by-step guide to getting started with
-							Synergy World Press.
+							A step-by-step guide to getting started with Synergy
+							World Press.
 						</p>
 						<div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-8 px-6 md:px-20">
 							<div className="p-6 bg-[#f0f9ff] rounded-lg shadow-md">
@@ -288,8 +288,8 @@ function HomePage() {
 							Ready to Transform Your Research?
 						</h2>
 						<p className="mt-4 text-lg text-[#496580]">
-							Join thousands of researchers who trust Synergy World Press
-							for their academic needs.
+							Join thousands of researchers who trust Synergy
+							World Press for their academic needs.
 						</p>
 						<Link
 							to={`${BASE_URL}/register`}

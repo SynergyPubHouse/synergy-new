@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App";
 
-const BASE_URL = '/journal/Journal-of-Intelligent-Computing-Systems';
+const BASE_URL = "/journal/jics";
 
 function Editors() {
 	const { user } = useAuth();
@@ -179,8 +179,8 @@ function Editors() {
 						Ready to Join Us?
 					</h2>
 					<p className="mt-4 text-lg text-[#496580]">
-						Take the first step towards becoming a Synergy World Press
-						Editor today.
+						Take the first step towards becoming a Synergy World
+						Press Editor today.
 					</p>
 					<motion.div
 						initial={{ opacity: 0, scale: 0.8 }}

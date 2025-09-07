@@ -62,15 +62,17 @@ const manuscriptSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 		},
-		authors: [{
-			type: mongoose.Schema.Types.ObjectId,
-			ref: "User",
-			required: true
-		}],
+		authors: [
+			{
+				type: mongoose.Schema.Types.ObjectId,
+				ref: "User",
+				required: true,
+			},
+		],
 		correspondingAuthor: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
-			required: true
+			required: true,
 		},
 		funding: {
 			type: String,
