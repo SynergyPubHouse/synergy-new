@@ -1240,7 +1240,49 @@ const ManuscriptPage = () => {
 	}, [files.manuscript]);
 
 	return (
-		<div className="min-h-screen bg-[#f8fafc] p-6 text-[#212121]">
+		<div className="min-h-screen bg-[#f8fafc] p-6 text-[#212121] relative">
+			{/* PDF Building Loading Overlay */}
+			{isBuildingPdf && (
+				<div className="fixed inset-0 bg-opacity-50 z-50 flex items-center justify-center">
+					<div className="bg-white rounded-lg p-8 shadow-2xl max-w-md mx-4">
+						<div className="text-center">
+							<div className="animate-spin rounded-full h-20 w-20 border-b-4 border-[#00796b] mx-auto mb-6"></div>
+							<div className="text-xl font-semibold text-[#00796b] mb-3">
+								Building Your PDF...
+							</div>
+							<div className="text-sm text-gray-600 mb-4">
+								Please wait while we compile your manuscript,
+								cover letter, and declaration into a single PDF
+								document.
+							</div>
+							<div className="text-xs text-gray-500 mb-4">
+								This process may take a few moments.
+							</div>
+							<div className="flex justify-center space-x-1">
+								<div
+									className="h-2 w-2 bg-[#00796b] rounded-full animate-bounce"
+									style={{
+										animationDelay: "0ms",
+									}}
+								></div>
+								<div
+									className="h-2 w-2 bg-[#00796b] rounded-full animate-bounce"
+									style={{
+										animationDelay: "150ms",
+									}}
+								></div>
+								<div
+									className="h-2 w-2 bg-[#00796b] rounded-full animate-bounce"
+									style={{
+										animationDelay: "300ms",
+									}}
+								></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
+
 			<h1 className="mt-20 text-3xl font-bold text-center text-[#00796b] mb-6">
 				Submit Manuscript
 			</h1>

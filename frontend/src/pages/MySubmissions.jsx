@@ -489,7 +489,7 @@ const MySubmissions = () => {
 											>
 												Editor Notes
 											</button>
-											{/* <button
+											<button
 												onClick={() =>
 													handleNotesTypeClick(
 														"reviewer"
@@ -503,7 +503,7 @@ const MySubmissions = () => {
 												}`}
 											>
 												Reviewer Notes
-											</button> */}
+											</button>
 										</div>
 										{selectedNotesType &&
 											renderNotes(manuscript)}

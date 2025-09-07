@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../App";
 import axios from "axios";
 
@@ -319,7 +319,7 @@ function EditorDashboard() {
 									className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0]"
 								>
 									<div className="flex justify-between items-start">
-										<div>
+										<div className="flex-1">
 											<h3 className="text-xl font-semibold text-[#1a365d] mb-2">
 												{manuscript.title}
 											</h3>
@@ -329,12 +329,170 @@ function EditorDashboard() {
 											<p className="text-[#496580] text-sm">
 												Status: {manuscript.status}
 											</p>
-											<p className="text-[#496580] text-sm">
-												Submitted:{" "}
-												{new Date(
-													manuscript.submissionDate
-												).toLocaleDateString()}
-											</p>
+
+											{/* Enhanced Timestamp Section */}
+											<div className="mt-3 bg-white p-3 rounded border border-[#e2e8f0]">
+												<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+													<div className="flex flex-col">
+														<span className="font-semibold text-[#496580] mb-1">
+															📅 Submitted:
+														</span>
+														<div className="text-[#1a365d]">
+															{manuscript.submissionDate ||
+															manuscript.createdAt ? (
+																<>
+																	<div className="font-medium">
+																		{new Date(
+																			manuscript.submissionDate ||
+																				manuscript.createdAt
+																		).toLocaleDateString(
+																			"en-US",
+																			{
+																				year: "numeric",
+																				month: "long",
+																				day: "numeric",
+																			}
+																		)}
+																	</div>
+																	<div className="text-xs text-[#496580]">
+																		{new Date(
+																			manuscript.submissionDate ||
+																				manuscript.createdAt
+																		).toLocaleTimeString(
+																			"en-US",
+																			{
+																				hour: "2-digit",
+																				minute: "2-digit",
+																				hour12: true,
+																			}
+																		)}
+																	</div>
+																</>
+															) : (
+																"N/A"
+															)}
+														</div>
+													</div>
+
+													{manuscript.updatedAt &&
+														manuscript.updatedAt !==
+															(manuscript.submissionDate ||
+																manuscript.createdAt) && (
+															<div className="flex flex-col">
+																<span className="font-semibold text-[#496580] mb-1">
+																	🔄 Last
+																	Updated:
+																</span>
+																<div className="text-[#1a365d]">
+																	<div className="font-medium">
+																		{new Date(
+																			manuscript.updatedAt
+																		).toLocaleDateString(
+																			"en-US",
+																			{
+																				year: "numeric",
+																				month: "long",
+																				day: "numeric",
+																			}
+																		)}
+																	</div>
+																	<div className="text-xs text-[#496580]">
+																		{new Date(
+																			manuscript.updatedAt
+																		).toLocaleTimeString(
+																			"en-US",
+																			{
+																				hour: "2-digit",
+																				minute: "2-digit",
+																				hour12: true,
+																			}
+																		)}
+																	</div>
+																</div>
+															</div>
+														)}
+												</div>
+
+												{/* Time since submission */}
+												{manuscript.submissionDate ||
+												manuscript.createdAt ? (
+													<div className="mt-2 pt-2 border-t border-[#e2e8f0]">
+														<span className="text-xs text-[#496580]">
+															⏱️{" "}
+															{(() => {
+																const submissionDate =
+																	new Date(
+																		manuscript.submissionDate ||
+																			manuscript.createdAt
+																	);
+																const now =
+																	new Date();
+																const diffTime =
+																	Math.abs(
+																		now -
+																			submissionDate
+																	);
+																const diffDays =
+																	Math.floor(
+																		diffTime /
+																			(1000 *
+																				60 *
+																				60 *
+																				24)
+																	);
+																const diffHours =
+																	Math.floor(
+																		(diffTime %
+																			(1000 *
+																				60 *
+																				60 *
+																				24)) /
+																			(1000 *
+																				60 *
+																				60)
+																	);
+																const diffMinutes =
+																	Math.floor(
+																		(diffTime %
+																			(1000 *
+																				60 *
+																				60)) /
+																			(1000 *
+																				60)
+																	);
+
+																if (
+																	diffDays > 0
+																) {
+																	return `Submitted ${diffDays} day${
+																		diffDays >
+																		1
+																			? "s"
+																			: ""
+																	} ago`;
+																} else if (
+																	diffHours >
+																	0
+																) {
+																	return `Submitted ${diffHours} hour${
+																		diffHours >
+																		1
+																			? "s"
+																			: ""
+																	} ago`;
+																} else {
+																	return `Submitted ${diffMinutes} minute${
+																		diffMinutes >
+																		1
+																			? "s"
+																			: ""
+																	} ago`;
+																}
+															})()}
+														</span>
+													</div>
+												) : null}
+											</div>
 										</div>
 										<div className="flex flex-col space-y-2">
 											<button
