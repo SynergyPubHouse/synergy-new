@@ -11,9 +11,31 @@ router.post("/login", editorController.loginEditor);
 router.get("/profile", auth, editorController.getProfile);
 router.put("/profile", auth, editorController.updateProfile);
 router.get("/reviewers", auth, editorController.getReviewers);
-router.get("/users-with-manuscripts", auth, editorController.getUsersWithManuscripts);
-router.get("/manuscripts/:author", auth, editorController.getManuscriptsByAuthor);
+router.get(
+	"/users-with-manuscripts",
+	auth,
+	editorController.getUsersWithManuscripts
+);
+router.get(
+	"/manuscripts/:author",
+	auth,
+	editorController.getManuscriptsByAuthor
+);
 router.post("/manuscripts/:manuscriptId/notes", auth, editorController.addNote);
-router.patch("/manuscripts/:manuscriptId/status", auth, editorController.updateManuscriptStatus);
+router.get(
+	"/manuscripts/:manuscriptId/notes",
+	auth,
+	editorController.getManuscriptNotes
+);
+router.patch(
+	"/manuscripts/:manuscriptId/status",
+	auth,
+	editorController.updateManuscriptStatus
+);
+router.patch(
+	"/manuscripts/bulk-update-status",
+	auth,
+	editorController.bulkUpdateManuscriptStatus
+);
 
 module.exports = router;

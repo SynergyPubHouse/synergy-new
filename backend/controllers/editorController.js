@@ -186,9 +186,11 @@ exports.getManuscriptsByAuthor = async (req, res) => {
 		const { author } = req.params;
 		const manuscripts = await Manuscript.find({
 			author,
-			status: { $ne: "Saved" }, // Exclude manuscripts with "Saved" status
+			status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 		})
-			.select("title type status submissionDate mergedFileUrl")
+			.select(
+				"title type status submissionDate mergedFileUrl authorNotes editorNotes reviewerNotes reviews createdAt updatedAt"
+			)
 			.sort({ submissionDate: -1 });
 
 		res.json(manuscripts);
@@ -216,10 +218,10 @@ exports.getUsersWithManuscripts = async (req, res) => {
 			users.map(async (user) => {
 				const manuscripts = await Manuscript.find({
 					_id: { $in: user.manuscripts },
-					status: { $ne: "Saved" }, // Exclude manuscripts with "Saved" status
+					status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 				})
 					.select(
-						"title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes reviewerNotes"
+						"title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes reviewerNotes reviews createdAt updatedAt"
 					)
 					.lean();
 
@@ -318,7 +320,37 @@ exports.getReviewers = async (req, res) => {
 exports.updateManuscriptStatus = async (req, res) => {
 	try {
 		const { manuscriptId } = req.params;
-		const { status } = req.body;
+		const { status, note } = req.body;
+
+		// First, get the current manuscript to check its current status
+		const currentManuscript = await Manuscript.findById(manuscriptId);
+		if (!currentManuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		// Prevent any status changes if the manuscript is already rejected
+		if (currentManuscript.status === "Rejected") {
+			return res.status(403).json({
+				message:
+					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
+			});
+		}
+
+		// Validate status
+		const validStatuses = [
+			"Pending",
+			"Under Review",
+			"Reviewed",
+			"Accepted",
+			"Rejected",
+		];
+		if (!validStatuses.includes(status)) {
+			return res.status(400).json({
+				message:
+					"Invalid status. Must be one of: " +
+					validStatuses.join(", "),
+			});
+		}
 
 		const manuscript = await Manuscript.findByIdAndUpdate(
 			manuscriptId,
@@ -326,14 +358,191 @@ exports.updateManuscriptStatus = async (req, res) => {
 			{ new: true }
 		);
 
-		if (!manuscript) {
-			return res.status(404).json({ message: "Manuscript not found" });
+		// If a note is provided, add it to the editor notes
+		if (note && note.trim()) {
+			const editorNote = {
+				text: note,
+				action: status,
+				visibility: ["author", "editor"],
+				addedBy: {
+					_id: req.editor._id,
+					name: `${req.editor.firstName} ${req.editor.lastName}`,
+					email: req.editor.email,
+					role: "editor",
+				},
+				addedAt: new Date(),
+			};
+
+			manuscript.editorNotes.push(editorNote);
+			await manuscript.save();
 		}
 
-		res.json(manuscript);
+		res.json({
+			message: `Manuscript status updated to ${status}`,
+			manuscript,
+		});
 	} catch (error) {
+		console.error("Error updating manuscript status:", error);
 		res.status(500).json({
 			message: "Error updating status",
+			error: error.message,
+		});
+	}
+};
+
+// Bulk update manuscript status (for multiple manuscripts)
+exports.bulkUpdateManuscriptStatus = async (req, res) => {
+	try {
+		const { manuscriptIds, status, note } = req.body;
+
+		// Validate status
+		const validStatuses = [
+			"Pending",
+			"Under Review",
+			"Reviewed",
+			"Accepted",
+			"Rejected",
+		];
+		if (!validStatuses.includes(status)) {
+			return res.status(400).json({
+				message:
+					"Invalid status. Must be one of: " +
+					validStatuses.join(", "),
+			});
+		}
+
+		const results = [];
+
+		for (const manuscriptId of manuscriptIds) {
+			// First check if the manuscript exists and its current status
+			const currentManuscript = await Manuscript.findById(manuscriptId);
+
+			if (!currentManuscript) {
+				results.push({
+					manuscriptId,
+					success: false,
+					error: "Manuscript not found",
+				});
+				continue;
+			}
+
+			// Prevent any status changes if the manuscript is already rejected
+			if (currentManuscript.status === "Rejected") {
+				results.push({
+					manuscriptId,
+					success: false,
+					error: "Cannot modify status of a rejected manuscript",
+				});
+				continue;
+			}
+
+			const manuscript = await Manuscript.findByIdAndUpdate(
+				manuscriptId,
+				{ status },
+				{ new: true }
+			);
+
+			if (manuscript) {
+				// If a note is provided, add it to the editor notes
+				if (note && note.trim()) {
+					const editorNote = {
+						text: note,
+						action: status,
+						visibility: ["author", "editor"],
+						addedBy: {
+							_id: req.editor._id,
+							name: `${req.editor.firstName} ${req.editor.lastName}`,
+							email: req.editor.email,
+							role: "editor",
+						},
+						addedAt: new Date(),
+					};
+
+					manuscript.editorNotes.push(editorNote);
+					await manuscript.save();
+				}
+				results.push({ manuscriptId, success: true });
+			} else {
+				results.push({
+					manuscriptId,
+					success: false,
+					error: "Manuscript not found",
+				});
+			}
+		}
+
+		res.json({
+			message: `Bulk status update completed. Updated ${
+				results.filter((r) => r.success).length
+			} of ${manuscriptIds.length} manuscripts.`,
+			results,
+		});
+	} catch (error) {
+		console.error("Error in bulk update:", error);
+		res.status(500).json({
+			message: "Error updating statuses",
+			error: error.message,
+		});
+	}
+};
+
+// Get all notes for a specific manuscript
+exports.getManuscriptNotes = async (req, res) => {
+	try {
+		const { manuscriptId } = req.params;
+
+		const manuscript = await Manuscript.findById(manuscriptId)
+			.select("authorNotes editorNotes reviewerNotes reviews")
+			.populate("reviews.reviewerId", "firstName lastName email")
+			.lean();
+
+		if (!manuscript) {
+			return res.status(404).json({
+				message: "Manuscript not found",
+			});
+		}
+
+		// Combine all notes and reviews with type information
+		const allNotes = [
+			...(manuscript.authorNotes || []).map((note) => ({
+				...note,
+				type: "author",
+			})),
+			...(manuscript.editorNotes || []).map((note) => ({
+				...note,
+				type: "editor",
+			})),
+			...(manuscript.reviewerNotes || []).map((note) => ({
+				...note,
+				type: "reviewer",
+			})),
+			...(manuscript.reviews || []).map((review) => ({
+				...review,
+				type: "review",
+				text: review.comments,
+				addedAt: review.submittedAt,
+			})),
+		].sort(
+			(a, b) =>
+				new Date(a.addedAt || a.submittedAt) -
+				new Date(b.addedAt || b.submittedAt)
+		);
+
+		res.json({
+			manuscriptId,
+			notes: allNotes,
+			summary: {
+				totalNotes: allNotes.length,
+				authorNotes: manuscript.authorNotes?.length || 0,
+				editorNotes: manuscript.editorNotes?.length || 0,
+				reviewerNotes: manuscript.reviewerNotes?.length || 0,
+				reviews: manuscript.reviews?.length || 0,
+			},
+		});
+	} catch (error) {
+		console.error("Error getting manuscript notes:", error);
+		res.status(500).json({
+			message: "Error fetching manuscript notes",
 			error: error.message,
 		});
 	}

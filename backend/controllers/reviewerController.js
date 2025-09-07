@@ -152,8 +152,8 @@ exports.getAssignedManuscripts = async (req, res) => {
 			select: "title correspondingAuthor submissionDate status mergedFileUrl reviewerNotes editorNotes",
 			populate: {
 				path: "correspondingAuthor",
-				select: "firstName lastName email"
-			}
+				select: "firstName lastName email",
+			},
 		});
 
 		if (!reviewer) {
@@ -163,16 +163,21 @@ exports.getAssignedManuscripts = async (req, res) => {
 		// Format the manuscripts data
 		const formattedManuscripts = reviewer.assignedManuscripts.map(
 			(manuscript) => {
-				console.log("Populated manuscript correspondingAuthor:", manuscript.correspondingAuthor);
+				console.log(
+					"Populated manuscript correspondingAuthor:",
+					manuscript.correspondingAuthor
+				);
 				// Use correspondingAuthor for author data
 				let authorData = {
 					_id: manuscript.correspondingAuthor?._id || null,
 					firstName: manuscript.correspondingAuthor?.firstName || "",
 					lastName: manuscript.correspondingAuthor?.lastName || "",
 					email: manuscript.correspondingAuthor?.email || "",
-					fullName: manuscript.correspondingAuthor?.firstName && manuscript.correspondingAuthor?.lastName
-						? `${manuscript.correspondingAuthor.firstName} ${manuscript.correspondingAuthor.lastName}`
-						: "Unknown Author",
+					fullName:
+						manuscript.correspondingAuthor?.firstName &&
+						manuscript.correspondingAuthor?.lastName
+							? `${manuscript.correspondingAuthor.firstName} ${manuscript.correspondingAuthor.lastName}`
+							: "Unknown Author",
 				};
 
 				// Ensure mergedFileUrl is properly formatted
@@ -228,21 +233,23 @@ exports.submitReview = async (req, res) => {
 				.json({ message: "Not authorized to review this manuscript" });
 		}
 
-		// Map recommendation to appropriate action
+		// Map recommendation to appropriate action for notes (but don't change manuscript status)
 		let action;
 		switch (recommendation) {
 			case "Accept":
-				action = "Accepted";
+				action = "Recommended for Acceptance";
 				break;
 			case "Minor Revision":
+				action = "Minor Revision Suggested";
+				break;
 			case "Major Revision":
-				action = "Revision Required";
+				action = "Major Revision Suggested";
 				break;
 			case "Reject":
-				action = "Rejected";
+				action = "Rejection Recommended";
 				break;
 			default:
-				action = "Reviewed";
+				action = "Review Completed";
 		}
 
 		// Create the reviewer note with all required fields
@@ -269,7 +276,9 @@ exports.submitReview = async (req, res) => {
 
 		// Update the manuscript with the review note
 		manuscript.reviewerNotes.push(reviewerNote);
-		manuscript.status = "Reviewed";
+
+		// Keep the manuscript status as "Under Review" - only editors can change the final status
+		// Do NOT automatically change status to "Reviewed"
 
 		// Save the changes
 		await manuscript.save();

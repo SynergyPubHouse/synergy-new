@@ -16,7 +16,6 @@ function EditorDashboard() {
 	const [acceptanceNote, setAcceptanceNote] = useState("");
 	const [selectedManuscriptIds, setSelectedManuscriptIds] = useState([]);
 	const [showBulkActions, setShowBulkActions] = useState(false);
-	const [expandedNotes, setExpandedNotes] = useState({});
 
 	useEffect(() => {
 		const fetchUsers = async () => {
@@ -183,18 +182,7 @@ function EditorDashboard() {
 			);
 		} catch (error) {
 			console.error("Error updating manuscript:", error);
-
-			// Check for specific error about rejected manuscripts
-			if (
-				error.response?.status === 403 &&
-				error.response?.data?.message?.includes("rejected")
-			) {
-				alert(
-					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable."
-				);
-			} else {
-				alert("Failed to update manuscript");
-			}
+			alert("Failed to update manuscript");
 		}
 	};
 
@@ -232,10 +220,8 @@ function EditorDashboard() {
 	// Handle direct status updates without notes or reviewers
 	const handleDirectStatusUpdate = async (manuscriptId, newStatus) => {
 		try {
-			console.log(
-				`Updating manuscript ${manuscriptId} to status: ${newStatus}`
-			);
-
+			console.log(`Updating manuscript ${manuscriptId} to status: ${newStatus}`);
+			
 			await axios.patch(
 				`${
 					import.meta.env.VITE_BACKEND_URL
@@ -257,40 +243,23 @@ function EditorDashboard() {
 			alert(`Manuscript status updated to "${newStatus}" successfully!`);
 		} catch (error) {
 			console.error("Error updating manuscript status:", error);
-
-			// Check for specific error about rejected manuscripts
-			if (
-				error.response?.status === 403 &&
-				error.response?.data?.message?.includes("rejected")
-			) {
-				alert(
-					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable."
-				);
-			} else {
-				alert(`Failed to update manuscript status to "${newStatus}"`);
-			}
+			alert(`Failed to update manuscript status to "${newStatus}"`);
 		}
 	};
 
 	// Handle bulk status updates
-	const handleBulkStatusUpdate = async (
-		manuscriptIds,
-		newStatus,
-		note = ""
-	) => {
+	const handleBulkStatusUpdate = async (manuscriptIds, newStatus, note = "") => {
 		try {
-			console.log(
-				`Bulk updating ${manuscriptIds.length} manuscripts to status: ${newStatus}`
-			);
-
+			console.log(`Bulk updating ${manuscriptIds.length} manuscripts to status: ${newStatus}`);
+			
 			await axios.patch(
 				`${
 					import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/bulk-update-status`,
-				{
-					manuscriptIds,
+				{ 
+					manuscriptIds, 
 					status: newStatus,
-					note,
+					note 
 				},
 				{
 					headers: {
@@ -309,31 +278,18 @@ function EditorDashboard() {
 			setSelectedManuscriptIds([]);
 			setShowBulkActions(false);
 
-			alert(
-				`${manuscriptIds.length} manuscripts updated to "${newStatus}" successfully!`
-			);
+			alert(`${manuscriptIds.length} manuscripts updated to "${newStatus}" successfully!`);
 		} catch (error) {
 			console.error("Error bulk updating manuscript status:", error);
-
-			// Check for specific error about rejected manuscripts
-			if (
-				error.response?.status === 403 ||
-				error.response?.data?.message?.includes("rejected")
-			) {
-				alert(
-					"Some manuscripts could not be updated because they are rejected. Rejected manuscripts cannot be modified."
-				);
-			} else {
-				alert(`Failed to bulk update manuscripts to "${newStatus}"`);
-			}
+			alert(`Failed to bulk update manuscripts to "${newStatus}"`);
 		}
 	};
 
 	// Toggle manuscript selection for bulk actions
 	const toggleManuscriptSelection = (manuscriptId) => {
-		setSelectedManuscriptIds((prev) =>
-			prev.includes(manuscriptId)
-				? prev.filter((id) => id !== manuscriptId)
+		setSelectedManuscriptIds(prev => 
+			prev.includes(manuscriptId) 
+				? prev.filter(id => id !== manuscriptId)
 				: [...prev, manuscriptId]
 		);
 	};
@@ -404,136 +360,31 @@ function EditorDashboard() {
 						<h2 className="text-2xl font-semibold text-[#496580] mb-4">
 							📊 Manuscript Status Overview
 						</h2>
-						<div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-							<p className="text-sm text-yellow-800">
-								<strong>📝 Note:</strong> Rejected manuscripts
-								are not displayed in the editor dashboard. Once
-								a manuscript is rejected, its status becomes
-								immutable and it&apos;s removed from editor
-								view.
-							</p>
-						</div>
 						{(() => {
 							// Calculate status counts from all users' manuscripts
-							// Note: Rejected manuscripts are not fetched for editors, so they won't appear in counts
-							const allManuscripts = users.flatMap(
-								(user) => user.manuscripts || []
-							);
-							const statusCounts = allManuscripts.reduce(
-								(acc, manuscript) => {
-									acc[manuscript.status] =
-										(acc[manuscript.status] || 0) + 1;
-									return acc;
-								},
-								{}
-							);
+							const allManuscripts = users.flatMap(user => user.manuscripts || []);
+							const statusCounts = allManuscripts.reduce((acc, manuscript) => {
+								acc[manuscript.status] = (acc[manuscript.status] || 0) + 1;
+								return acc;
+							}, {});
 
-							// Only show statuses that editors can see (excluding Rejected)
-							const statusOrder = [
-								"Pending",
-								"Under Review",
-								"Reviewed",
-								"Accepted",
-							];
+							const statusOrder = ["Pending", "Under Review", "Reviewed", "Accepted", "Rejected"];
 							const statusColors = {
-								Pending: "bg-blue-500",
-								"Under Review": "bg-yellow-500",
-								Reviewed: "bg-purple-500",
-								Accepted: "bg-green-500",
+								"Pending": "bg-blue-500",
+								"Under Review": "bg-yellow-500", 
+								"Reviewed": "bg-purple-500",
+								"Accepted": "bg-green-500",
+								"Rejected": "bg-red-500"
 							};
 
 							return (
-								<div>
-									<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-										{statusOrder.map((status) => (
-											<div
-												key={status}
-												className={`${statusColors[status]} text-white p-4 rounded-lg text-center`}
-											>
-												<div className="text-2xl font-bold">
-													{statusCounts[status] || 0}
-												</div>
-												<div className="text-sm">
-													{status}
-												</div>
-											</div>
-										))}
-									</div>
-
-									{/* Recent Activity Summary */}
-									<div className="bg-gray-50 p-4 rounded-lg border">
-										<h3 className="text-lg font-semibold text-gray-700 mb-3">
-											⏰ Recent Activity
-										</h3>
-										<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-											<div className="bg-white p-3 rounded border">
-												<div className="font-semibold text-blue-600">
-													📥 Today&apos;s Submissions
-												</div>
-												<div className="text-lg font-bold">
-													{
-														allManuscripts.filter(
-															(m) => {
-																const today =
-																	new Date();
-																const submissionDate =
-																	new Date(
-																		m.submissionDate
-																	);
-																return (
-																	submissionDate.toDateString() ===
-																	today.toDateString()
-																);
-															}
-														).length
-													}
-												</div>
-											</div>
-											<div className="bg-white p-3 rounded border">
-												<div className="font-semibold text-yellow-600">
-													🔄 Updated This Week
-												</div>
-												<div className="text-lg font-bold">
-													{
-														allManuscripts.filter(
-															(m) => {
-																const weekAgo =
-																	new Date();
-																weekAgo.setDate(
-																	weekAgo.getDate() -
-																		7
-																);
-																const updatedDate =
-																	new Date(
-																		m.updatedAt
-																	);
-																return (
-																	updatedDate >=
-																	weekAgo
-																);
-															}
-														).length
-													}
-												</div>
-											</div>
-											<div className="bg-white p-3 rounded border">
-												<div className="font-semibold text-green-600">
-													⚡ Pending Action
-												</div>
-												<div className="text-lg font-bold">
-													{
-														allManuscripts.filter(
-															(m) =>
-																m.status ===
-																	"Pending" ||
-																m.status ===
-																	"Reviewed"
-														).length
-													}
-												</div>
-											</div>
+								<div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+									{statusOrder.map(status => (
+										<div key={status} className={`${statusColors[status]} text-white p-4 rounded-lg text-center`}>
+											<div className="text-2xl font-bold">{statusCounts[status] || 0}</div>
+											<div className="text-sm">{status}</div>
 										</div>
-									</div>
+									))}
 								</div>
 							);
 						})()}
@@ -572,31 +423,25 @@ function EditorDashboard() {
 									? `Manuscripts by ${selectedUser.firstName} ${selectedUser.lastName}`
 									: "Select a User"}
 							</h2>
-
+							
 							{/* Bulk Actions Toggle */}
 							{manuscripts.length > 0 && (
 								<div className="flex items-center space-x-2">
 									<button
-										onClick={() =>
-											setShowBulkActions(!showBulkActions)
-										}
+										onClick={() => setShowBulkActions(!showBulkActions)}
 										className={`px-3 py-1 text-sm rounded ${
-											showBulkActions
-												? "bg-red-500 text-white hover:bg-red-600"
+											showBulkActions 
+												? "bg-red-500 text-white hover:bg-red-600" 
 												: "bg-blue-500 text-white hover:bg-blue-600"
 										}`}
 									>
-										{showBulkActions
-											? "❌ Cancel Bulk"
-											: "☑️ Bulk Actions"}
+										{showBulkActions ? "❌ Cancel Bulk" : "☑️ Bulk Actions"}
 									</button>
-									{showBulkActions &&
-										selectedManuscriptIds.length > 0 && (
-											<span className="text-sm text-gray-600">
-												{selectedManuscriptIds.length}{" "}
-												selected
-											</span>
-										)}
+									{showBulkActions && selectedManuscriptIds.length > 0 && (
+										<span className="text-sm text-gray-600">
+											{selectedManuscriptIds.length} selected
+										</span>
+									)}
 								</div>
 							)}
 						</div>
@@ -604,79 +449,53 @@ function EditorDashboard() {
 						{/* Bulk Actions Panel */}
 						{showBulkActions && manuscripts.length > 0 && (
 							<div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-								<h3 className="text-lg font-semibold text-blue-700 mb-3">
-									🔧 Bulk Actions
-								</h3>
+								<h3 className="text-lg font-semibold text-blue-700 mb-3">🔧 Bulk Actions</h3>
 								<div className="flex flex-wrap gap-2 mb-3">
 									<button
-										onClick={() =>
-											setSelectedManuscriptIds(
-												manuscripts.map((m) => m._id)
-											)
-										}
+										onClick={() => setSelectedManuscriptIds(manuscripts.map(m => m._id))}
 										className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
 									>
 										Select All
 									</button>
 									<button
-										onClick={() =>
-											setSelectedManuscriptIds([])
-										}
+										onClick={() => setSelectedManuscriptIds([])}
 										className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
 									>
 										Clear All
 									</button>
 								</div>
-
+								
 								{selectedManuscriptIds.length > 0 && (
 									<div className="flex flex-wrap gap-2">
 										<button
-											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
-													"Pending"
-												)
-											}
+											onClick={() => handleBulkStatusUpdate(selectedManuscriptIds, "Pending")}
 											className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
 										>
-											🔄 Set to Pending (
-											{selectedManuscriptIds.length})
+											🔄 Set to Pending ({selectedManuscriptIds.length})
 										</button>
 										<button
-											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
-													"Under Review"
-												)
-											}
+											onClick={() => handleBulkStatusUpdate(selectedManuscriptIds, "Under Review")}
 											className="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600"
 										>
-											👥 Send to Review (
-											{selectedManuscriptIds.length})
+											👥 Send to Review ({selectedManuscriptIds.length})
 										</button>
 										<button
-											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
-													"Reviewed"
-												)
-											}
+											onClick={() => handleBulkStatusUpdate(selectedManuscriptIds, "Reviewed")}
 											className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
 										>
-											✅ Mark Reviewed (
-											{selectedManuscriptIds.length})
+											✅ Mark Reviewed ({selectedManuscriptIds.length})
 										</button>
 										<button
-											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
-													"Accepted"
-												)
-											}
+											onClick={() => handleBulkStatusUpdate(selectedManuscriptIds, "Accepted")}
 											className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
 										>
-											🎉 Accept All (
-											{selectedManuscriptIds.length})
+											🎉 Accept All ({selectedManuscriptIds.length})
+										</button>
+										<button
+											onClick={() => handleBulkStatusUpdate(selectedManuscriptIds, "Rejected", "Bulk rejection")}
+											className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+										>
+											❌ Reject All ({selectedManuscriptIds.length})
 										</button>
 									</div>
 								)}
@@ -687,7 +506,6 @@ function EditorDashboard() {
 							{manuscripts.map((manuscript) => (
 								<div
 									key={manuscript._id}
-									data-manuscript-id={manuscript._id}
 									className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0]"
 								>
 									<div className="flex justify-between items-start">
@@ -696,18 +514,12 @@ function EditorDashboard() {
 											{showBulkActions && (
 												<input
 													type="checkbox"
-													checked={selectedManuscriptIds.includes(
-														manuscript._id
-													)}
-													onChange={() =>
-														toggleManuscriptSelection(
-															manuscript._id
-														)
-													}
+													checked={selectedManuscriptIds.includes(manuscript._id)}
+													onChange={() => toggleManuscriptSelection(manuscript._id)}
 													className="mt-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
 												/>
 											)}
-
+											
 											<div className="flex-1">
 												<h3 className="text-xl font-semibold text-[#1a365d] mb-2">
 													{manuscript.title}
@@ -715,104 +527,184 @@ function EditorDashboard() {
 												<p className="text-[#496580] text-sm">
 													Type: {manuscript.type}
 												</p>
-												<div className="flex items-center space-x-2 mb-1">
-													<p className="text-[#496580] text-sm">
-														Status:
-													</p>
-													<span
-														className={`px-2 py-1 rounded text-xs font-semibold ${
-															manuscript.status ===
-															"Pending"
-																? "bg-blue-100 text-blue-800"
-																: manuscript.status ===
-																  "Under Review"
-																? "bg-yellow-100 text-yellow-800"
-																: manuscript.status ===
-																  "Reviewed"
-																? "bg-purple-100 text-purple-800"
-																: manuscript.status ===
-																  "Accepted"
-																? "bg-green-100 text-green-800"
-																: manuscript.status ===
-																  "Rejected"
-																? "bg-red-100 text-red-800"
-																: "bg-gray-100 text-gray-800"
-														}`}
-													>
+												<div className="flex items-center space-x-2">
+													<p className="text-[#496580] text-sm">Status:</p>
+													<span className={`px-2 py-1 rounded text-xs font-semibold ${
+														manuscript.status === "Pending" ? "bg-blue-100 text-blue-800" :
+														manuscript.status === "Under Review" ? "bg-yellow-100 text-yellow-800" :
+														manuscript.status === "Reviewed" ? "bg-purple-100 text-purple-800" :
+														manuscript.status === "Accepted" ? "bg-green-100 text-green-800" :
+														manuscript.status === "Rejected" ? "bg-red-100 text-red-800" :
+														"bg-gray-100 text-gray-800"
+													}`}>
 														{manuscript.status}
 													</span>
 												</div>
-												{/* Time Information */}
-												<div className="text-xs text-gray-600 space-y-1">
-													{manuscript.submissionDate && (
-														<div className="flex items-center space-x-1">
-															<span>
-																📅 Submitted:
-															</span>
-															<span>
-																{new Date(
-																	manuscript.submissionDate
-																).toLocaleDateString(
-																	"en-US",
-																	{
-																		year: "numeric",
-																		month: "short",
-																		day: "numeric",
-																		hour: "2-digit",
-																		minute: "2-digit",
-																	}
-																)}
-															</span>
+
+												{/* Enhanced Timestamp Section */}
+												<div className="mt-3 bg-white p-3 rounded border border-[#e2e8f0]">
+												<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+													<div className="flex flex-col">
+														<span className="font-semibold text-[#496580] mb-1">
+															📅 Submitted:
+														</span>
+														<div className="text-[#1a365d]">
+															{manuscript.submissionDate ||
+															manuscript.createdAt ? (
+																<>
+																	<div className="font-medium">
+																		{new Date(
+																			manuscript.submissionDate ||
+																				manuscript.createdAt
+																		).toLocaleDateString(
+																			"en-US",
+																			{
+																				year: "numeric",
+																				month: "long",
+																				day: "numeric",
+																			}
+																		)}
+																	</div>
+																	<div className="text-xs text-[#496580]">
+																		{new Date(
+																			manuscript.submissionDate ||
+																				manuscript.createdAt
+																		).toLocaleTimeString(
+																			"en-US",
+																			{
+																				hour: "2-digit",
+																				minute: "2-digit",
+																				hour12: true,
+																			}
+																		)}
+																	</div>
+																</>
+															) : (
+																"N/A"
+															)}
 														</div>
-													)}
-													{manuscript.updatedAt && (
-														<div className="flex items-center space-x-1">
-															<span>
-																🔄 Last Updated:
-															</span>
-															<span>
-																{new Date(
-																	manuscript.updatedAt
-																).toLocaleDateString(
-																	"en-US",
-																	{
-																		year: "numeric",
-																		month: "short",
-																		day: "numeric",
-																		hour: "2-digit",
-																		minute: "2-digit",
-																	}
-																)}
-															</span>
-														</div>
-													)}
-													{manuscript.createdAt &&
-														!manuscript.submissionDate && (
-															<div className="flex items-center space-x-1">
-																<span>
-																	📝 Created:
+													</div>
+
+													{manuscript.updatedAt &&
+														manuscript.updatedAt !==
+															(manuscript.submissionDate ||
+																manuscript.createdAt) && (
+															<div className="flex flex-col">
+																<span className="font-semibold text-[#496580] mb-1">
+																	🔄 Last
+																	Updated:
 																</span>
-																<span>
-																	{new Date(
-																		manuscript.createdAt
-																	).toLocaleDateString(
-																		"en-US",
-																		{
-																			year: "numeric",
-																			month: "short",
-																			day: "numeric",
-																			hour: "2-digit",
-																			minute: "2-digit",
-																		}
-																	)}
-																</span>
+																<div className="text-[#1a365d]">
+																	<div className="font-medium">
+																		{new Date(
+																			manuscript.updatedAt
+																		).toLocaleDateString(
+																			"en-US",
+																			{
+																				year: "numeric",
+																				month: "long",
+																				day: "numeric",
+																			}
+																		)}
+																	</div>
+																	<div className="text-xs text-[#496580]">
+																		{new Date(
+																			manuscript.updatedAt
+																		).toLocaleTimeString(
+																			"en-US",
+																			{
+																				hour: "2-digit",
+																				minute: "2-digit",
+																				hour12: true,
+																			}
+																		)}
+																	</div>
+																</div>
 															</div>
 														)}
 												</div>
+
+												{/* Time since submission */}
+												{manuscript.submissionDate ||
+												manuscript.createdAt ? (
+													<div className="mt-2 pt-2 border-t border-[#e2e8f0]">
+														<span className="text-xs text-[#496580]">
+															⏱️{" "}
+															{(() => {
+																const submissionDate =
+																	new Date(
+																		manuscript.submissionDate ||
+																			manuscript.createdAt
+																	);
+																const now =
+																	new Date();
+																const diffTime =
+																	Math.abs(
+																		now -
+																			submissionDate
+																	);
+																const diffDays =
+																	Math.floor(
+																		diffTime /
+																			(1000 *
+																				60 *
+																				60 *
+																				24)
+																	);
+																const diffHours =
+																	Math.floor(
+																		(diffTime %
+																			(1000 *
+																				60 *
+																				60 *
+																				24)) /
+																			(1000 *
+																				60 *
+																				60)
+																	);
+																const diffMinutes =
+																	Math.floor(
+																		(diffTime %
+																			(1000 *
+																				60 *
+																				60)) /
+																			(1000 *
+																				60)
+																	);
+
+																if (
+																	diffDays > 0
+																) {
+																	return `Submitted ${diffDays} day${
+																		diffDays >
+																		1
+																			? "s"
+																			: ""
+																	} ago`;
+																} else if (
+																	diffHours >
+																	0
+																) {
+																	return `Submitted ${diffHours} hour${
+																		diffHours >
+																		1
+																			? "s"
+																			: ""
+																	} ago`;
+																} else {
+																	return `Submitted ${diffMinutes} minute${
+																		diffMinutes >
+																		1
+																			? "s"
+																			: ""
+																	} ago`;
+																}
+															})()}
+														</span>
+													</div>
+												) : null}
 											</div>
 										</div>
-
-										{/* Action Buttons */}
 										<div className="flex flex-col space-y-2">
 											{/* View PDF Button - Always Available */}
 											<button
@@ -825,53 +717,6 @@ function EditorDashboard() {
 											>
 												📄 View PDF
 											</button>
-
-											{/* View Notes Button */}
-											{(manuscript.editorNotes?.length >
-												0 ||
-												manuscript.reviewerNotes
-													?.length > 0 ||
-												manuscript.reviews?.length >
-													0) && (
-												<button
-													className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-													title={`View ${
-														(manuscript.editorNotes
-															?.length || 0) +
-														(manuscript
-															.reviewerNotes
-															?.length || 0) +
-														(manuscript.reviews
-															?.length || 0)
-													} notes/reviews`}
-													onClick={() => {
-														// Scroll to notes section
-														const element =
-															document.querySelector(
-																`[data-manuscript-id="${manuscript._id}"] .notes-section`
-															);
-														if (element) {
-															element.scrollIntoView(
-																{
-																	behavior:
-																		"smooth",
-																	block: "center",
-																}
-															);
-														}
-													}}
-												>
-													📝 Notes (
-													{(manuscript.editorNotes
-														?.length || 0) +
-														(manuscript
-															.reviewerNotes
-															?.length || 0) +
-														(manuscript.reviews
-															?.length || 0)}
-													)
-												</button>
-											)}
 
 											{/* Manual Status Control Buttons */}
 											<div className="bg-gray-50 p-3 rounded border">
@@ -888,20 +733,13 @@ function EditorDashboard() {
 															)
 														}
 														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Pending"
+															manuscript.status === "Pending"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-blue-500 text-white hover:bg-blue-600"
 														}`}
-														disabled={
-															manuscript.status ===
-															"Pending"
-														}
+														disabled={manuscript.status === "Pending"}
 													>
-														{manuscript.status ===
-														"Pending"
-															? "✓ Currently Pending"
-															: "🔄 Set to Pending"}
+														{manuscript.status === "Pending" ? "✓ Currently Pending" : "🔄 Set to Pending"}
 													</button>
 
 													{/* Set to Under Review */}
@@ -913,20 +751,13 @@ function EditorDashboard() {
 															)
 														}
 														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Under Review"
+															manuscript.status === "Under Review"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-[#496580] text-white hover:bg-[#3a5269]"
 														}`}
-														disabled={
-															manuscript.status ===
-															"Under Review"
-														}
+														disabled={manuscript.status === "Under Review"}
 													>
-														{manuscript.status ===
-														"Under Review"
-															? "✓ Under Review"
-															: "👥 Send to Review"}
+														{manuscript.status === "Under Review" ? "✓ Under Review" : "👥 Send to Review"}
 													</button>
 
 													{/* Set to Reviewed */}
@@ -938,20 +769,13 @@ function EditorDashboard() {
 															)
 														}
 														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Reviewed"
+															manuscript.status === "Reviewed"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-purple-500 text-white hover:bg-purple-600"
 														}`}
-														disabled={
-															manuscript.status ===
-															"Reviewed"
-														}
+														disabled={manuscript.status === "Reviewed"}
 													>
-														{manuscript.status ===
-														"Reviewed"
-															? "✓ Reviewed"
-															: "✅ Mark as Reviewed"}
+														{manuscript.status === "Reviewed" ? "✓ Reviewed" : "✅ Mark as Reviewed"}
 													</button>
 
 													{/* Accept */}
@@ -962,20 +786,13 @@ function EditorDashboard() {
 															)
 														}
 														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Accepted"
+															manuscript.status === "Accepted"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-green-500 text-white hover:bg-green-600"
 														}`}
-														disabled={
-															manuscript.status ===
-															"Accepted"
-														}
+														disabled={manuscript.status === "Accepted"}
 													>
-														{manuscript.status ===
-														"Accepted"
-															? "✓ Accepted"
-															: "🎉 Accept"}
+														{manuscript.status === "Accepted" ? "✓ Accepted" : "🎉 Accept"}
 													</button>
 
 													{/* Reject */}
@@ -987,20 +804,13 @@ function EditorDashboard() {
 															)
 														}
 														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Rejected"
+															manuscript.status === "Rejected"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-red-500 text-white hover:bg-red-600"
 														}`}
-														disabled={
-															manuscript.status ===
-															"Rejected"
-														}
+														disabled={manuscript.status === "Rejected"}
 													>
-														{manuscript.status ===
-														"Rejected"
-															? "✓ Rejected"
-															: "❌ Reject"}
+														{manuscript.status === "Rejected" ? "✓ Rejected" : "❌ Reject"}
 													</button>
 												</div>
 											</div>
@@ -1012,8 +822,7 @@ function EditorDashboard() {
 												</h4>
 												<div className="grid grid-cols-1 gap-1">
 													{/* Auto-workflow buttons */}
-													{manuscript.status ===
-														"Under Review" && (
+													{manuscript.status === "Under Review" && (
 														<button
 															onClick={() =>
 																handleDirectStatusUpdate(
@@ -1026,9 +835,8 @@ function EditorDashboard() {
 															🔙 Reset to Pending
 														</button>
 													)}
-
-													{manuscript.status ===
-														"Pending" && (
+													
+													{manuscript.status === "Pending" && (
 														<button
 															onClick={() =>
 																handleDirectStatusUpdate(
@@ -1038,13 +846,11 @@ function EditorDashboard() {
 															}
 															className="px-3 py-1 text-sm bg-[#496580] text-white rounded hover:bg-[#3a5269]"
 														>
-															🚀 Quick Send to
-															Review
+															🚀 Quick Send to Review
 														</button>
 													)}
 
-													{manuscript.status ===
-														"Under Review" && (
+													{manuscript.status === "Under Review" && (
 														<button
 															onClick={() =>
 																handleDirectStatusUpdate(
@@ -1054,13 +860,11 @@ function EditorDashboard() {
 															}
 															className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
 														>
-															✅ Auto-Mark
-															Reviewed
+															✅ Auto-Mark Reviewed
 														</button>
 													)}
 
-													{manuscript.status ===
-														"Reviewed" && (
+													{manuscript.status === "Reviewed" && (
 														<button
 															onClick={() =>
 																handleDirectStatusUpdate(
@@ -1077,267 +881,6 @@ function EditorDashboard() {
 											</div>
 										</div>
 									</div>
-
-									{/* Notes History Section */}
-									{(manuscript.editorNotes?.length > 0 ||
-										manuscript.reviewerNotes?.length > 0 ||
-										manuscript.reviews?.length > 0) && (
-										<div className="notes-section mt-4 border-t border-[#e2e8f0] pt-4">
-											<h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-												📝 Notes & Reviews History
-											</h4>
-
-											<div className="space-y-3 max-h-60 overflow-y-auto">
-												{/* Show limited or all notes based on expanded state */}
-												{(() => {
-													const isExpanded =
-														expandedNotes[
-															manuscript._id
-														];
-													const allNotes = [
-														...(
-															manuscript.editorNotes ||
-															[]
-														).map((note) => ({
-															...note,
-															type: "editor",
-														})),
-														...(
-															manuscript.reviewerNotes ||
-															[]
-														).map((note) => ({
-															...note,
-															type: "reviewer",
-														})),
-														...(
-															manuscript.reviews ||
-															[]
-														).map((review) => ({
-															...review,
-															type: "review",
-														})),
-													].sort(
-														(a, b) =>
-															new Date(
-																a.addedAt ||
-																	a.submittedAt
-															) -
-															new Date(
-																b.addedAt ||
-																	b.submittedAt
-															)
-													);
-
-													const displayNotes =
-														isExpanded
-															? allNotes
-															: allNotes.slice(
-																	0,
-																	3
-															  );
-
-													return displayNotes.map(
-														(item, index) => {
-															if (
-																item.type ===
-																"editor"
-															) {
-																return (
-																	<div
-																		key={`editor-${index}`}
-																		className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400"
-																	>
-																		<div className="flex items-center justify-between mb-1">
-																			<div className="flex items-center space-x-2">
-																				<span className="text-sm font-semibold text-blue-700">
-																					👨‍💼
-																					Editor:{" "}
-																					{item
-																						.addedBy
-																						?.name ||
-																						"Unknown"}
-																				</span>
-																				{item.action && (
-																					<span className="px-2 py-1 text-xs bg-blue-200 text-blue-800 rounded">
-																						{
-																							item.action
-																						}
-																					</span>
-																				)}
-																			</div>
-																			<span className="text-xs text-blue-600">
-																				{new Date(
-																					item.addedAt
-																				).toLocaleDateString(
-																					"en-US",
-																					{
-																						month: "short",
-																						day: "numeric",
-																						hour: "2-digit",
-																						minute: "2-digit",
-																					}
-																				)}
-																			</span>
-																		</div>
-																		<p className="text-sm text-gray-700">
-																			{
-																				item.text
-																			}
-																		</p>
-																	</div>
-																);
-															} else if (
-																item.type ===
-																"reviewer"
-															) {
-																return (
-																	<div
-																		key={`reviewer-note-${index}`}
-																		className="bg-purple-50 p-3 rounded-lg border-l-4 border-purple-400"
-																	>
-																		<div className="flex items-center justify-between mb-1">
-																			<div className="flex items-center space-x-2">
-																				<span className="text-sm font-semibold text-purple-700">
-																					👥
-																					Reviewer:{" "}
-																					{item
-																						.addedBy
-																						?.name ||
-																						"Anonymous"}
-																				</span>
-																				{item.action && (
-																					<span className="px-2 py-1 text-xs bg-purple-200 text-purple-800 rounded">
-																						{
-																							item.action
-																						}
-																					</span>
-																				)}
-																			</div>
-																			<span className="text-xs text-purple-600">
-																				{new Date(
-																					item.addedAt
-																				).toLocaleDateString(
-																					"en-US",
-																					{
-																						month: "short",
-																						day: "numeric",
-																						hour: "2-digit",
-																						minute: "2-digit",
-																					}
-																				)}
-																			</span>
-																		</div>
-																		<p className="text-sm text-gray-700">
-																			{
-																				item.text
-																			}
-																		</p>
-																	</div>
-																);
-															} else if (
-																item.type ===
-																"review"
-															) {
-																return (
-																	<div
-																		key={`review-${index}`}
-																		className="bg-green-50 p-3 rounded-lg border-l-4 border-green-400"
-																	>
-																		<div className="flex items-center justify-between mb-1">
-																			<div className="flex items-center space-x-2">
-																				<span className="text-sm font-semibold text-green-700">
-																					📋
-																					Review
-																					by
-																					Reviewer
-																				</span>
-																				<span
-																					className={`px-2 py-1 text-xs rounded ${
-																						item.recommendation ===
-																						"Accept"
-																							? "bg-green-200 text-green-800"
-																							: item.recommendation ===
-																							  "Minor Revision"
-																							? "bg-yellow-200 text-yellow-800"
-																							: item.recommendation ===
-																							  "Major Revision"
-																							? "bg-orange-200 text-orange-800"
-																							: "bg-red-200 text-red-800"
-																					}`}
-																				>
-																					{
-																						item.recommendation
-																					}
-																				</span>
-																			</div>
-																			<span className="text-xs text-green-600">
-																				{new Date(
-																					item.submittedAt
-																				).toLocaleDateString(
-																					"en-US",
-																					{
-																						month: "short",
-																						day: "numeric",
-																						hour: "2-digit",
-																						minute: "2-digit",
-																					}
-																				)}
-																			</span>
-																		</div>
-																		<p className="text-sm text-gray-700">
-																			{
-																				item.comments
-																			}
-																		</p>
-																	</div>
-																);
-															}
-														}
-													);
-												})()}
-											</div>
-
-											{/* Toggle View All Notes Button */}
-											{(() => {
-												const totalNotes =
-													(manuscript.editorNotes
-														?.length || 0) +
-													(manuscript.reviewerNotes
-														?.length || 0) +
-													(manuscript.reviews
-														?.length || 0);
-												const isExpanded =
-													expandedNotes[
-														manuscript._id
-													];
-
-												if (totalNotes > 3) {
-													return (
-														<button
-															className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-															onClick={() => {
-																setExpandedNotes(
-																	(prev) => ({
-																		...prev,
-																		[manuscript._id]:
-																			!prev[
-																				manuscript
-																					._id
-																			],
-																	})
-																);
-															}}
-														>
-															{isExpanded
-																? "📋 Show Less"
-																: `📋 View All Notes (${totalNotes} total)`}
-														</button>
-													);
-												}
-												return null;
-											})()}
-										</div>
-									)}
 
 									{/* Note Input Section */}
 									{showNoteInput &&
@@ -1520,6 +1063,239 @@ function EditorDashboard() {
 												)}
 											</div>
 										)}
+
+									{/* Display notes section */}
+									{(manuscript.editorNotes?.length > 0 ||
+										manuscript.authorNotes?.length > 0 ||
+										manuscript.reviewerNotes?.length >
+											0) && (
+										<div className="mt-4 border-t border-[#e2e8f0] pt-4">
+											<h4 className="text-[#1a365d] font-semibold mb-2">
+												Notes:
+											</h4>
+
+											{/* Editor Notes */}
+											{manuscript.editorNotes?.length >
+												0 && (
+												<div className="mb-4">
+													<h5 className="text-[#496580] text-sm font-semibold mb-2">
+														Editor Notes:
+													</h5>
+													{manuscript.editorNotes.map(
+														(note, noteIndex) => (
+															<div
+																key={`editor-${noteIndex}`}
+																className="bg-white p-3 rounded mb-2 border border-[#e2e8f0]"
+															>
+																<div className="flex justify-between items-start">
+																	<p className="text-[#1a365d]">
+																		{
+																			note.text
+																		}
+																	</p>
+																	{note.action && (
+																		<span
+																			className={`px-2 py-1 rounded text-xs ${
+																				note.action ===
+																				"Rejected"
+																					? "bg-red-500"
+																					: note.action ===
+																					  "Under Review"
+																					? "bg-yellow-500"
+																					: note.action ===
+																					  "Accepted by Author(you)"
+																					? "bg-green-500"
+																					: "bg-blue-500"
+																			} text-white`}
+																		>
+																			{
+																				note.action
+																			}
+																		</span>
+																	)}
+																</div>
+																<p className="text-[#496580] text-sm mt-2">
+																	By:{" "}
+																	{
+																		note
+																			.addedBy
+																			.name
+																	}{" "}
+																	(
+																	{
+																		note
+																			.addedBy
+																			.role
+																	}
+																	)<br />
+																	Added:{" "}
+																	{new Date(
+																		note.addedAt
+																	).toLocaleString()}
+																</p>
+															</div>
+														)
+													)}
+												</div>
+											)}
+
+											{/* Reviewer Status Buttons */}
+											{manuscript.status ===
+												"Under Review" &&
+												manuscript.assignedReviewers
+													?.length > 0 && (
+													<div className="mb-4">
+														<h5 className="text-[#496580] text-sm font-semibold mb-2">
+															Reviewer Status:
+														</h5>
+														<div className="flex flex-wrap gap-2">
+															{manuscript.assignedReviewers.map(
+																(reviewer) => {
+																	const hasReviewed =
+																		manuscript.reviews?.some(
+																			(
+																				review
+																			) =>
+																				review.reviewerId.toString() ===
+																				reviewer._id.toString()
+																		);
+																	const initials = `${reviewer.firstName.charAt(
+																		0
+																	)}${reviewer.lastName.charAt(
+																		0
+																	)}`;
+																	return (
+																		<div
+																			key={
+																				reviewer._id
+																			}
+																			className="relative group"
+																		>
+																			<button
+																				className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold cursor-default
+											${hasReviewed ? "bg-green-500" : "bg-red-500"}`}
+																				title={`${reviewer.firstName} ${reviewer.lastName}`}
+																			>
+																				{
+																					initials
+																				}
+																			</button>
+																			<div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity">
+																				{`${reviewer.firstName} ${reviewer.lastName}`}
+																			</div>
+																		</div>
+																	);
+																}
+															)}
+														</div>
+													</div>
+												)}
+
+											{/* Author Notes */}
+											{manuscript.authorNotes?.length >
+												0 && (
+												<div className="mb-4">
+													<h5 className="text-blue-500 text-sm font-semibold mb-2">
+														Author Notes:
+													</h5>
+													{manuscript.authorNotes.map(
+														(note, noteIndex) => (
+															<div
+																key={`author-${noteIndex}`}
+																className="bg-white p-3 rounded mb-2 border border-[#e2e8f0]"
+															>
+																<div className="flex justify-between items-start">
+																	<p className="text-[#1a365d]">
+																		{
+																			note.text
+																		}
+																	</p>
+																	{note.action && (
+																		<span className="px-2 py-1 rounded text-xs bg-blue-500 text-white">
+																			{
+																				note.action
+																			}
+																		</span>
+																	)}
+																</div>
+																<p className="text-[#496580] text-sm mt-2">
+																	By:{" "}
+																	{
+																		note
+																			.addedBy
+																			.name
+																	}{" "}
+																	(
+																	{
+																		note
+																			.addedBy
+																			.role
+																	}
+																	)<br />
+																	Added:{" "}
+																	{new Date(
+																		note.addedAt
+																	).toLocaleString()}
+																</p>
+															</div>
+														)
+													)}
+												</div>
+											)}
+
+											{/* Reviewer Notes */}
+											{manuscript.reviewerNotes?.length >
+												0 && (
+												<div className="mb-4">
+													<h5 className="text-green-500 text-sm font-semibold mb-2">
+														Reviewer Notes:
+													</h5>
+													{manuscript.reviewerNotes.map(
+														(note, noteIndex) => (
+															<div
+																key={`reviewer-${noteIndex}`}
+																className="bg-white p-3 rounded mb-2 border border-[#e2e8f0]"
+															>
+																<div className="flex justify-between items-start">
+																	<p className="text-[#1a365d]">
+																		{
+																			note.text
+																		}
+																	</p>
+																	{note.action && (
+																		<span className="px-2 py-1 rounded text-xs bg-green-500 text-white">
+																			{
+																				note.action
+																			}
+																		</span>
+																	)}
+																</div>
+																<p className="text-[#496580] text-sm mt-2">
+																	By:{" "}
+																	{
+																		note
+																			.addedBy
+																			.name
+																	}{" "}
+																	(
+																	{
+																		note
+																			.addedBy
+																			.role
+																	}
+																	)<br />
+																	Added:{" "}
+																	{new Date(
+																		note.addedAt
+																	).toLocaleString()}
+																</p>
+															</div>
+														)
+													)}
+												</div>
+											)}
+										</div>
+									)}
 								</div>
 							))}
 						</div>
@@ -1534,6 +1310,51 @@ function EditorDashboard() {
 						<h2 className="text-2xl font-semibold text-[#1a365d] mb-4">
 							Accept Manuscript
 						</h2>
+
+						{/* Reviewer Notes Section */}
+						{selectedManuscript.reviewerNotes?.length > 0 && (
+							<div className="mb-6">
+								<h3 className="text-lg font-semibold text-green-500 mb-3">
+									Reviewer Notes
+								</h3>
+								<div className="space-y-3">
+									{selectedManuscript.reviewerNotes.map(
+										(note, index) => (
+											<div
+												key={index}
+												className="bg-[#f8fafc] p-4 rounded border border-[#e2e8f0]"
+											>
+												<p className="text-[#1a365d] mb-2">
+													{note.text}
+												</p>
+												<div className="flex items-center justify-between">
+													<span
+														className={`px-2 py-1 text-xs rounded ${
+															note.action ===
+															"Accept"
+																? "bg-green-500"
+																: note.action ===
+																  "Minor Revision"
+																? "bg-yellow-500"
+																: note.action ===
+																  "Major Revision"
+																? "bg-orange-500"
+																: "bg-red-500"
+														} text-white`}
+													>
+														{note.action}
+													</span>
+													<span className="text-[#496580] text-sm">
+														By {note.addedBy.name} (
+														{note.addedBy.role})
+													</span>
+												</div>
+											</div>
+										)
+									)}
+								</div>
+							</div>
+						)}
 
 						{/* Acceptance Note Input */}
 						<div className="mb-6">
