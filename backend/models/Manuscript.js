@@ -106,13 +106,14 @@ const manuscriptSchema = new mongoose.Schema(
 		status: {
 			type: String,
 			enum: [
+				"Saved",
 				"Pending",
 				"Under Review",
 				"Reviewed",
 				"Accepted",
 				"Rejected",
 			],
-			default: "Pending",
+			default: "Saved",
 		},
 		assignedReviewers: [
 			{

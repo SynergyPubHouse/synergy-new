@@ -184,7 +184,10 @@ exports.getAuthors = async (req, res) => {
 exports.getManuscriptsByAuthor = async (req, res) => {
 	try {
 		const { author } = req.params;
-		const manuscripts = await Manuscript.find({ author })
+		const manuscripts = await Manuscript.find({
+			author,
+			status: { $ne: "Saved" }, // Exclude manuscripts with "Saved" status
+		})
 			.select("title type status submissionDate mergedFileUrl")
 			.sort({ submissionDate: -1 });
 
@@ -208,11 +211,12 @@ exports.getUsersWithManuscripts = async (req, res) => {
 			.select("firstName lastName middleName email manuscripts")
 			.lean();
 
-		// For each user, populate their manuscripts
+		// For each user, populate their manuscripts (excluding "Saved" status)
 		const usersWithManuscripts = await Promise.all(
 			users.map(async (user) => {
 				const manuscripts = await Manuscript.find({
 					_id: { $in: user.manuscripts },
+					status: { $ne: "Saved" }, // Exclude manuscripts with "Saved" status
 				})
 					.select(
 						"title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes reviewerNotes"
@@ -236,7 +240,12 @@ exports.getUsersWithManuscripts = async (req, res) => {
 			})
 		);
 
-		res.json(usersWithManuscripts);
+		// Filter out users who have no manuscripts after excluding "Saved" ones
+		const filteredUsers = usersWithManuscripts.filter(
+			(user) => user.manuscripts.length > 0
+		);
+
+		res.json(filteredUsers);
 	} catch (error) {
 		console.error("Error in getUsersWithManuscripts:", error);
 		res.status(500).json({

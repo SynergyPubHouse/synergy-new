@@ -485,59 +485,72 @@ exports.createManuscript = async (req, res) => {
 			// const localFileUploadManager = new FileUploadManager();
 			// localFileUploadManager.useGoogleDrive = false;
 
-let manuscriptUpload, coverLetterUpload, declarationUpload, mergedUpload;
-try {
-    console.log("[createManuscript] Uploading files to Cloudinary...");
+			let manuscriptUpload,
+				coverLetterUpload,
+				declarationUpload,
+				mergedUpload;
+			try {
+				console.log(
+					"[createManuscript] Uploading files to Cloudinary..."
+				);
 
-    // Upload all PDFs to Cloudinary
-    [manuscriptUpload, coverLetterUpload, declarationUpload, mergedUpload] =
-        await Promise.all([
-            uploadToCloudinary(
-                manuscriptPdfPath,
-                "manuscripts" // Folder in Cloudinary
-            ),
-            uploadToCloudinary(
-                coverLetterPdfPath,
-                "coverLetters" // Folder in Cloudinary
-            ),
-            uploadToCloudinary(
-                declarationPdfPath,
-                "declarations" // Folder in Cloudinary
-            ),
-            uploadToCloudinary(
-                mergedPdfResult.localPath,
-                "merged_manuscripts", // Folder in Cloudinary
-                "raw" // Use 'raw' for PDF files to get a direct link
-            ),
-        ]);
+				// Upload all PDFs to Cloudinary
+				[
+					manuscriptUpload,
+					coverLetterUpload,
+					declarationUpload,
+					mergedUpload,
+				] = await Promise.all([
+					uploadToCloudinary(
+						manuscriptPdfPath,
+						"manuscripts" // Folder in Cloudinary
+					),
+					uploadToCloudinary(
+						coverLetterPdfPath,
+						"coverLetters" // Folder in Cloudinary
+					),
+					uploadToCloudinary(
+						declarationPdfPath,
+						"declarations" // Folder in Cloudinary
+					),
+					uploadToCloudinary(
+						mergedPdfResult.localPath,
+						"merged_manuscripts", // Folder in Cloudinary
+						"raw" // Use 'raw' for PDF files to get a direct link
+					),
+				]);
 
-    console.log("[createManuscript] All files uploaded successfully to Cloudinary");
-} catch (err) {
-    console.error("[createManuscript] Cloudinary upload failed:", err);
-    return res.status(500).json({
-        success: false,
-        message: "File upload to Cloudinary failed.",
-    });
-}
+				console.log(
+					"[createManuscript] All files uploaded successfully to Cloudinary"
+				);
+			} catch (err) {
+				console.error(
+					"[createManuscript] Cloudinary upload failed:",
+					err
+				);
+				return res.status(500).json({
+					success: false,
+					message: "File upload to Cloudinary failed.",
+				});
+			}
 
-
-const manuscriptData = {
-    ...req.body,
-    authors: authorObjectIds,
-    correspondingAuthor: correspondingAuthorObjectId,
-    // Use the secure_url from the Cloudinary response
-    manuscriptFile: manuscriptUpload.secure_url,
-    coverLetterFile: coverLetterUpload.secure_url,
-    declarationFile: declarationUpload.secure_url,
-    mergedFileUrl: mergedUpload.secure_url,
-    status: "Pending",
-    extractedText: manuscriptText,
-    coverLetterText: coverLetterText,
-    declarationText: declarationText,
-    extractedTitle: manuscriptTitle,
-    extractedAbstract: manuscriptAbstract,
-    extractedKeywords: manuscriptKeywords,
-};
+			const manuscriptData = {
+				...req.body,
+				authors: authorObjectIds,
+				correspondingAuthor: correspondingAuthorObjectId,
+				// Use the secure_url from the Cloudinary response
+				manuscriptFile: manuscriptUpload.secure_url,
+				coverLetterFile: coverLetterUpload.secure_url,
+				declarationFile: declarationUpload.secure_url,
+				mergedFileUrl: mergedUpload.secure_url,
+				status: "Saved",
+				extractedText: manuscriptText,
+				coverLetterText: coverLetterText,
+				declarationText: declarationText,
+				extractedTitle: manuscriptTitle,
+				extractedAbstract: manuscriptAbstract,
+				extractedKeywords: manuscriptKeywords,
+			};
 
 			let manuscript;
 			try {

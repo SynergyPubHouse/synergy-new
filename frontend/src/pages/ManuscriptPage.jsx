@@ -810,7 +810,7 @@ const ManuscriptPage = () => {
 				`${
 					import.meta.env.VITE_BACKEND_URL
 				}/api/manuscripts/${manuscriptId}/status`,
-				{ status: "Accepted" },
+				{ status: "Saved" },
 				{
 					headers: {
 						Authorization: `Bearer ${user.token}`,
