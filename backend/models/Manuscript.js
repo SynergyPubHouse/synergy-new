@@ -122,26 +122,6 @@ const manuscriptSchema = new mongoose.Schema(
 				required: false, // Reviewers assigned by editors
 			},
 		],
-		reviews: [
-			{
-				reviewerId: {
-					type: mongoose.Schema.Types.ObjectId,
-					ref: "Reviewer",
-				},
-				comments: { type: String, required: true },
-				recommendation: {
-					type: String,
-					enum: [
-						"Accept",
-						"Minor Revision",
-						"Major Revision",
-						"Reject",
-					],
-					required: true,
-				},
-				submittedAt: { type: Date, default: Date.now },
-			},
-		],
 		authorNotes: [noteSchema],
 		editorNotes: [noteSchema],
 		reviewerNotes: [noteSchema],

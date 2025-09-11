@@ -222,7 +222,7 @@ exports.submitReview = async (req, res) => {
 		}
 
 		// Get the reviewer's information
-		const reviewer = await Reviewer.findById(req.user.id);
+		const reviewer = await Reviewer.findById(req.user._id);
 		if (!reviewer) {
 			return res.status(404).json({ message: "Reviewer not found" });
 		}
@@ -233,23 +233,23 @@ exports.submitReview = async (req, res) => {
 				.json({ message: "Not authorized to review this manuscript" });
 		}
 
-		// Map recommendation to appropriate action for notes (but don't change manuscript status)
+		// Map recommendation to valid enum action values from the schema
 		let action;
 		switch (recommendation) {
 			case "Accept":
-				action = "Recommended for Acceptance";
+				action = "Accepted";
 				break;
 			case "Minor Revision":
-				action = "Minor Revision Suggested";
+				action = "Revision Required";
 				break;
 			case "Major Revision":
-				action = "Major Revision Suggested";
+				action = "Revision Required";
 				break;
 			case "Reject":
-				action = "Rejection Recommended";
+				action = "Rejected";
 				break;
 			default:
-				action = "Review Completed";
+				action = "Reviewed";
 		}
 
 		// Create the reviewer note with all required fields
@@ -266,15 +266,27 @@ exports.submitReview = async (req, res) => {
 			addedAt: new Date(),
 		};
 
-		// Add the review to reviews array
-		manuscript.reviews.push({
-			reviewerId: reviewer._id,
-			comments: comments,
-			recommendation: recommendation,
-			submittedAt: new Date(),
-		});
+		// Clean up any existing invalid action values before adding new one
+		const validActions = [
+			"Under Review",
+			"Reviewed",
+			"Accepted",
+			"Rejected",
+			"Revision Required",
+			"Revised",
+		];
+		if (manuscript.reviewerNotes && manuscript.reviewerNotes.length > 0) {
+			manuscript.reviewerNotes.forEach((note, index) => {
+				if (note.action && !validActions.includes(note.action)) {
+					console.log(
+						`Fixing invalid action at index ${index}: ${note.action} -> Reviewed`
+					);
+					manuscript.reviewerNotes[index].action = "Reviewed";
+				}
+			});
+		}
 
-		// Update the manuscript with the review note
+		// Add the review to reviewerNotes array only
 		manuscript.reviewerNotes.push(reviewerNote);
 
 		// Keep the manuscript status as "Under Review" - only editors can change the final status

@@ -189,7 +189,7 @@ exports.getManuscriptsByAuthor = async (req, res) => {
 			status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 		})
 			.select(
-				"title type status submissionDate mergedFileUrl authorNotes editorNotes reviewerNotes reviews createdAt updatedAt"
+				"title type status submissionDate mergedFileUrl authorNotes editorNotes reviewerNotes createdAt updatedAt"
 			)
 			.sort({ submissionDate: -1 });
 
@@ -221,7 +221,7 @@ exports.getUsersWithManuscripts = async (req, res) => {
 					status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 				})
 					.select(
-						"title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes reviewerNotes reviews createdAt updatedAt"
+						"title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes reviewerNotes createdAt updatedAt"
 					)
 					.lean();
 
@@ -492,8 +492,7 @@ exports.getManuscriptNotes = async (req, res) => {
 		const { manuscriptId } = req.params;
 
 		const manuscript = await Manuscript.findById(manuscriptId)
-			.select("authorNotes editorNotes reviewerNotes reviews")
-			.populate("reviews.reviewerId", "firstName lastName email")
+			.select("authorNotes editorNotes reviewerNotes")
 			.lean();
 
 		if (!manuscript) {
@@ -502,7 +501,7 @@ exports.getManuscriptNotes = async (req, res) => {
 			});
 		}
 
-		// Combine all notes and reviews with type information
+		// Combine all notes with type information
 		const allNotes = [
 			...(manuscript.authorNotes || []).map((note) => ({
 				...note,
@@ -516,17 +515,7 @@ exports.getManuscriptNotes = async (req, res) => {
 				...note,
 				type: "reviewer",
 			})),
-			...(manuscript.reviews || []).map((review) => ({
-				...review,
-				type: "review",
-				text: review.comments,
-				addedAt: review.submittedAt,
-			})),
-		].sort(
-			(a, b) =>
-				new Date(a.addedAt || a.submittedAt) -
-				new Date(b.addedAt || b.submittedAt)
-		);
+		].sort((a, b) => new Date(a.addedAt) - new Date(b.addedAt));
 
 		res.json({
 			manuscriptId,
@@ -536,7 +525,6 @@ exports.getManuscriptNotes = async (req, res) => {
 				authorNotes: manuscript.authorNotes?.length || 0,
 				editorNotes: manuscript.editorNotes?.length || 0,
 				reviewerNotes: manuscript.reviewerNotes?.length || 0,
-				reviews: manuscript.reviews?.length || 0,
 			},
 		});
 	} catch (error) {

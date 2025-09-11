@@ -351,13 +351,14 @@ function EditorDashboard() {
 
 	const handleAcceptManuscript = async () => {
 		try {
-			await axios.put(
-				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${
-					selectedManuscript._id
-				}/status`,
+			// Use the editor controller endpoint that properly handles notes
+			await axios.patch(
+				`${
+					import.meta.env.VITE_BACKEND_URL
+				}/api/auth/editor/manuscripts/${selectedManuscript._id}/status`,
 				{
 					status: "Accepted",
-					note: acceptanceNote,
+					note: acceptanceNote.trim() || undefined, // Only send note if there's content
 				},
 				{
 					headers: {
@@ -830,9 +831,7 @@ function EditorDashboard() {
 											{(manuscript.editorNotes?.length >
 												0 ||
 												manuscript.reviewerNotes
-													?.length > 0 ||
-												manuscript.reviews?.length >
-													0) && (
+													?.length > 0) && (
 												<button
 													className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
 													title={`View ${
@@ -840,10 +839,8 @@ function EditorDashboard() {
 															?.length || 0) +
 														(manuscript
 															.reviewerNotes
-															?.length || 0) +
-														(manuscript.reviews
 															?.length || 0)
-													} notes/reviews`}
+													} notes`}
 													onClick={() => {
 														// Scroll to notes section
 														const element =
@@ -866,8 +863,6 @@ function EditorDashboard() {
 														?.length || 0) +
 														(manuscript
 															.reviewerNotes
-															?.length || 0) +
-														(manuscript.reviews
 															?.length || 0)}
 													)
 												</button>
@@ -1080,8 +1075,8 @@ function EditorDashboard() {
 
 									{/* Notes History Section */}
 									{(manuscript.editorNotes?.length > 0 ||
-										manuscript.reviewerNotes?.length > 0 ||
-										manuscript.reviews?.length > 0) && (
+										manuscript.reviewerNotes?.length >
+											0) && (
 										<div className="notes-section mt-4 border-t border-[#e2e8f0] pt-4">
 											<h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
 												📝 Notes & Reviews History
@@ -1109,23 +1104,12 @@ function EditorDashboard() {
 															...note,
 															type: "reviewer",
 														})),
-														...(
-															manuscript.reviews ||
-															[]
-														).map((review) => ({
-															...review,
-															type: "review",
-														})),
 													].sort(
 														(a, b) =>
 															new Date(
-																a.addedAt ||
-																	a.submittedAt
+																a.addedAt
 															) -
-															new Date(
-																b.addedAt ||
-																	b.submittedAt
-															)
+															new Date(b.addedAt)
 													);
 
 													const displayNotes =
@@ -1303,8 +1287,6 @@ function EditorDashboard() {
 													(manuscript.editorNotes
 														?.length || 0) +
 													(manuscript.reviewerNotes
-														?.length || 0) +
-													(manuscript.reviews
 														?.length || 0);
 												const isExpanded =
 													expandedNotes[
