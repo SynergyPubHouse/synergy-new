@@ -188,10 +188,17 @@ exports.getAssignedManuscripts = async (req, res) => {
 					pdfUrl = `https://paper-sphere.vercel.app${pdfUrl}`;
 				}
 
+				// Filter reviewerNotes to only show notes from the current reviewer
+				const filteredReviewerNotes = manuscript.reviewerNotes.filter(
+					(note) =>
+						note.addedBy._id.toString() === req.user._id.toString()
+				);
+
 				return {
 					...manuscript.toObject(),
 					author: authorData, // Continue to use 'author' in frontend for now for consistency
 					mergedFileUrl: pdfUrl,
+					reviewerNotes: filteredReviewerNotes, // Override with filtered notes
 				};
 			}
 		);
