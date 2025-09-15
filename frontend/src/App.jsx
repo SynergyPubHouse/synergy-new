@@ -34,6 +34,8 @@ import EditorDashboard from "./components/EditorDashboard";
 import MySubmissions from "./pages/MySubmissions";
 import ReviewerRegister from "./components/ReviewerRegister";
 import ReviewerLogin from "./components/ReviewerLogin";
+import ReviewerForgotPassword from "./components/ReviewerForgotPassword";
+import ReviewerResetPassword from "./components/ReviewerResetPassword";
 import ReviewerDashboard from "./components/ReviewerDashboard";
 import OrcidCallback from "./components/OrcidCallback";
 // Import Peer Review Pages
@@ -206,12 +208,24 @@ function AppContent() {
 
 				{/* Reviewer Routes */}
 				<Route
+					path={`/reviewer/reset-password/:token`}
+					element={<ReviewerResetPassword />}
+				/>
+				<Route
 					path={`${JICS_URL}/reviewer/register`}
 					element={<ReviewerRegister />}
 				/>
 				<Route
 					path={`${JICS_URL}/reviewer/login`}
 					element={<ReviewerLogin />}
+				/>
+				<Route
+					path={`${JICS_URL}/reviewer/forgot-password`}
+					element={<ReviewerForgotPassword />}
+				/>
+				<Route
+					path={`${JICS_URL}/reviewer/reset-password/:token`}
+					element={<ReviewerResetPassword />}
 				/>
 				<Route
 					path={`${JICS_URL}/reviewer/dashboard`}

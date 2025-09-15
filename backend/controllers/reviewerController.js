@@ -3,6 +3,8 @@ const Reviewer = require("../models/Reviewer");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
+const crypto = require("crypto");
+const sendEmail = require("../utils/sendEmail"); // Adjust the path as necessary
 
 // Register a new reviewer
 exports.registerReviewer = async (req, res) => {
@@ -308,6 +310,107 @@ exports.submitReview = async (req, res) => {
 		console.error("Error submitting review:", error);
 		res.status(500).json({
 			message: "Error submitting review",
+			error: error.message,
+		});
+	}
+};
+
+// Forgot Password
+exports.forgotPassword = async (req, res) => {
+	try {
+		const { email } = req.body;
+		const reviewer = await Reviewer.findOne({ email });
+
+		if (!reviewer) {
+			return res.status(404).json({ message: "Reviewer not found" });
+		}
+
+		const resetToken = crypto.randomBytes(20).toString("hex");
+		reviewer.resetPasswordToken = crypto
+			.createHash("sha256")
+			.update(resetToken)
+			.digest("hex");
+		reviewer.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+
+		await reviewer.save();
+
+		const resetUrl = `http://localhost:5173/reviewer/reset-password/${resetToken}`;
+
+		const message = `
+            <h1>You have requested a password reset</h1>
+            <p>Please go to this link to reset your password:</p>
+            <a href="${resetUrl}" clicktracking=off>${resetUrl}</a>
+        `;
+
+		try {
+			await sendEmail({
+				to: reviewer.email,
+				subject: "Password Reset Request",
+				text: message,
+			});
+
+			res.status(200).json({
+				success: true,
+				message: "Email sent successfully.",
+			});
+		} catch (err) {
+			console.log(err);
+			reviewer.resetPasswordToken = undefined;
+			reviewer.resetPasswordExpires = undefined;
+			await reviewer.save();
+			return res.status(500).json({ message: "Email could not be sent" });
+		}
+	} catch (error) {
+		res.status(500).json({
+			message: "Server error",
+			error: error.message,
+		});
+	}
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+	try {
+		const resetPasswordToken = crypto
+			.createHash("sha256")
+			.update(req.params.token)
+			.digest("hex");
+
+		console.log("Looking for token:", resetPasswordToken);
+		console.log("Current time:", Date.now());
+
+		const reviewer = await Reviewer.findOne({
+			resetPasswordToken,
+			resetPasswordExpires: { $gt: Date.now() },
+		});
+
+		if (!reviewer) {
+			console.log("No reviewer found with valid token");
+			return res
+				.status(400)
+				.json({ message: "Invalid or expired token" });
+		}
+
+		console.log("Found reviewer:", reviewer.email);
+		console.log("Token expires at:", reviewer.resetPasswordExpires);
+
+		// Update password and clear reset fields
+		reviewer.password = req.body.password;
+		reviewer.resetPasswordToken = undefined;
+		reviewer.resetPasswordExpires = undefined;
+
+		await reviewer.save();
+
+		console.log("Password updated successfully for:", reviewer.email);
+
+		res.status(200).json({
+			success: true,
+			message: "Password updated successfully",
+		});
+	} catch (error) {
+		console.error("Reset password error:", error);
+		res.status(500).json({
+			message: "Server error",
 			error: error.message,
 		});
 	}

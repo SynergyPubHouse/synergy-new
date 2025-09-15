@@ -105,6 +105,15 @@ function ReviewerLogin() {
 						/>
 					</div>
 
+					<div className="text-right">
+						<a
+							href={`${BASE_URL}/reviewer/forgot-password`}
+							className="text-sm text-[#496580] hover:underline"
+						>
+							Forgot Password?
+						</a>
+					</div>
+
 					<button
 						type="submit"
 						className="w-full bg-[#496580] hover:bg-[#3a5269] text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-[#496580]/30"
