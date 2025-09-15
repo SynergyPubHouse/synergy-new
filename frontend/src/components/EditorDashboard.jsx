@@ -8,8 +8,9 @@ function EditorDashboard() {
 	const [selectedUser, setSelectedUser] = useState(null);
 	const [manuscripts, setManuscripts] = useState([]);
 	const [noteText, setNoteText] = useState("");
+	const [revisionNoteText, setRevisionNoteText] = useState("");
 	const [selectedManuscript, setSelectedManuscript] = useState(null);
-	const [showNoteInput, setShowNoteInput] = useState(null); // 'reject' or 'review' or null
+	const [showNoteInput, setShowNoteInput] = useState(null); // 'reject' or 'review' or 'revision' or null
 	const [reviewers, setReviewers] = useState([]);
 	const [selectedReviewers, setSelectedReviewers] = useState([]);
 	const [showAcceptDialog, setShowAcceptDialog] = useState(null);
@@ -338,10 +339,62 @@ function EditorDashboard() {
 		);
 	};
 
+	// Handle revision required
+	const handleRevisionRequired = async (manuscriptId) => {
+		try {
+			if (!revisionNoteText.trim()) {
+				alert("Please enter a revision note");
+				return;
+			}
+
+			await axios.post(
+				`${
+					import.meta.env.VITE_BACKEND_URL
+				}/api/auth/editor/manuscripts/${manuscriptId}/revision-required`,
+				{ text: revisionNoteText },
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			// Update manuscripts list with new status
+			const updatedManuscripts = manuscripts.map((m) =>
+				m._id === manuscriptId
+					? { ...m, status: "Revision Required" }
+					: m
+			);
+			setManuscripts(updatedManuscripts);
+
+			// Reset states
+			setRevisionNoteText("");
+			setShowNoteInput(null);
+			setSelectedManuscript(null);
+
+			alert("Revision required note added successfully");
+		} catch (error) {
+			console.error("Error adding revision required note:", error);
+
+			// Check for specific error about rejected manuscripts
+			if (
+				error.response?.status === 403 &&
+				error.response?.data?.message?.includes("rejected")
+			) {
+				alert(
+					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable."
+				);
+			} else {
+				alert("Failed to add revision required note");
+			}
+		}
+	};
+
 	const handleCancel = () => {
 		setShowNoteInput(null);
 		setSelectedManuscript(null);
 		setNoteText("");
+		setRevisionNoteText("");
 	};
 
 	const handleAcceptClick = (manuscript) => {
@@ -434,12 +487,14 @@ function EditorDashboard() {
 								"Pending",
 								"Under Review",
 								"Reviewed",
+								"Revision Required",
 								"Accepted",
 							];
 							const statusColors = {
 								Pending: "bg-blue-500",
 								"Under Review": "bg-yellow-500",
 								Reviewed: "bg-purple-500",
+								"Revision Required": "bg-orange-500",
 								Accepted: "bg-green-500",
 							};
 
@@ -528,7 +583,9 @@ function EditorDashboard() {
 																m.status ===
 																	"Pending" ||
 																m.status ===
-																	"Reviewed"
+																	"Reviewed" ||
+																m.status ===
+																	"Revision Required"
 														).length
 													}
 												</div>
@@ -671,6 +728,18 @@ function EditorDashboard() {
 											onClick={() =>
 												handleBulkStatusUpdate(
 													selectedManuscriptIds,
+													"Revision Required"
+												)
+											}
+											className="px-3 py-1 text-sm bg-orange-500 text-white rounded hover:bg-orange-600"
+										>
+											📝 Revision Required (
+											{selectedManuscriptIds.length})
+										</button>
+										<button
+											onClick={() =>
+												handleBulkStatusUpdate(
+													selectedManuscriptIds,
 													"Accepted"
 												)
 											}
@@ -731,6 +800,9 @@ function EditorDashboard() {
 																: manuscript.status ===
 																  "Reviewed"
 																? "bg-purple-100 text-purple-800"
+																: manuscript.status ===
+																  "Revision Required"
+																? "bg-orange-100 text-orange-800"
 																: manuscript.status ===
 																  "Accepted"
 																? "bg-green-100 text-green-800"
@@ -830,12 +902,17 @@ function EditorDashboard() {
 											{/* View Notes Button */}
 											{(manuscript.editorNotes?.length >
 												0 ||
+												manuscript.editorNotesForAuthor
+													?.length > 0 ||
 												manuscript.reviewerNotes
 													?.length > 0) && (
 												<button
 													className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
 													title={`View ${
 														(manuscript.editorNotes
+															?.length || 0) +
+														(manuscript
+															.editorNotesForAuthor
 															?.length || 0) +
 														(manuscript
 															.reviewerNotes
@@ -861,6 +938,9 @@ function EditorDashboard() {
 													📝 Notes (
 													{(manuscript.editorNotes
 														?.length || 0) +
+														(manuscript
+															.editorNotesForAuthor
+															?.length || 0) +
 														(manuscript
 															.reviewerNotes
 															?.length || 0)}
@@ -997,6 +1077,31 @@ function EditorDashboard() {
 															? "✓ Rejected"
 															: "❌ Reject"}
 													</button>
+
+													{/* Revision Required */}
+													<button
+														onClick={() =>
+															handleActionClick(
+																manuscript,
+																"revision"
+															)
+														}
+														className={`px-3 py-1 text-sm rounded ${
+															manuscript.status ===
+															"Revision Required"
+																? "bg-gray-400 text-white cursor-not-allowed"
+																: "bg-orange-500 text-white hover:bg-orange-600"
+														}`}
+														disabled={
+															manuscript.status ===
+															"Revision Required"
+														}
+													>
+														{manuscript.status ===
+														"Revision Required"
+															? "✓ Revision Required"
+															: "📝 Revision Required"}
+													</button>
 												</div>
 											</div>
 
@@ -1068,6 +1173,21 @@ function EditorDashboard() {
 															🎯 Auto-Accept
 														</button>
 													)}
+
+													{manuscript.status ===
+														"Revision Required" && (
+														<button
+															onClick={() =>
+																handleDirectStatusUpdate(
+																	manuscript._id,
+																	"Pending"
+																)
+															}
+															className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+														>
+															🔄 Reset to Pending
+														</button>
+													)}
 												</div>
 											</div>
 										</div>
@@ -1075,6 +1195,8 @@ function EditorDashboard() {
 
 									{/* Notes History Section */}
 									{(manuscript.editorNotes?.length > 0 ||
+										manuscript.editorNotesForAuthor
+											?.length > 0 ||
 										manuscript.reviewerNotes?.length >
 											0) && (
 										<div className="notes-section mt-4 border-t border-[#e2e8f0] pt-4">
@@ -1096,6 +1218,13 @@ function EditorDashboard() {
 														).map((note) => ({
 															...note,
 															type: "editor",
+														})),
+														...(
+															manuscript.editorNotesForAuthor ||
+															[]
+														).map((note) => ({
+															...note,
+															type: "editorForAuthor",
 														})),
 														...(
 															manuscript.reviewerNotes ||
@@ -1150,6 +1279,57 @@ function EditorDashboard() {
 																				)}
 																			</div>
 																			<span className="text-xs text-blue-600">
+																				{new Date(
+																					item.addedAt
+																				).toLocaleDateString(
+																					"en-US",
+																					{
+																						month: "short",
+																						day: "numeric",
+																						hour: "2-digit",
+																						minute: "2-digit",
+																					}
+																				)}
+																			</span>
+																		</div>
+																		<p className="text-sm text-gray-700">
+																			{
+																				item.text
+																			}
+																		</p>
+																	</div>
+																);
+															} else if (
+																item.type ===
+																"editorForAuthor"
+															) {
+																return (
+																	<div
+																		key={`editorForAuthor-${index}`}
+																		className="bg-orange-50 p-3 rounded-lg border-l-4 border-orange-400"
+																	>
+																		<div className="flex items-center justify-between mb-1">
+																			<div className="flex items-center space-x-2">
+																				<span className="text-sm font-semibold text-orange-700">
+																					📝
+																					Editor
+																					Note
+																					for
+																					Author:{" "}
+																					{item
+																						.addedBy
+																						?.name ||
+																						"Unknown"}
+																				</span>
+																				{item.action && (
+																					<span className="px-2 py-1 text-xs bg-orange-200 text-orange-800 rounded">
+																						{
+																							item.action
+																						}
+																					</span>
+																				)}
+																			</div>
+																			<span className="text-xs text-orange-600">
 																				{new Date(
 																					item.addedAt
 																				).toLocaleDateString(
@@ -1285,6 +1465,9 @@ function EditorDashboard() {
 											{(() => {
 												const totalNotes =
 													(manuscript.editorNotes
+														?.length || 0) +
+													(manuscript
+														.editorNotesForAuthor
 														?.length || 0) +
 													(manuscript.reviewerNotes
 														?.length || 0);
@@ -1496,6 +1679,56 @@ function EditorDashboard() {
 															>
 																Confirm
 																Rejection
+															</button>
+														</div>
+													</>
+												)}
+
+												{showNoteInput ===
+													"revision" && (
+													<>
+														<div className="mb-4">
+															<label className="block text-[#1a365d] mb-2 font-semibold">
+																Add a revision
+																required note:
+															</label>
+															<textarea
+																value={
+																	revisionNoteText
+																}
+																onChange={(e) =>
+																	setRevisionNoteText(
+																		e.target
+																			.value
+																	)
+																}
+																className="w-full h-32 p-2 rounded bg-white text-[#1a365d] border border-[#e2e8f0]"
+																placeholder="Enter revision requirements and feedback for the author..."
+																required
+															/>
+														</div>
+
+														<div className="flex justify-end space-x-2">
+															<button
+																onClick={
+																	handleCancel
+																}
+																className="px-4 py-2 bg-gray-300 text-[#1a365d] rounded hover:bg-gray-400"
+															>
+																Cancel
+															</button>
+															<button
+																onClick={() =>
+																	handleRevisionRequired(
+																		manuscript._id
+																	)
+																}
+																disabled={
+																	!revisionNoteText.trim()
+																}
+																className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+															>
+																Request Revision
 															</button>
 														</div>
 													</>

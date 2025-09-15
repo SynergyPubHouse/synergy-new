@@ -112,6 +112,7 @@ const manuscriptSchema = new mongoose.Schema(
 				"Reviewed",
 				"Accepted",
 				"Rejected",
+				"Revision Required",
 			],
 			default: "Saved",
 		},
@@ -124,6 +125,7 @@ const manuscriptSchema = new mongoose.Schema(
 		],
 		authorNotes: [noteSchema],
 		editorNotes: [noteSchema],
+		editorNotesForAuthor: [noteSchema],
 		reviewerNotes: [noteSchema],
 	},
 	{ timestamps: true }

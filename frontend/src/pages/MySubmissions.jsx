@@ -13,7 +13,6 @@ const MySubmissions = () => {
 	const [showConfirmation, setShowConfirmation] = useState(null);
 	const [pdfBuiltManuscripts, setPdfBuiltManuscripts] = useState(new Set());
 	const [showNotes, setShowNotes] = useState(null);
-	const [selectedNotesType, setSelectedNotesType] = useState(null);
 	const navigate = useNavigate();
 
 	useEffect(() => {
@@ -96,22 +95,14 @@ const MySubmissions = () => {
 
 	const handleNotesClick = (manuscriptId) => {
 		setShowNotes(manuscriptId);
-		setSelectedNotesType(null);
-	};
-
-	const handleNotesTypeClick = (type) => {
-		setSelectedNotesType(type);
 	};
 
 	const renderNotes = (manuscript) => {
 		if (!manuscript) return null;
 
-		const notes =
-			selectedNotesType === "editor"
-				? manuscript.editorNotes
-				: manuscript.reviewerNotes;
-		const title =
-			selectedNotesType === "editor" ? "Editor Notes" : "Reviewer Notes";
+		// Authors can only see editorNotesForAuthor
+		const notes = manuscript.editorNotesForAuthor;
+		const title = "Editor Notes for Author";
 
 		return (
 			<div className="mt-4 p-4 bg-[#e0f7fa] rounded-lg border border-[#e0e0e0]">
@@ -475,40 +466,7 @@ const MySubmissions = () => {
 
 								{showNotes === manuscript._id && (
 									<div className="mt-4">
-										<div className="flex space-x-2 mb-4">
-											<button
-												onClick={() =>
-													handleNotesTypeClick(
-														"editor"
-													)
-												}
-												className={`px-4 py-2 rounded ${
-													selectedNotesType ===
-													"editor"
-														? "bg-[#00796b] text-white"
-														: "bg-[#e0e0e0] text-[#212121]"
-												}`}
-											>
-												Editor Notes
-											</button>
-											<button
-												onClick={() =>
-													handleNotesTypeClick(
-														"reviewer"
-													)
-												}
-												className={`px-4 py-2 rounded ${
-													selectedNotesType ===
-													"reviewer"
-														? "bg-[#00796b] text-white"
-														: "bg-[#e0e0e0] text-[#212121]"
-												}`}
-											>
-												Reviewer Notes
-											</button>
-										</div>
-										{selectedNotesType &&
-											renderNotes(manuscript)}
+										{renderNotes(manuscript)}
 									</div>
 								)}
 							</div>

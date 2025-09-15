@@ -22,6 +22,11 @@ router.get(
 	editorController.getManuscriptsByAuthor
 );
 router.post("/manuscripts/:manuscriptId/notes", auth, editorController.addNote);
+router.post(
+	"/manuscripts/:manuscriptId/revision-required",
+	auth,
+	editorController.addRevisionRequiredNote
+);
 router.get(
 	"/manuscripts/:manuscriptId/notes",
 	auth,

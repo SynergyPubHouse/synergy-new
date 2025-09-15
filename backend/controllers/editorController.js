@@ -189,7 +189,7 @@ exports.getManuscriptsByAuthor = async (req, res) => {
 			status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 		})
 			.select(
-				"title type status submissionDate mergedFileUrl authorNotes editorNotes reviewerNotes createdAt updatedAt"
+				"title type status submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt"
 			)
 			.sort({ submissionDate: -1 });
 
@@ -221,7 +221,7 @@ exports.getUsersWithManuscripts = async (req, res) => {
 					status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 				})
 					.select(
-						"title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes reviewerNotes createdAt updatedAt"
+						"title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt"
 					)
 					.lean();
 
@@ -341,6 +341,7 @@ exports.updateManuscriptStatus = async (req, res) => {
 			"Pending",
 			"Under Review",
 			"Reviewed",
+			"Revision Required",
 			"Accepted",
 			"Rejected",
 		];
@@ -358,12 +359,11 @@ exports.updateManuscriptStatus = async (req, res) => {
 			{ new: true }
 		);
 
-		// If a note is provided, add it to the editor notes
+		// If a note is provided, add it to the appropriate notes array
 		if (note && note.trim()) {
 			const editorNote = {
 				text: note,
 				action: status,
-				visibility: ["author", "editor"],
 				addedBy: {
 					_id: req.editor._id,
 					name: `${req.editor.firstName} ${req.editor.lastName}`,
@@ -373,7 +373,15 @@ exports.updateManuscriptStatus = async (req, res) => {
 				addedAt: new Date(),
 			};
 
-			manuscript.editorNotes.push(editorNote);
+			// For acceptance and rejection, add to editorNotesForAuthor so authors can see them
+			// For other status changes, add to regular editorNotes
+			if (status === "Accepted" || status === "Rejected") {
+				manuscript.editorNotesForAuthor.push(editorNote);
+			} else {
+				// Add visibility for internal editor notes
+				editorNote.visibility = ["editor", "reviewer"];
+				manuscript.editorNotes.push(editorNote);
+			}
 			await manuscript.save();
 		}
 
@@ -400,6 +408,7 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 			"Pending",
 			"Under Review",
 			"Reviewed",
+			"Revision Required",
 			"Accepted",
 			"Rejected",
 		];
@@ -443,12 +452,11 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 			);
 
 			if (manuscript) {
-				// If a note is provided, add it to the editor notes
+				// If a note is provided, add it to the appropriate notes array
 				if (note && note.trim()) {
 					const editorNote = {
 						text: note,
 						action: status,
-						visibility: ["author", "editor"],
 						addedBy: {
 							_id: req.editor._id,
 							name: `${req.editor.firstName} ${req.editor.lastName}`,
@@ -458,7 +466,15 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 						addedAt: new Date(),
 					};
 
-					manuscript.editorNotes.push(editorNote);
+					// For acceptance and rejection, add to editorNotesForAuthor so authors can see them
+					// For other status changes, add to regular editorNotes
+					if (status === "Accepted" || status === "Rejected") {
+						manuscript.editorNotesForAuthor.push(editorNote);
+					} else {
+						// Add visibility for internal editor notes
+						editorNote.visibility = ["editor", "reviewer"];
+						manuscript.editorNotes.push(editorNote);
+					}
 					await manuscript.save();
 				}
 				results.push({ manuscriptId, success: true });
@@ -486,13 +502,86 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 	}
 };
 
+// Add revision required note and update status
+exports.addRevisionRequiredNote = async (req, res) => {
+	try {
+		const { manuscriptId } = req.params;
+		const { text } = req.body;
+
+		if (!text || !text.trim()) {
+			return res.status(400).json({
+				message: "Revision note text is required",
+			});
+		}
+
+		// First, get the current manuscript to check its current status
+		const currentManuscript = await Manuscript.findById(manuscriptId);
+		if (!currentManuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		// Prevent any status changes if the manuscript is already rejected
+		if (currentManuscript.status === "Rejected") {
+			return res.status(403).json({
+				message:
+					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
+			});
+		}
+
+		const note = {
+			text: text.trim(),
+			action: "Revision Required",
+			visibility: ["author", "editor"],
+			addedBy: {
+				_id: req.editor._id,
+				name: `${req.editor.firstName} ${req.editor.lastName}`,
+				email: req.editor.email,
+				role: "editor",
+			},
+			addedAt: new Date(),
+		};
+
+		// Update the manuscript with the new note and status
+		const manuscript = await Manuscript.findByIdAndUpdate(
+			manuscriptId,
+			{
+				$push: { editorNotesForAuthor: note },
+				status: "Revision Required",
+			},
+			{ new: true }
+		);
+
+		if (!manuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		res.json({
+			message:
+				"Revision required note added and status updated successfully",
+			note,
+			manuscript: {
+				_id: manuscript._id,
+				status: manuscript.status,
+			},
+		});
+	} catch (error) {
+		console.error("Error adding revision required note:", error);
+		res.status(500).json({
+			message: "Error adding revision required note",
+			error: error.message,
+		});
+	}
+};
+
 // Get all notes for a specific manuscript
 exports.getManuscriptNotes = async (req, res) => {
 	try {
 		const { manuscriptId } = req.params;
 
 		const manuscript = await Manuscript.findById(manuscriptId)
-			.select("authorNotes editorNotes reviewerNotes")
+			.select(
+				"authorNotes editorNotes editorNotesForAuthor reviewerNotes"
+			)
 			.lean();
 
 		if (!manuscript) {
@@ -511,6 +600,10 @@ exports.getManuscriptNotes = async (req, res) => {
 				...note,
 				type: "editor",
 			})),
+			...(manuscript.editorNotesForAuthor || []).map((note) => ({
+				...note,
+				type: "editorForAuthor",
+			})),
 			...(manuscript.reviewerNotes || []).map((note) => ({
 				...note,
 				type: "reviewer",
@@ -524,6 +617,8 @@ exports.getManuscriptNotes = async (req, res) => {
 				totalNotes: allNotes.length,
 				authorNotes: manuscript.authorNotes?.length || 0,
 				editorNotes: manuscript.editorNotes?.length || 0,
+				editorNotesForAuthor:
+					manuscript.editorNotesForAuthor?.length || 0,
 				reviewerNotes: manuscript.reviewerNotes?.length || 0,
 			},
 		});

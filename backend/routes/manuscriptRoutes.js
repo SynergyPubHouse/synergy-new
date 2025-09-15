@@ -26,6 +26,11 @@ router.get(
 	auth,
 	manuscriptController.getManuscriptById
 );
+router.get(
+	"/manuscripts/:manuscriptId/notes",
+	auth,
+	manuscriptController.getManuscriptNotesForAuthor
+);
 router.delete(
 	"/manuscripts/:manuscriptId",
 	auth,

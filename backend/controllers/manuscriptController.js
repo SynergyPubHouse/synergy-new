@@ -1008,7 +1008,10 @@ exports.updateManuscriptStatus = async (req, res) => {
 // Get user's submissions
 exports.getMySubmissions = async (req, res) => {
 	try {
-		const user = await User.findById(req.user._id).populate("manuscripts");
+		const user = await User.findById(req.user._id).populate({
+			path: "manuscripts",
+			select: "-reviewerNotes", // Exclude reviewer notes from author view
+		});
 
 		if (!user) {
 			return res.status(404).json({ message: "User not found" });
@@ -1083,7 +1086,8 @@ exports.getManuscriptById = async (req, res) => {
 		const manuscript = await Manuscript.findById(req.params.manuscriptId)
 			.populate("authors", "firstName lastName email")
 			.populate("correspondingAuthor", "firstName lastName email")
-			.populate("assignedReviewers", "firstName lastName email");
+			.populate("assignedReviewers", "firstName lastName email")
+			.select("-reviewerNotes"); // Exclude reviewer notes from author view
 
 		if (!manuscript) {
 			return res.status(404).json({
@@ -1307,6 +1311,61 @@ exports.extractManuscriptInfo = async (req, res) => {
 			});
 		}
 	});
+};
+
+// Get notes for author (only editorNotesForAuthor)
+exports.getManuscriptNotesForAuthor = async (req, res) => {
+	try {
+		const { manuscriptId } = req.params;
+
+		const manuscript = await Manuscript.findById(manuscriptId)
+			.select("editorNotesForAuthor authors correspondingAuthor")
+			.lean();
+
+		if (!manuscript) {
+			return res.status(404).json({
+				message: "Manuscript not found",
+			});
+		}
+
+		// Check if the user is an author of this manuscript
+		const userObjectId = req.user._id;
+		const isAuthor = manuscript.authors.some(
+			(authorId) => authorId.toString() === userObjectId.toString()
+		);
+		const isCorrespondingAuthor =
+			manuscript.correspondingAuthor &&
+			manuscript.correspondingAuthor.toString() ===
+				userObjectId.toString();
+
+		if (!isAuthor && !isCorrespondingAuthor) {
+			return res.status(403).json({
+				message:
+					"Access denied. You are not an author of this manuscript.",
+			});
+		}
+
+		// Return only editor notes for author
+		const editorNotesForAuthor = manuscript.editorNotesForAuthor || [];
+
+		res.json({
+			manuscriptId,
+			notes: editorNotesForAuthor.map((note) => ({
+				...note,
+				type: "editorForAuthor",
+			})),
+			summary: {
+				totalNotes: editorNotesForAuthor.length,
+				editorNotesForAuthor: editorNotesForAuthor.length,
+			},
+		});
+	} catch (error) {
+		console.error("Error getting manuscript notes for author:", error);
+		res.status(500).json({
+			message: "Error fetching manuscript notes",
+			error: error.message,
+		});
+	}
 };
 
 module.exports.convertDocxToPdf = convertDocxToPdf;
