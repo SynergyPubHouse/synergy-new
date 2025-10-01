@@ -194,11 +194,18 @@ exports.getAssignedManuscripts = async (req, res) => {
 						note.addedBy._id.toString() === req.user._id.toString()
 				);
 
+				// Filter editorNotes to only show notes visible to reviewers
+				const visibleEditorNotes = manuscript.editorNotes.filter(
+					(note) =>
+						note.visibility && note.visibility.includes("reviewer")
+				);
+
 				return {
 					...manuscript.toObject(),
 					author: authorData, // Continue to use 'author' in frontend for now for consistency
 					mergedFileUrl: pdfUrl,
 					reviewerNotes: filteredReviewerNotes, // Override with filtered notes
+					editorNotes: visibleEditorNotes, // Include editor notes visible to reviewers
 				};
 			}
 		);
@@ -418,6 +425,168 @@ exports.resetPassword = async (req, res) => {
 		console.error("Reset password error:", error);
 		res.status(500).json({
 			message: "Server error",
+			error: error.message,
+		});
+	}
+};
+
+// Get pending invitations for logged-in reviewer
+exports.getPendingInvitations = async (req, res) => {
+	try {
+		const reviewerEmail = req.user.email;
+
+		// Find manuscripts with pending invitations for this reviewer
+		const manuscriptsWithInvitations = await Manuscript.find({
+			"invitations.email": reviewerEmail,
+			"invitations.status": "pending",
+		})
+			.select(
+				"title type abstract keywords submissionDate invitations editorNotes"
+			)
+			.lean();
+
+		// Filter invitations for this specific reviewer
+		const invitations = manuscriptsWithInvitations.map((manuscript) => {
+			const relevantInvitation = manuscript.invitations.find(
+				(inv) => inv.email === reviewerEmail && inv.status === "pending"
+			);
+
+			// Filter editor notes visible to reviewers
+			const visibleEditorNotes = manuscript.editorNotes
+				? manuscript.editorNotes.filter(
+						(note) =>
+							note.visibility &&
+							note.visibility.includes("reviewer")
+				  )
+				: [];
+
+			return {
+				_id: manuscript._id,
+				title: manuscript.title,
+				type: manuscript.type,
+				abstract: manuscript.abstract,
+				keywords: manuscript.keywords,
+				submissionDate: manuscript.submissionDate,
+				invitedAt: relevantInvitation.invitedAt,
+				editorNotes: visibleEditorNotes,
+			};
+		});
+
+		res.json(invitations);
+	} catch (error) {
+		console.error("Error getting pending invitations:", error);
+		res.status(500).json({
+			message: "Error fetching pending invitations",
+			error: error.message,
+		});
+	}
+};
+
+// Accept invitation
+exports.acceptInvitation = async (req, res) => {
+	try {
+		const { manuscriptId } = req.params;
+		const reviewerEmail = req.user.email;
+		const reviewerId = req.user._id;
+
+		// Update manuscript invitation status
+		const manuscript = await Manuscript.findById(manuscriptId);
+		if (!manuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		// Find the invitation for this reviewer
+		const invitation = manuscript.invitations.find(
+			(inv) => inv.email === reviewerEmail && inv.status === "pending"
+		);
+
+		if (!invitation) {
+			return res.status(404).json({
+				message: "No pending invitation found for this manuscript",
+			});
+		}
+
+		// Update invitation status
+		invitation.status = "accepted";
+		invitation.acceptedAt = new Date();
+
+		// Add reviewer to assignedReviewers if not already added
+		if (!manuscript.assignedReviewers.includes(reviewerId)) {
+			manuscript.assignedReviewers.push(reviewerId);
+		}
+
+		await manuscript.save();
+
+		// Add manuscript to reviewer's assignedManuscripts
+		const reviewer = await Reviewer.findById(reviewerId);
+		if (!reviewer.assignedManuscripts.includes(manuscriptId)) {
+			reviewer.assignedManuscripts.push(manuscriptId);
+		}
+
+		// Remove from pending invitations if exists
+		reviewer.pendingInvitations = reviewer.pendingInvitations.filter(
+			(inv) => inv.manuscriptId.toString() !== manuscriptId
+		);
+
+		await reviewer.save();
+
+		res.json({
+			message: "Invitation accepted successfully",
+			manuscriptTitle: manuscript.title,
+		});
+	} catch (error) {
+		console.error("Error accepting invitation:", error);
+		res.status(500).json({
+			message: "Error accepting invitation",
+			error: error.message,
+		});
+	}
+};
+
+// Reject invitation
+exports.rejectInvitation = async (req, res) => {
+	try {
+		const { manuscriptId } = req.params;
+		const reviewerEmail = req.user.email;
+
+		// Update manuscript invitation status
+		const manuscript = await Manuscript.findById(manuscriptId);
+		if (!manuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		// Find the invitation for this reviewer
+		const invitation = manuscript.invitations.find(
+			(inv) => inv.email === reviewerEmail && inv.status === "pending"
+		);
+
+		if (!invitation) {
+			return res.status(404).json({
+				message: "No pending invitation found for this manuscript",
+			});
+		}
+
+		// Update invitation status
+		invitation.status = "rejected";
+		invitation.rejectedAt = new Date();
+
+		await manuscript.save();
+
+		// Remove from reviewer's pending invitations if exists
+		const reviewer = await Reviewer.findById(req.user._id);
+		reviewer.pendingInvitations = reviewer.pendingInvitations.filter(
+			(inv) => inv.manuscriptId.toString() !== manuscriptId
+		);
+		await reviewer.save();
+
+		res.json({
+			message: "Invitation rejected successfully",
+			manuscriptTitle: manuscript.title,
+		});
+	} catch (error) {
+		console.error("Error rejecting invitation:", error);
+		res.status(500).json({
+			message: "Error rejecting invitation",
 			error: error.message,
 		});
 	}

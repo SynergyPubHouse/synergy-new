@@ -925,40 +925,16 @@ exports.previewManuscript = async (req, res) => {
 	}
 };
 
-// Assign reviewers to a manuscript
+// Assign reviewers to a manuscript (DEPRECATED - Use invitation system instead)
 exports.assignReviewers = async (req, res) => {
 	try {
-		const { manuscriptId } = req.params;
-		const { reviewers } = req.body;
-
-		// Update the manuscript with assigned reviewers
-		const manuscript = await Manuscript.findByIdAndUpdate(
-			manuscriptId,
-			{
-				$set: {
-					assignedReviewers: reviewers,
-					status: "Under Review",
-				},
-			},
-			{ new: true }
-		);
-
-		if (!manuscript) {
-			return res.status(404).json({ message: "Manuscript not found" });
-		}
-
-		// Update each reviewer's assignedManuscripts array
-		await Reviewer.updateMany(
-			{ _id: { $in: reviewers } },
-			{ $addToSet: { assignedManuscripts: manuscriptId } }
-		);
-
-		res.status(200).json({
-			success: true,
-			data: manuscript,
+		return res.status(400).json({
+			success: false,
+			message:
+				"This endpoint is deprecated. Please use the invitation system: POST /api/editor/manuscripts/:manuscriptId/invite-reviewers followed by POST /api/editor/manuscripts/:manuscriptId/assign-reviewers",
 		});
 	} catch (error) {
-		console.error("Error assigning reviewers:", error);
+		console.error("Error in deprecated assignReviewers:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message,

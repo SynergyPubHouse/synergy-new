@@ -42,5 +42,20 @@ router.patch(
 	auth,
 	editorController.bulkUpdateManuscriptStatus
 );
+router.post(
+	"/manuscripts/:manuscriptId/invite-reviewers",
+	auth,
+	editorController.sendInvitation
+);
+router.get(
+	"/manuscripts/:manuscriptId/accepted-invitations",
+	auth,
+	editorController.getAcceptedInvitations
+);
+router.post(
+	"/manuscripts/:manuscriptId/assign-reviewers",
+	auth,
+	editorController.assignReviewersFromInvitations
+);
 
 module.exports = router;

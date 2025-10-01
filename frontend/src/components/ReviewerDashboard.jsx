@@ -10,6 +10,7 @@ function ReviewerDashboard() {
 	const [showReviewForm, setShowReviewForm] = useState(null); // Store manuscript ID when showing form
 	const [reviewText, setReviewText] = useState("");
 	const [recommendation, setRecommendation] = useState(""); // For storing review recommendation
+	const [pendingInvitations, setPendingInvitations] = useState([]);
 
 	useEffect(() => {
 		const fetchManuscripts = async () => {
@@ -39,7 +40,10 @@ function ReviewerDashboard() {
 				const userManuscripts = {};
 				response.data.forEach((manuscript) => {
 					console.log("Processing manuscript:", manuscript.title);
-					console.log("Manuscript author object (raw):", manuscript.author); // Added log
+					console.log(
+						"Manuscript author object (raw):",
+						manuscript.author
+					); // Added log
 
 					let authorFullName = "Unknown Author";
 					let firstName = "";
@@ -47,20 +51,26 @@ function ReviewerDashboard() {
 					let authorId = ""; // Initialize authorId
 
 					// Assuming manuscript.author is always an object now due to backend populate
-					if (manuscript.author && typeof manuscript.author === "object") {
+					if (
+						manuscript.author &&
+						typeof manuscript.author === "object"
+					) {
 						firstName = manuscript.author.firstName || "";
 						lastName = manuscript.author.lastName || "";
 						authorFullName = `${firstName} ${lastName}`.trim();
 						authorId = manuscript.author._id || "";
 					} else {
 						// Fallback if manuscript.author is unexpectedly not an object or null
-						console.warn("Manuscript author is not an object or is null/undefined:", manuscript.author);
+						console.warn(
+							"Manuscript author is not an object or is null/undefined:",
+							manuscript.author
+						);
 						authorId = manuscript._id; // Use manuscript ID as a fallback for grouping
 					}
 
 					// If authorFullName is still empty (e.g., if firstName/lastName were empty),
 					// ensure it defaults to 'Unknown Author' and use a reliable ID for grouping.
-					if (!authorFullName || authorFullName.trim() === '') {
+					if (!authorFullName || authorFullName.trim() === "") {
 						authorFullName = "Unknown Author";
 					}
 					if (!authorId) {
@@ -98,7 +108,31 @@ function ReviewerDashboard() {
 			}
 		};
 
+		const fetchInvitations = async () => {
+			try {
+				const userData = JSON.parse(localStorage.getItem("user"));
+				if (!userData || !userData.token) {
+					return;
+				}
+
+				const response = await axios.get(
+					`${
+						import.meta.env.VITE_BACKEND_URL
+					}/api/auth/reviewer/pending-invitations`,
+					{
+						headers: {
+							Authorization: `Bearer ${userData.token}`,
+						},
+					}
+				);
+				setPendingInvitations(response.data);
+			} catch (error) {
+				console.error("Error fetching invitations:", error);
+			}
+		};
+
 		fetchManuscripts();
+		fetchInvitations();
 	}, [navigate]);
 
 	const handleUserClick = (user) => {
@@ -256,12 +290,136 @@ function ReviewerDashboard() {
 		}
 	};
 
+	// Handle accepting invitation
+	const handleAcceptInvitation = async (manuscriptId) => {
+		try {
+			const userData = JSON.parse(localStorage.getItem("user"));
+			await axios.post(
+				`${
+					import.meta.env.VITE_BACKEND_URL
+				}/api/auth/reviewer/manuscripts/${manuscriptId}/accept-invitation`,
+				{},
+				{
+					headers: {
+						Authorization: `Bearer ${userData.token}`,
+					},
+				}
+			);
+
+			// Remove from pending invitations
+			setPendingInvitations((prev) =>
+				prev.filter((inv) => inv._id !== manuscriptId)
+			);
+			alert("Invitation accepted successfully!");
+
+			// Refresh manuscripts to show the newly accepted one
+			window.location.reload();
+		} catch (error) {
+			console.error("Error accepting invitation:", error);
+			alert("Failed to accept invitation");
+		}
+	};
+
+	// Handle rejecting invitation
+	const handleRejectInvitation = async (manuscriptId) => {
+		try {
+			const userData = JSON.parse(localStorage.getItem("user"));
+			await axios.post(
+				`${
+					import.meta.env.VITE_BACKEND_URL
+				}/api/auth/reviewer/manuscripts/${manuscriptId}/reject-invitation`,
+				{},
+				{
+					headers: {
+						Authorization: `Bearer ${userData.token}`,
+					},
+				}
+			);
+
+			// Remove from pending invitations
+			setPendingInvitations((prev) =>
+				prev.filter((inv) => inv._id !== manuscriptId)
+			);
+			alert("Invitation rejected successfully!");
+		} catch (error) {
+			console.error("Error rejecting invitation:", error);
+			alert("Failed to reject invitation");
+		}
+	};
+
 	return (
 		<div className="min-h-screen bg-[#f8fafc] p-6">
 			<div className="max-w-6xl mx-auto">
 				<h1 className="text-4xl font-bold text-[#1a365d] mb-8 text-center">
 					Reviewer Dashboard
 				</h1>
+
+				{/* Pending Invitations Section */}
+				{pendingInvitations.length > 0 && (
+					<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
+						<h2 className="text-2xl font-semibold text-yellow-800 mb-4">
+							📧 Pending Review Invitations (
+							{pendingInvitations.length})
+						</h2>
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+							{pendingInvitations.map((invitation) => (
+								<div
+									key={invitation._id}
+									className="bg-white border border-yellow-300 rounded-lg p-4"
+								>
+									<h3 className="text-lg font-semibold text-gray-800 mb-2">
+										{invitation.title}
+									</h3>
+									<p className="text-sm text-gray-600 mb-2">
+										Type: {invitation.type}
+									</p>
+									<p className="text-sm text-gray-600 mb-2">
+										Keywords: {invitation.keywords}
+									</p>
+									<p className="text-xs text-gray-500 mb-3">
+										Invited:{" "}
+										{new Date(
+											invitation.invitedAt
+										).toLocaleDateString()}
+									</p>
+									<div className="text-sm text-gray-700 mb-4">
+										<strong>Abstract:</strong>
+										<p className="mt-1 text-gray-600">
+											{invitation.abstract.length > 150
+												? `${invitation.abstract.substring(
+														0,
+														150
+												  )}...`
+												: invitation.abstract}
+										</p>
+									</div>
+									<div className="flex space-x-2">
+										<button
+											onClick={() =>
+												handleAcceptInvitation(
+													invitation._id
+												)
+											}
+											className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+										>
+											✅ Accept
+										</button>
+										<button
+											onClick={() =>
+												handleRejectInvitation(
+													invitation._id
+												)
+											}
+											className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+										>
+											❌ Reject
+										</button>
+									</div>
+								</div>
+							))}
+						</div>
+					</div>
+				)}
 
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 					{/* Users List */}

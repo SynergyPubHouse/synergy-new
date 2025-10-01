@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const Manuscript = require("../models/Manuscript");
 const User = require("../models/User");
 const Reviewer = require("../models/Reviewer");
+const sendEmail = require("../utils/sendEmail");
 
 // Register a new editor
 exports.registerEditor = async (req, res) => {
@@ -626,6 +627,305 @@ exports.getManuscriptNotes = async (req, res) => {
 		console.error("Error getting manuscript notes:", error);
 		res.status(500).json({
 			message: "Error fetching manuscript notes",
+			error: error.message,
+		});
+	}
+};
+
+// Send invitation to reviewers
+exports.sendInvitation = async (req, res) => {
+	try {
+		console.log("=== INVITATION REQUEST START ===");
+		console.log("Request body:", JSON.stringify(req.body, null, 2));
+		console.log("Request params:", req.params);
+		console.log("Editor info:", {
+			id: req.editor?._id,
+			name: req.editor
+				? `${req.editor.firstName} ${req.editor.lastName}`
+				: "Not found",
+			email: req.editor?.email,
+		});
+
+		const { manuscriptId } = req.params;
+		const { emails, editorNote } = req.body;
+
+		if (!emails || !Array.isArray(emails) || emails.length === 0) {
+			return res.status(400).json({
+				message: "Please provide an array of reviewer emails",
+			});
+		}
+
+		const manuscript = await Manuscript.findById(manuscriptId);
+		if (!manuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		// Add editor note if provided
+		if (editorNote && editorNote.trim()) {
+			console.log("Adding editor note:", editorNote.trim());
+			console.log("Editor info:", {
+				id: req.editor._id,
+				name: `${req.editor.firstName} ${req.editor.lastName}`,
+				email: req.editor.email,
+			});
+
+			const note = {
+				text: editorNote.trim(),
+				action: "Reviewer Invitation",
+				visibility: ["editor", "reviewer"],
+				addedBy: {
+					_id: req.editor._id,
+					name: `${req.editor.firstName} ${req.editor.lastName}`,
+					email: req.editor.email,
+					role: "editor",
+				},
+				addedAt: new Date(),
+			};
+
+			manuscript.editorNotes.push(note);
+			console.log(
+				"Editor note added to manuscript. Total editor notes:",
+				manuscript.editorNotes.length
+			);
+		} else {
+			console.log("No editor note provided or empty note");
+		}
+
+		// Add invitations to manuscript
+		const newInvitations = emails.map((email) => ({
+			email: email.toLowerCase().trim(),
+			invitedAt: new Date(),
+			status: "pending",
+		}));
+
+		manuscript.invitations.push(...newInvitations);
+
+		console.log(
+			"Before save - manuscript editorNotes length:",
+			manuscript.editorNotes.length
+		);
+		await manuscript.save();
+		console.log("After save - manuscript saved successfully");
+
+		// Verify the note was saved
+		const savedManuscript = await Manuscript.findById(manuscriptId).select(
+			"editorNotes"
+		);
+		console.log(
+			"Verified saved manuscript editorNotes length:",
+			savedManuscript.editorNotes.length
+		);
+
+		// Send emails to reviewers
+		for (const email of emails) {
+			// Debug log to check environment variable
+			console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+
+			const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+			const registrationUrl = `${baseUrl}/journal/jics/reviewer/register`;
+
+			console.log("Generated registration URL:", registrationUrl);
+
+			// Include editor note in email if provided
+			const editorNoteSection =
+				editorNote && editorNote.trim()
+					? `
+					<div style="background-color: #f8f9fa; padding: 15px; margin: 20px 0; border-left: 4px solid #496580;">
+						<h4 style="color: #496580; margin-top: 0;">Editor's Note:</h4>
+						<p style="margin-bottom: 0;">${editorNote.trim()}</p>
+					</div>
+				`
+					: "";
+
+			const emailContent = `
+				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+					<h2 style="color: #496580;">Reviewer Invitation - Synergy World Press</h2>
+					<p>Dear Reviewer,</p>
+					<p>You have been invited to review a manuscript titled: <strong>"${manuscript.title}"</strong></p>
+					<p><strong>Manuscript ID:</strong> ${manuscriptId}</p>
+					<p><strong>Your Email:</strong> ${email}</p>
+					${editorNoteSection}
+					<p>To accept or reject this invitation, please:</p>
+					<ol>
+						<li>Register as a reviewer (if you haven't already)</li>
+						<li>Login to your reviewer dashboard</li>
+						<li>View and respond to the invitation</li>
+					</ol>
+					<div style="text-align: center; margin: 30px 0;">
+						<a href="${registrationUrl}" 
+						   style="background-color: #496580; color: white; padding: 12px 24px; 
+						          text-decoration: none; border-radius: 5px; display: inline-block;">
+							Register/Login as Reviewer
+						</a>
+					</div>
+					<p>If you're already registered, you can login directly at: <a href="${baseUrl}/journal/jics/reviewer/login">Reviewer Login</a></p>
+					<p>Best regards,<br>Synergy World Press Editorial Team</p>
+				</div>
+			`;
+
+			await sendEmail({
+				to: email,
+				subject: `Reviewer Invitation: ${manuscript.title}`,
+				text: emailContent,
+			});
+		}
+
+		res.json({
+			message: `Invitations sent to ${emails.length} reviewers successfully`,
+			invitedEmails: emails,
+			editorNoteAdded: editorNote && editorNote.trim() ? true : false,
+		});
+	} catch (error) {
+		console.error("Error sending invitations:", error);
+		res.status(500).json({
+			message: "Error sending invitations",
+			error: error.message,
+		});
+	}
+};
+
+// Get accepted invitations for a manuscript
+exports.getAcceptedInvitations = async (req, res) => {
+	try {
+		const { manuscriptId } = req.params;
+
+		const manuscript = await Manuscript.findById(manuscriptId);
+		if (!manuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		// Get accepted invitations
+		const acceptedInvitations = manuscript.invitations.filter(
+			(inv) => inv.status === "accepted"
+		);
+
+		// Get reviewer details for accepted invitations
+		const reviewersWithDetails = await Promise.all(
+			acceptedInvitations.map(async (invitation) => {
+				const reviewer = await Reviewer.findOne({
+					email: invitation.email,
+				}).select("firstName lastName email specialization experience");
+
+				return {
+					email: invitation.email,
+					acceptedAt: invitation.acceptedAt,
+					reviewer: reviewer || null,
+					isAssigned: manuscript.assignedReviewers.some(
+						(reviewerId) =>
+							reviewer &&
+							reviewerId.toString() === reviewer._id.toString()
+					),
+				};
+			})
+		);
+
+		res.json({
+			manuscriptId,
+			manuscriptTitle: manuscript.title,
+			acceptedInvitations: reviewersWithDetails,
+			totalAccepted: acceptedInvitations.length,
+		});
+	} catch (error) {
+		console.error("Error getting accepted invitations:", error);
+		res.status(500).json({
+			message: "Error fetching accepted invitations",
+			error: error.message,
+		});
+	}
+};
+
+// Assign reviewers from accepted invitations
+exports.assignReviewersFromInvitations = async (req, res) => {
+	try {
+		const { manuscriptId } = req.params;
+		const { reviewerEmails } = req.body;
+
+		if (
+			!reviewerEmails ||
+			!Array.isArray(reviewerEmails) ||
+			reviewerEmails.length === 0
+		) {
+			return res.status(400).json({
+				message: "Please provide an array of reviewer emails to assign",
+			});
+		}
+
+		const manuscript = await Manuscript.findById(manuscriptId);
+		if (!manuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		const results = [];
+
+		for (const email of reviewerEmails) {
+			// Check if invitation exists and is accepted
+			const invitation = manuscript.invitations.find(
+				(inv) => inv.email === email && inv.status === "accepted"
+			);
+
+			if (!invitation) {
+				results.push({
+					email,
+					success: false,
+					error: "No accepted invitation found for this email",
+				});
+				continue;
+			}
+
+			// Find the reviewer
+			const reviewer = await Reviewer.findOne({ email });
+			if (!reviewer) {
+				results.push({
+					email,
+					success: false,
+					error: "Reviewer not found in database",
+				});
+				continue;
+			}
+
+			// Check if already assigned
+			if (manuscript.assignedReviewers.includes(reviewer._id)) {
+				results.push({
+					email,
+					success: false,
+					error: "Reviewer already assigned to this manuscript",
+				});
+				continue;
+			}
+
+			// Add to assignedReviewers
+			manuscript.assignedReviewers.push(reviewer._id);
+
+			// Add manuscript to reviewer's assignedManuscripts
+			if (!reviewer.assignedManuscripts.includes(manuscriptId)) {
+				reviewer.assignedManuscripts.push(manuscriptId);
+				await reviewer.save();
+			}
+
+			results.push({
+				email,
+				success: true,
+				reviewerName: `${reviewer.firstName} ${reviewer.lastName}`,
+			});
+		}
+
+		// Update manuscript status to "Under Review" if any reviewers were assigned
+		const successfulAssignments = results.filter((r) => r.success);
+		if (successfulAssignments.length > 0) {
+			manuscript.status = "Under Review";
+		}
+
+		await manuscript.save();
+
+		res.json({
+			message: `Successfully assigned ${successfulAssignments.length} of ${reviewerEmails.length} reviewers`,
+			results,
+			manuscriptStatus: manuscript.status,
+		});
+	} catch (error) {
+		console.error("Error assigning reviewers:", error);
+		res.status(500).json({
+			message: "Error assigning reviewers",
 			error: error.message,
 		});
 	}

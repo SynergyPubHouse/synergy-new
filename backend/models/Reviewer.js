@@ -55,6 +55,19 @@ const reviewerSchema = new mongoose.Schema({
 			required: false,
 		},
 	],
+	pendingInvitations: [
+		{
+			manuscriptId: {
+				type: mongoose.Schema.Types.ObjectId,
+				ref: "Manuscript",
+				required: true,
+			},
+			invitedAt: {
+				type: Date,
+				default: Date.now,
+			},
+		},
+	],
 	resetPasswordToken: {
 		type: String,
 	},

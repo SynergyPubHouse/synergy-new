@@ -24,6 +24,7 @@ const noteSchema = new mongoose.Schema({
 			"Rejected",
 			"Revision Required",
 			"Revised",
+			"Reviewer Invitation",
 		],
 		required: false,
 	},
@@ -121,6 +122,29 @@ const manuscriptSchema = new mongoose.Schema(
 				type: mongoose.Schema.Types.ObjectId,
 				ref: "Reviewer",
 				required: false, // Reviewers assigned by editors
+			},
+		],
+		invitations: [
+			{
+				email: {
+					type: String,
+					required: true,
+				},
+				invitedAt: {
+					type: Date,
+					default: Date.now,
+				},
+				status: {
+					type: String,
+					enum: ["pending", "accepted", "rejected"],
+					default: "pending",
+				},
+				acceptedAt: {
+					type: Date,
+				},
+				rejectedAt: {
+					type: Date,
+				},
 			},
 		],
 		authorNotes: [noteSchema],

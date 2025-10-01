@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const BASE_URL = "/journal/jics";
 
@@ -20,6 +20,20 @@ function ReviewerRegister() {
 
 	const [errorMessage, setErrorMessage] = useState("");
 	const navigate = useNavigate();
+	const location = useLocation();
+
+	useEffect(() => {
+		// Check if coming from an invitation link
+		const urlParams = new URLSearchParams(location.search);
+		const invitationEmail = urlParams.get("email");
+
+		if (invitationEmail) {
+			setFormData((prev) => ({
+				...prev,
+				email: decodeURIComponent(invitationEmail),
+			}));
+		}
+	}, [location]);
 
 	const handleChange = (e) => {
 		setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -58,6 +72,21 @@ function ReviewerRegister() {
 				<h2 className="text-4xl font-extrabold text-[#496580] mb-4 text-center">
 					Reviewer Registration
 				</h2>
+
+				{/* Invitation Notice */}
+				{new URLSearchParams(location.search).get("email") && (
+					<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+						<div className="flex items-center">
+							<span className="text-blue-600 mr-2">📧</span>
+							<p className="text-blue-800 text-sm">
+								You&apos;re registering from a review
+								invitation. Your email has been pre-filled.
+								After registration, you can view and respond to
+								invitations in your dashboard.
+							</p>
+						</div>
+					</div>
+				)}
 
 				<div>
 					<label className="block text-sm font-medium text-[#496580] mb-1">

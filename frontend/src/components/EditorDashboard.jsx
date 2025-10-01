@@ -18,6 +18,10 @@ function EditorDashboard() {
 	const [selectedManuscriptIds, setSelectedManuscriptIds] = useState([]);
 	const [showBulkActions, setShowBulkActions] = useState(false);
 	const [expandedNotes, setExpandedNotes] = useState({});
+	const [showInviteDialog, setShowInviteDialog] = useState(false);
+	const [inviteEmails, setInviteEmails] = useState([""]);
+	const [inviteManuscript, setInviteManuscript] = useState(null);
+	const [editorNote, setEditorNote] = useState("");
 
 	useEffect(() => {
 		const fetchUsers = async () => {
@@ -437,6 +441,120 @@ function EditorDashboard() {
 			console.error("Error accepting manuscript:", error);
 			alert("Failed to accept manuscript");
 		}
+	};
+
+	// Handle invite reviewers click
+	const handleInviteReviewers = (manuscript) => {
+		setInviteManuscript(manuscript);
+		setShowInviteDialog(true);
+		setInviteEmails([""]);
+		setEditorNote("");
+	};
+
+	// Handle send invitations
+	const handleSendInvitations = async () => {
+		try {
+			// Filter out empty emails and trim whitespace
+			const emailArray = inviteEmails
+				.map((email) => email.trim())
+				.filter((email) => email.length > 0);
+
+			if (emailArray.length === 0) {
+				alert("Please enter at least one email address");
+				return;
+			}
+
+			// Validate email format
+			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+			const invalidEmails = emailArray.filter(
+				(email) => !emailRegex.test(email)
+			);
+
+			if (invalidEmails.length > 0) {
+				alert(`Invalid email addresses: ${invalidEmails.join(", ")}`);
+				return;
+			}
+
+			const requestData = {
+				emails: emailArray,
+			};
+
+			// Add editor note if provided
+			if (editorNote.trim()) {
+				requestData.editorNote = editorNote.trim();
+			}
+
+			await axios.post(
+				`${
+					import.meta.env.VITE_BACKEND_URL
+				}/api/auth/editor/manuscripts/${
+					inviteManuscript._id
+				}/invite-reviewers`,
+				requestData,
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			alert(
+				`Invitations sent successfully to ${emailArray.length} reviewers!`
+			);
+			setShowInviteDialog(false);
+			setInviteEmails([""]);
+			setEditorNote("");
+			setInviteManuscript(null);
+		} catch (error) {
+			console.error("Error sending invitations:", error);
+			alert("Failed to send invitations");
+		}
+	};
+
+	// Add a new email input field
+	const addEmailField = () => {
+		setInviteEmails([...inviteEmails, ""]);
+	};
+
+	// Remove an email input field
+	const removeEmailField = (index) => {
+		if (inviteEmails.length > 1) {
+			const newEmails = inviteEmails.filter((_, i) => i !== index);
+			setInviteEmails(newEmails);
+		}
+	};
+
+	// Update email at specific index
+	const updateEmailField = (index, value) => {
+		const newEmails = [...inviteEmails];
+		newEmails[index] = value;
+		setInviteEmails(newEmails);
+	};
+
+	// Bulk add emails from text input
+	const handleBulkEmailAdd = () => {
+		const bulkText = prompt(
+			"Paste multiple email addresses (separated by commas, semicolons, or new lines):"
+		);
+		if (bulkText && bulkText.trim()) {
+			const newEmails = bulkText
+				.split(/[,;\n]+/)
+				.map((email) => email.trim())
+				.filter((email) => email.length > 0);
+
+			if (newEmails.length > 0) {
+				// Remove any empty email fields and add the new ones
+				const currentEmails = inviteEmails.filter(
+					(email) => email.trim().length > 0
+				);
+				setInviteEmails([...currentEmails, ...newEmails]);
+			}
+		}
+	};
+
+	// Clear all email fields
+	const clearAllEmails = () => {
+		setInviteEmails([""]);
 	};
 
 	return (
@@ -897,6 +1015,18 @@ function EditorDashboard() {
 												className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
 											>
 												📄 View PDF
+											</button>
+
+											{/* Invite Reviewers Button */}
+											<button
+												onClick={() =>
+													handleInviteReviewers(
+														manuscript
+													)
+												}
+												className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+											>
+												✉️ Invite Reviewers
 											</button>
 
 											{/* View Notes Button */}
@@ -1781,6 +1911,231 @@ function EditorDashboard() {
 								className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
 							>
 								Confirm Accept
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Invite Reviewers Dialog */}
+			{showInviteDialog && inviteManuscript && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+					<div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-[#e2e8f0]">
+						<h2 className="text-2xl font-semibold text-[#1a365d] mb-4">
+							Invite Reviewers
+						</h2>
+
+						<div className="mb-4">
+							<h3 className="text-lg font-medium text-[#496580] mb-2">
+								Manuscript: {inviteManuscript.title}
+							</h3>
+							<p className="text-sm text-gray-600 mb-2">
+								Type: {inviteManuscript.type}
+							</p>
+							<div className="flex items-center space-x-2">
+								<span className="text-sm text-gray-600">
+									📧 Emails to invite:
+								</span>
+								<span className="px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded font-medium">
+									{
+										inviteEmails.filter(
+											(email) => email.trim().length > 0
+										).length
+									}{" "}
+									reviewer(s)
+								</span>
+							</div>
+						</div>
+
+						{/* Email Input Section */}
+						<div className="mb-6">
+							<label className="block text-[#1a365d] mb-2 font-semibold">
+								Reviewer Email Addresses:
+							</label>
+
+							<div className="space-y-3">
+								{inviteEmails.map((email, index) => {
+									const emailRegex =
+										/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+									const isValidEmail =
+										email.length === 0 ||
+										emailRegex.test(email.trim());
+
+									return (
+										<div
+											key={index}
+											className="flex items-center space-x-2"
+										>
+											<div className="flex-1">
+												<div className="relative">
+													<input
+														type="email"
+														value={email}
+														onChange={(e) =>
+															updateEmailField(
+																index,
+																e.target.value
+															)
+														}
+														className={`w-full bg-white text-[#1a365d] rounded p-2 border focus:ring-2 focus:ring-[#496580]/20 outline-none transition-colors ${
+															isValidEmail
+																? "border-[#e2e8f0] focus:border-[#496580]"
+																: "border-red-300 focus:border-red-500"
+														}`}
+														placeholder={`Reviewer ${
+															index + 1
+														} email address...`}
+													/>
+													{email.length > 0 && (
+														<div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+															{isValidEmail ? (
+																<span
+																	className="text-green-500"
+																	title="Valid email"
+																>
+																	✅
+																</span>
+															) : (
+																<span
+																	className="text-red-500"
+																	title="Invalid email format"
+																>
+																	❌
+																</span>
+															)}
+														</div>
+													)}
+												</div>
+												{!isValidEmail &&
+													email.length > 0 && (
+														<p className="text-red-500 text-xs mt-1">
+															Please enter a valid
+															email address
+														</p>
+													)}
+											</div>
+
+											{/* Remove button (only show if more than 1 email field) */}
+											{inviteEmails.length > 1 && (
+												<button
+													type="button"
+													onClick={() =>
+														removeEmailField(index)
+													}
+													className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex-shrink-0"
+													title="Remove this email field"
+												>
+													🗑️
+												</button>
+											)}
+										</div>
+									);
+								})}
+
+								{/* Add more email buttons */}
+								<div className="flex space-x-2">
+									<button
+										type="button"
+										onClick={addEmailField}
+										className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors border-2 border-dashed border-transparent hover:border-blue-300"
+									>
+										➕ Add Another Email
+									</button>
+									<button
+										type="button"
+										onClick={handleBulkEmailAdd}
+										className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+										title="Paste multiple emails at once"
+									>
+										📋 Bulk Add
+									</button>
+									{inviteEmails.filter(
+										(email) => email.trim().length > 0
+									).length > 0 && (
+										<button
+											type="button"
+											onClick={clearAllEmails}
+											className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+											title="Clear all email fields"
+										>
+											🗑️ Clear All
+										</button>
+									)}
+								</div>
+							</div>
+
+							<p className="text-sm text-gray-600 mt-3">
+								💡 <strong>Tip:</strong> Add multiple reviewer
+								email addresses above. Each reviewer will
+								receive an invitation email with a link to
+								register/login and accept or reject the review
+								invitation.
+							</p>
+						</div>
+
+						{/* Editor Notes Section */}
+						<div className="mb-6">
+							<label className="block text-[#1a365d] mb-2 font-semibold">
+								Editor Notes (Optional):
+							</label>
+							<textarea
+								value={editorNote}
+								onChange={(e) => setEditorNote(e.target.value)}
+								className="w-full bg-white text-[#1a365d] rounded p-3 border border-[#e2e8f0] focus:ring-2 focus:ring-[#496580]/20 focus:border-[#496580] outline-none transition-colors resize-vertical"
+								rows="4"
+								placeholder="Add any specific instructions, requirements, or information for the reviewers (e.g., deadline, special focus areas, manuscript requirements)..."
+								maxLength="1000"
+							/>
+							<div className="flex justify-between items-center mt-2">
+								<p className="text-sm text-gray-500">
+									💬 This note will be included in the
+									invitation email and visible to reviewers
+								</p>
+								<span className="text-xs text-gray-400">
+									{editorNote.length}/1000 characters
+								</span>
+							</div>
+						</div>
+
+						<div className="flex justify-end space-x-3">
+							<button
+								onClick={() => {
+									setShowInviteDialog(false);
+									setInviteEmails([""]);
+									setEditorNote("");
+									setInviteManuscript(null);
+								}}
+								className="px-4 py-2 bg-gray-300 text-[#1a365d] rounded hover:bg-gray-400"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={handleSendInvitations}
+								disabled={
+									inviteEmails.filter(
+										(email) => email.trim().length > 0
+									).length === 0
+								}
+								className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+							>
+								✉️ Send{" "}
+								{inviteEmails.filter(
+									(email) => email.trim().length > 0
+								).length > 0
+									? `${
+											inviteEmails.filter(
+												(email) =>
+													email.trim().length > 0
+											).length
+									  } Invitation${
+											inviteEmails.filter(
+												(email) =>
+													email.trim().length > 0
+											).length !== 1
+												? "s"
+												: ""
+									  }`
+									: "Invitations"}
 							</button>
 						</div>
 					</div>
