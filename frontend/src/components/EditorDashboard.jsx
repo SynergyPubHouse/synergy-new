@@ -10,9 +10,8 @@ function EditorDashboard() {
 	const [noteText, setNoteText] = useState("");
 	const [revisionNoteText, setRevisionNoteText] = useState("");
 	const [selectedManuscript, setSelectedManuscript] = useState(null);
-	const [showNoteInput, setShowNoteInput] = useState(null); // 'reject' or 'review' or 'revision' or null
+	const [showNoteInput, setShowNoteInput] = useState(null); // 'reject' or 'revision' or null
 	const [reviewers, setReviewers] = useState([]);
-	const [selectedReviewers, setSelectedReviewers] = useState([]);
 	const [showAcceptDialog, setShowAcceptDialog] = useState(null);
 	const [acceptanceNote, setAcceptanceNote] = useState("");
 	const [selectedManuscriptIds, setSelectedManuscriptIds] = useState([]);
@@ -141,22 +140,7 @@ function EditorDashboard() {
 				);
 			}
 
-			if (newStatus === "Under Review") {
-				// First assign reviewers
-				await axios.put(
-					`${
-						import.meta.env.VITE_BACKEND_URL
-					}/api/manuscripts/${manuscriptId}/assign-reviewers`,
-					{ reviewers: selectedReviewers },
-					{
-						headers: {
-							Authorization: `Bearer ${user.token}`,
-						},
-					}
-				);
-			}
-
-			// Then update the status
+			// Update the status
 			await axios.patch(
 				`${
 					import.meta.env.VITE_BACKEND_URL
@@ -179,12 +163,11 @@ function EditorDashboard() {
 			setNoteText("");
 			setShowNoteInput(null);
 			setSelectedManuscript(null);
-			setSelectedReviewers([]);
 
 			alert(
-				`Manuscript ${
-					newStatus === "Rejected" ? "rejected" : "sent for review"
-				} successfully`
+				newStatus === "Rejected"
+					? "Manuscript rejected successfully"
+					: `Manuscript status updated to "${newStatus}" successfully`
 			);
 		} catch (error) {
 			console.error("Error updating manuscript:", error);
@@ -211,7 +194,6 @@ function EditorDashboard() {
 			setSelectedManuscript(null);
 			setShowNoteInput(null);
 			setNoteText("");
-			setSelectedReviewers([]);
 
 			// Small delay to ensure state reset
 			await new Promise((resolve) => setTimeout(resolve, 0));
@@ -822,18 +804,6 @@ function EditorDashboard() {
 											onClick={() =>
 												handleBulkStatusUpdate(
 													selectedManuscriptIds,
-													"Under Review"
-												)
-											}
-											className="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600"
-										>
-											👥 Send to Review (
-											{selectedManuscriptIds.length})
-										</button>
-										<button
-											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
 													"Reviewed"
 												)
 											}
@@ -999,6 +969,113 @@ function EditorDashboard() {
 																</span>
 															</div>
 														)}
+
+													{/* Invitations Status */}
+													{manuscript.invitations &&
+														manuscript.invitations
+															.length > 0 && (
+															<div className="mt-3 border-t border-gray-200 pt-3">
+																<h4 className="text-sm font-semibold text-gray-700 mb-2">
+																	📧 Reviewer
+																	Invitations
+																	(
+																	{
+																		manuscript
+																			.invitations
+																			.length
+																	}
+																	)
+																</h4>
+																<div className="space-y-2">
+																	{manuscript.invitations.map(
+																		(
+																			invitation,
+																			index
+																		) => (
+																			<div
+																				key={
+																					index
+																				}
+																				className={`text-xs p-2 rounded border ${
+																					invitation.status ===
+																					"accepted"
+																						? "bg-green-50 border-green-200"
+																						: invitation.status ===
+																						  "rejected"
+																						? "bg-red-50 border-red-200"
+																						: "bg-yellow-50 border-yellow-200"
+																				}`}
+																			>
+																				<div className="flex items-center justify-between">
+																					<span className="font-medium">
+																						{
+																							invitation.email
+																						}
+																					</span>
+																					<span
+																						className={`px-2 py-1 rounded text-xs font-semibold ${
+																							invitation.status ===
+																							"accepted"
+																								? "bg-green-100 text-green-800"
+																								: invitation.status ===
+																								  "rejected"
+																								? "bg-red-100 text-red-800"
+																								: "bg-yellow-100 text-yellow-800"
+																						}`}
+																					>
+																						{invitation.status
+																							.charAt(
+																								0
+																							)
+																							.toUpperCase() +
+																							invitation.status.slice(
+																								1
+																							)}
+																					</span>
+																				</div>
+																				<div className="text-gray-600 mt-1">
+																					Invited:{" "}
+																					{new Date(
+																						invitation.invitedAt
+																					).toLocaleDateString()}
+																					{invitation.acceptedAt && (
+																						<span className="ml-2">
+																							•
+																							Accepted:{" "}
+																							{new Date(
+																								invitation.acceptedAt
+																							).toLocaleDateString()}
+																						</span>
+																					)}
+																					{invitation.rejectedAt && (
+																						<span className="ml-2">
+																							•
+																							Rejected:{" "}
+																							{new Date(
+																								invitation.rejectedAt
+																							).toLocaleDateString()}
+																						</span>
+																					)}
+																				</div>
+																				{invitation.rejectionReason && (
+																					<div className="mt-2 p-2 bg-red-100 border border-red-200 rounded text-xs">
+																						<span className="font-semibold text-red-800">
+																							Rejection
+																							Reason:
+																						</span>
+																						<p className="text-red-700 mt-1">
+																							{
+																								invitation.rejectionReason
+																							}
+																						</p>
+																					</div>
+																				)}
+																			</div>
+																		)
+																	)}
+																</div>
+															</div>
+														)}
 												</div>
 											</div>
 										</div>
@@ -1107,31 +1184,6 @@ function EditorDashboard() {
 														"Pending"
 															? "✓ Currently Pending"
 															: "🔄 Set to Pending"}
-													</button>
-
-													{/* Set to Under Review */}
-													<button
-														onClick={() =>
-															handleActionClick(
-																manuscript,
-																"review"
-															)
-														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Under Review"
-																? "bg-gray-400 text-white cursor-not-allowed"
-																: "bg-[#496580] text-white hover:bg-[#3a5269]"
-														}`}
-														disabled={
-															manuscript.status ===
-															"Under Review"
-														}
-													>
-														{manuscript.status ===
-														"Under Review"
-															? "✓ Under Review"
-															: "👥 Send to Review"}
 													</button>
 
 													{/* Set to Reviewed */}
@@ -1345,24 +1397,87 @@ function EditorDashboard() {
 														...(
 															manuscript.editorNotes ||
 															[]
-														).map((note) => ({
-															...note,
-															type: "editor",
-														})),
+														)
+															.filter((note) => {
+																// Filter out notes that contain schema definitions or invalid content
+																const text =
+																	note.text ||
+																	"";
+																return (
+																	!text.includes(
+																		"rejectionReason: { type: String"
+																	) &&
+																	!text.includes(
+																		"required: function"
+																	) &&
+																	!text.includes(
+																		"type: String"
+																	) &&
+																	text.trim()
+																		.length >
+																		0
+																);
+															})
+															.map((note) => ({
+																...note,
+																type: "editor",
+															})),
 														...(
 															manuscript.editorNotesForAuthor ||
 															[]
-														).map((note) => ({
-															...note,
-															type: "editorForAuthor",
-														})),
+														)
+															.filter((note) => {
+																// Filter out notes that contain schema definitions or invalid content
+																const text =
+																	note.text ||
+																	"";
+																return (
+																	!text.includes(
+																		"rejectionReason: { type: String"
+																	) &&
+																	!text.includes(
+																		"required: function"
+																	) &&
+																	!text.includes(
+																		"type: String"
+																	) &&
+																	text.trim()
+																		.length >
+																		0
+																);
+															})
+															.map((note) => ({
+																...note,
+																type: "editorForAuthor",
+															})),
 														...(
 															manuscript.reviewerNotes ||
 															[]
-														).map((note) => ({
-															...note,
-															type: "reviewer",
-														})),
+														)
+															.filter((note) => {
+																// Filter out notes that contain schema definitions or invalid content
+																const text =
+																	note.text ||
+																	"";
+																return (
+																	!text.includes(
+																		"rejectionReason: { type: String"
+																	) &&
+																	!text.includes(
+																		"required: function"
+																	) &&
+																	!text.includes(
+																		"type: String"
+																	) &&
+																	text.trim()
+																		.length >
+																		0
+																);
+															})
+															.map((note) => ({
+																...note,
+																type: "reviewer",
+															})),
 													].sort(
 														(a, b) =>
 															new Date(
@@ -1639,132 +1754,6 @@ function EditorDashboard() {
 										selectedManuscript?._id ===
 											manuscript._id && (
 											<div className="mt-4 border-t border-[#e2e8f0] pt-4">
-												{showNoteInput === "review" && (
-													<>
-														<div className="mb-4 bg-[#f8fafc] p-4 rounded border border-[#e2e8f0]">
-															<label className="block text-[#1a365d] mb-2 font-semibold text-lg">
-																Select Reviewers
-																(
-																{reviewers?.length ||
-																	0}{" "}
-																available):
-															</label>
-															<div className="bg-white rounded border border-[#e2e8f0] p-2 max-h-60 overflow-y-auto">
-																{reviewers?.map(
-																	(
-																		reviewer
-																	) => (
-																		<div
-																			key={
-																				reviewer._id
-																			}
-																			className="mb-2"
-																		>
-																			<label className="flex items-center space-x-2 text-[#1a365d] cursor-pointer hover:bg-gray-100 p-2 rounded">
-																				<input
-																					type="checkbox"
-																					value={
-																						reviewer._id
-																					}
-																					checked={selectedReviewers.includes(
-																						reviewer._id
-																					)}
-																					onChange={(
-																						e
-																					) => {
-																						const reviewerId =
-																							e
-																								.target
-																								.value;
-																						setSelectedReviewers(
-																							(
-																								prev
-																							) =>
-																								e
-																									.target
-																									.checked
-																									? [
-																											...prev,
-																											reviewerId,
-																									  ]
-																									: prev.filter(
-																											(
-																												id
-																											) =>
-																												id !==
-																												reviewerId
-																									  )
-																						);
-																					}}
-																					className="form-checkbox h-5 w-5 text-[#496580]"
-																				/>
-																				<span className="flex-1">
-																					{`${reviewer.firstName} ${reviewer.lastName} - ${reviewer.specialization}`}
-																				</span>
-																			</label>
-																		</div>
-																	)
-																)}
-															</div>
-															<p className="text-[#496580] text-sm mt-2">
-																Select one or
-																more reviewers
-																from the list
-																above
-															</p>
-														</div>
-
-														<div className="mb-4">
-															<label className="block text-[#1a365d] mb-2 font-semibold">
-																Add a note
-																(optional):
-															</label>
-															<textarea
-																value={noteText}
-																onChange={(e) =>
-																	setNoteText(
-																		e.target
-																			.value
-																	)
-																}
-																className="w-full h-32 p-2 rounded bg-white text-[#1a365d] border border-[#e2e8f0]"
-																placeholder="Enter your note here..."
-															/>
-														</div>
-
-														<div className="flex justify-end space-x-2">
-															<button
-																onClick={
-																	handleCancel
-																}
-																className="px-4 py-2 bg-gray-300 text-[#1a365d] rounded hover:bg-gray-400"
-															>
-																Cancel
-															</button>
-															<button
-																onClick={() => {
-																	handleStatusUpdate(
-																		selectedManuscript._id,
-																		"Under Review"
-																	);
-																}}
-																disabled={
-																	selectedReviewers.length ===
-																	0
-																}
-																className="px-4 py-2 bg-[#496580] text-white rounded hover:bg-[#3a5269] disabled:opacity-50 disabled:cursor-not-allowed"
-															>
-																{`Confirm Send to Review${
-																	selectedReviewers.length >
-																	0
-																		? ` (${selectedReviewers.length} selected)`
-																		: ""
-																}`}
-															</button>
-														</div>
-													</>
-												)}
-
 												{showNoteInput === "reject" && (
 													<>
 														<div className="mb-4">

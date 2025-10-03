@@ -145,6 +145,10 @@ const manuscriptSchema = new mongoose.Schema(
 				rejectedAt: {
 					type: Date,
 				},
+				rejectionReason: {
+					type: String,
+					default: "",
+				},
 			},
 		],
 		authorNotes: [noteSchema],

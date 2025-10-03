@@ -11,6 +11,8 @@ function ReviewerDashboard() {
 	const [reviewText, setReviewText] = useState("");
 	const [recommendation, setRecommendation] = useState(""); // For storing review recommendation
 	const [pendingInvitations, setPendingInvitations] = useState([]);
+	const [showRejectForm, setShowRejectForm] = useState(null); // Store manuscript ID when showing reject form
+	const [rejectionReason, setRejectionReason] = useState(""); // For storing rejection reason
 
 	useEffect(() => {
 		const fetchManuscripts = async () => {
@@ -322,13 +324,20 @@ function ReviewerDashboard() {
 
 	// Handle rejecting invitation
 	const handleRejectInvitation = async (manuscriptId) => {
+		if (!rejectionReason.trim()) {
+			alert("Please provide a reason for rejection");
+			return;
+		}
+
 		try {
 			const userData = JSON.parse(localStorage.getItem("user"));
 			await axios.post(
 				`${
 					import.meta.env.VITE_BACKEND_URL
 				}/api/auth/reviewer/manuscripts/${manuscriptId}/reject-invitation`,
-				{},
+				{
+					rejectionReason: rejectionReason.trim(),
+				},
 				{
 					headers: {
 						Authorization: `Bearer ${userData.token}`,
@@ -340,10 +349,14 @@ function ReviewerDashboard() {
 			setPendingInvitations((prev) =>
 				prev.filter((inv) => inv._id !== manuscriptId)
 			);
+			setShowRejectForm(null);
+			setRejectionReason("");
 			alert("Invitation rejected successfully!");
 		} catch (error) {
 			console.error("Error rejecting invitation:", error);
-			alert("Failed to reject invitation");
+			alert(
+				error.response?.data?.message || "Failed to reject invitation"
+			);
 		}
 	};
 
@@ -393,28 +406,73 @@ function ReviewerDashboard() {
 												: invitation.abstract}
 										</p>
 									</div>
-									<div className="flex space-x-2">
-										<button
-											onClick={() =>
-												handleAcceptInvitation(
-													invitation._id
-												)
-											}
-											className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-										>
-											✅ Accept
-										</button>
-										<button
-											onClick={() =>
-												handleRejectInvitation(
-													invitation._id
-												)
-											}
-											className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-										>
-											❌ Reject
-										</button>
-									</div>
+
+									{showRejectForm === invitation._id ? (
+										<div className="mt-4 border-t border-gray-200 pt-4">
+											<h4 className="text-sm font-semibold text-red-700 mb-2">
+												Rejection Reason (Required)
+											</h4>
+											<textarea
+												value={rejectionReason}
+												onChange={(e) =>
+													setRejectionReason(
+														e.target.value
+													)
+												}
+												className="w-full h-24 p-2 border border-gray-300 rounded text-sm"
+												placeholder="Please provide a detailed reason for rejecting this invitation..."
+												required
+											/>
+											<div className="flex space-x-2 mt-3">
+												<button
+													onClick={() => {
+														setShowRejectForm(null);
+														setRejectionReason("");
+													}}
+													className="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm"
+												>
+													Cancel
+												</button>
+												<button
+													onClick={() =>
+														handleRejectInvitation(
+															invitation._id
+														)
+													}
+													disabled={
+														!rejectionReason.trim()
+													}
+													className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+												>
+													Confirm Rejection
+												</button>
+											</div>
+										</div>
+									) : (
+										<div className="flex space-x-2">
+											<button
+												onClick={() =>
+													handleAcceptInvitation(
+														invitation._id
+													)
+												}
+												className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+											>
+												✅ Accept
+											</button>
+											<button
+												onClick={() => {
+													setShowRejectForm(
+														invitation._id
+													);
+													setRejectionReason("");
+												}}
+												className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+											>
+												❌ Reject
+											</button>
+										</div>
+									)}
 								</div>
 							))}
 						</div>

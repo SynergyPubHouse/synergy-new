@@ -547,7 +547,15 @@ exports.acceptInvitation = async (req, res) => {
 exports.rejectInvitation = async (req, res) => {
 	try {
 		const { manuscriptId } = req.params;
+		const { rejectionReason } = req.body;
 		const reviewerEmail = req.user.email;
+
+		// Validate that rejection reason is provided
+		if (!rejectionReason || !rejectionReason.trim()) {
+			return res.status(400).json({
+				message: "Rejection reason is required",
+			});
+		}
 
 		// Update manuscript invitation status
 		const manuscript = await Manuscript.findById(manuscriptId);
@@ -566,9 +574,10 @@ exports.rejectInvitation = async (req, res) => {
 			});
 		}
 
-		// Update invitation status
+		// Update invitation status with rejection reason
 		invitation.status = "rejected";
 		invitation.rejectedAt = new Date();
+		invitation.rejectionReason = rejectionReason.trim();
 
 		await manuscript.save();
 
