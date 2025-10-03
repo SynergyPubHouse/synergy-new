@@ -5,6 +5,24 @@ const User = require("../models/User");
 const Reviewer = require("../models/Reviewer");
 const sendEmail = require("../utils/sendEmail");
 
+// Helper function to format full name including middle name if it exists
+const formatFullName = (user) => {
+	if (!user) return "Unknown";
+
+	const { firstName, middleName, lastName } = user;
+	let fullName = firstName || "";
+
+	if (middleName && middleName.trim() !== "") {
+		fullName += ` ${middleName}`;
+	}
+
+	if (lastName) {
+		fullName += ` ${lastName}`;
+	}
+
+	return fullName.trim() || "Unknown";
+};
+
 // Register a new editor
 exports.registerEditor = async (req, res) => {
 	try {
@@ -270,7 +288,7 @@ exports.addNote = async (req, res) => {
 			visibility: visibility || ["author", "editor"],
 			addedBy: {
 				_id: req.editor._id,
-				name: `${req.editor.firstName} ${req.editor.lastName}`,
+				name: formatFullName(req.editor),
 				email: req.editor.email,
 				role: "editor",
 			},
@@ -304,7 +322,9 @@ exports.addNote = async (req, res) => {
 exports.getReviewers = async (req, res) => {
 	try {
 		const reviewers = await Reviewer.find()
-			.select("firstName lastName email specialization experience")
+			.select(
+				"firstName middleName lastName email specialization experience"
+			)
 			.sort({ lastName: 1, firstName: 1 });
 
 		res.json(reviewers);
@@ -367,7 +387,7 @@ exports.updateManuscriptStatus = async (req, res) => {
 				action: status,
 				addedBy: {
 					_id: req.editor._id,
-					name: `${req.editor.firstName} ${req.editor.lastName}`,
+					name: formatFullName(req.editor),
 					email: req.editor.email,
 					role: "editor",
 				},
@@ -460,7 +480,7 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 						action: status,
 						addedBy: {
 							_id: req.editor._id,
-							name: `${req.editor.firstName} ${req.editor.lastName}`,
+							name: formatFullName(req.editor),
 							email: req.editor.email,
 							role: "editor",
 						},
@@ -535,7 +555,7 @@ exports.addRevisionRequiredNote = async (req, res) => {
 			visibility: ["author", "editor"],
 			addedBy: {
 				_id: req.editor._id,
-				name: `${req.editor.firstName} ${req.editor.lastName}`,
+				name: formatFullName(req.editor),
 				email: req.editor.email,
 				role: "editor",
 			},
@@ -640,9 +660,7 @@ exports.sendInvitation = async (req, res) => {
 		console.log("Request params:", req.params);
 		console.log("Editor info:", {
 			id: req.editor?._id,
-			name: req.editor
-				? `${req.editor.firstName} ${req.editor.lastName}`
-				: "Not found",
+			name: req.editor ? formatFullName(req.editor) : "Not found",
 			email: req.editor?.email,
 		});
 
@@ -665,7 +683,7 @@ exports.sendInvitation = async (req, res) => {
 			console.log("Adding editor note:", editorNote.trim());
 			console.log("Editor info:", {
 				id: req.editor._id,
-				name: `${req.editor.firstName} ${req.editor.lastName}`,
+				name: formatFullName(req.editor),
 				email: req.editor.email,
 			});
 
@@ -675,7 +693,7 @@ exports.sendInvitation = async (req, res) => {
 				visibility: ["editor", "reviewer"],
 				addedBy: {
 					_id: req.editor._id,
-					name: `${req.editor.firstName} ${req.editor.lastName}`,
+					name: formatFullName(req.editor),
 					email: req.editor.email,
 					role: "editor",
 				},
@@ -804,7 +822,9 @@ exports.getAcceptedInvitations = async (req, res) => {
 			acceptedInvitations.map(async (invitation) => {
 				const reviewer = await Reviewer.findOne({
 					email: invitation.email,
-				}).select("firstName lastName email specialization experience");
+				}).select(
+					"firstName middleName lastName email specialization experience"
+				);
 
 				return {
 					email: invitation.email,
@@ -905,7 +925,7 @@ exports.assignReviewersFromInvitations = async (req, res) => {
 			results.push({
 				email,
 				success: true,
-				reviewerName: `${reviewer.firstName} ${reviewer.lastName}`,
+				reviewerName: formatFullName(reviewer),
 			});
 		}
 

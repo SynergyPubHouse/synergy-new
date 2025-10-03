@@ -602,93 +602,6 @@ const ManuscriptPage = () => {
 
 	// Add a new function to handle save and submit later
 
-	const handleSaveAndSubmitLater = async (e) => {
-		e.preventDefault();
-
-		if (!user?.token) {
-			alert("Please log in to submit a manuscript");
-			return;
-		}
-
-		// Validate all sections
-		for (let section = 1; section <= 6; section++) {
-			if (!validateSection(section)) {
-				alert(
-					`Please complete all required fields in Section ${section}`
-				);
-				setCurrentSection(section);
-				return;
-			}
-		}
-
-		// Check if all required files are present
-		if (!files.manuscript || !files.coverLetter || !files.declaration) {
-			alert(
-				"Please upload all required files: manuscript, cover letter, and declaration"
-			);
-			setCurrentSection(2); // Navigate to the files section
-			return;
-		}
-
-		const data = new FormData();
-		Object.keys(formData).forEach((key) => {
-			if (key === "additionalInfo") {
-				data.append(key, JSON.stringify(formData[key]));
-			} else {
-				data.append(key, formData[key]);
-			}
-		});
-
-		// Append files
-		if (files.manuscript) {
-			data.append("manuscript", files.manuscript);
-		}
-		if (files.coverLetter) {
-			data.append("coverLetter", files.coverLetter);
-		}
-		if (files.declaration) {
-			data.append("declaration", files.declaration);
-		}
-
-		// Add authors data
-		data.append("authors", JSON.stringify(selectedAuthors));
-		data.append("correspondingAuthorId", correspondingAuthorId);
-
-		try {
-			const response = await axios.post(
-				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts`,
-				data,
-				{
-					headers: {
-						"Content-Type": "multipart/form-data",
-						Authorization: `Bearer ${user.token}`,
-					},
-				}
-			);
-
-			if (response.data.success) {
-				alert("Manuscript saved successfully!");
-				clearForm();
-				navigate(`${BASE_URL}/my-submissions`);
-			} else {
-				throw new Error(response.data.message || "Submission failed");
-			}
-		} catch (error) {
-			console.error("Error saving manuscript:", error);
-			if (error.response?.status === 401) {
-				alert("Your session has expired. Please log in again.");
-				navigate("/login", {
-					state: { from: location.pathname },
-				});
-			} else {
-				alert(
-					"Save failed: " +
-						(error.response?.data?.message || error.message)
-				);
-			}
-		}
-	};
-
 	const [manuscriptId, setManuscriptId] = useState(null);
 
 	// Add a new function to handle save and submit later
@@ -2295,16 +2208,6 @@ const ManuscriptPage = () => {
 								{renderBackButton(6)}
 
 								<div className="flex flex-col space-y-4">
-									{!pdfUrl && (
-										<button
-											type="button"
-											onClick={handleSaveAndSubmitLater}
-											className="px-6 py-2 bg-[#BAFFF5] text-[#00796b] rounded-lg hover:bg-[#a8e6dc]"
-										>
-											Save and Submit Later
-										</button>
-									)}
-
 									<div className="flex space-x-4">
 										{!pdfUrl && (
 											<button

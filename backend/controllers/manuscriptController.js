@@ -1060,9 +1060,15 @@ exports.withdrawManuscript = async (req, res) => {
 exports.getManuscriptById = async (req, res) => {
 	try {
 		const manuscript = await Manuscript.findById(req.params.manuscriptId)
-			.populate("authors", "firstName lastName email")
-			.populate("correspondingAuthor", "firstName lastName email")
-			.populate("assignedReviewers", "firstName lastName email")
+			.populate("authors", "firstName middleName lastName email")
+			.populate(
+				"correspondingAuthor",
+				"firstName middleName lastName email"
+			)
+			.populate(
+				"assignedReviewers",
+				"firstName middleName lastName email"
+			)
 			.select("-reviewerNotes"); // Exclude reviewer notes from author view
 
 		if (!manuscript) {

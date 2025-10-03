@@ -4,6 +4,25 @@ import axios from "axios";
 
 function EditorDashboard() {
 	const { user } = useAuth();
+
+	// Helper function to format full name including middle name if it exists
+	const formatFullName = (user) => {
+		if (!user) return "Unknown";
+
+		const { firstName, middleName, lastName } = user;
+		let fullName = firstName || "";
+
+		if (middleName && middleName.trim() !== "") {
+			fullName += ` ${middleName}`;
+		}
+
+		if (lastName) {
+			fullName += ` ${lastName}`;
+		}
+
+		return fullName.trim() || "Unknown";
+	};
+
 	const [users, setUsers] = useState([]);
 	const [selectedUser, setSelectedUser] = useState(null);
 	const [manuscripts, setManuscripts] = useState([]);
@@ -21,6 +40,7 @@ function EditorDashboard() {
 	const [inviteEmails, setInviteEmails] = useState([""]);
 	const [inviteManuscript, setInviteManuscript] = useState(null);
 	const [editorNote, setEditorNote] = useState("");
+	const [isSendingInvitations, setIsSendingInvitations] = useState(false);
 
 	useEffect(() => {
 		const fetchUsers = async () => {
@@ -435,6 +455,7 @@ function EditorDashboard() {
 
 	// Handle send invitations
 	const handleSendInvitations = async () => {
+		setIsSendingInvitations(true); // Start loading
 		try {
 			// Filter out empty emails and trim whitespace
 			const emailArray = inviteEmails
@@ -443,6 +464,7 @@ function EditorDashboard() {
 
 			if (emailArray.length === 0) {
 				alert("Please enter at least one email address");
+				setIsSendingInvitations(false);
 				return;
 			}
 
@@ -454,6 +476,7 @@ function EditorDashboard() {
 
 			if (invalidEmails.length > 0) {
 				alert(`Invalid email addresses: ${invalidEmails.join(", ")}`);
+				setIsSendingInvitations(false);
 				return;
 			}
 
@@ -490,6 +513,8 @@ function EditorDashboard() {
 		} catch (error) {
 			console.error("Error sending invitations:", error);
 			alert("Failed to send invitations");
+		} finally {
+			setIsSendingInvitations(false); // Stop loading
 		}
 	};
 
@@ -727,7 +752,9 @@ function EditorDashboard() {
 						<div className="flex justify-between items-center mb-4">
 							<h2 className="text-2xl font-semibold text-[#496580]">
 								{selectedUser
-									? `Manuscripts by ${selectedUser.firstName} ${selectedUser.lastName}`
+									? `Manuscripts by ${formatFullName(
+											selectedUser
+									  )}`
 									: "Select a User"}
 							</h2>
 
@@ -2101,32 +2128,82 @@ function EditorDashboard() {
 							<button
 								onClick={handleSendInvitations}
 								disabled={
+									isSendingInvitations ||
 									inviteEmails.filter(
 										(email) => email.trim().length > 0
 									).length === 0
 								}
 								className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
 							>
-								✉️ Send{" "}
-								{inviteEmails.filter(
-									(email) => email.trim().length > 0
-								).length > 0
-									? `${
-											inviteEmails.filter(
-												(email) =>
-													email.trim().length > 0
-											).length
-									  } Invitation${
-											inviteEmails.filter(
-												(email) =>
-													email.trim().length > 0
-											).length !== 1
-												? "s"
-												: ""
-									  }`
-									: "Invitations"}
+								{isSendingInvitations ? (
+									<>
+										<span className="inline-block animate-spin mr-2">
+											⏳
+										</span>
+										Sending...
+									</>
+								) : (
+									<>
+										✉️ Send{" "}
+										{inviteEmails.filter(
+											(email) => email.trim().length > 0
+										).length > 0
+											? `${
+													inviteEmails.filter(
+														(email) =>
+															email.trim()
+																.length > 0
+													).length
+											  } Invitation${
+													inviteEmails.filter(
+														(email) =>
+															email.trim()
+																.length > 0
+													).length !== 1
+														? "s"
+														: ""
+											  }`
+											: "Invitations"}
+									</>
+								)}
 							</button>
 						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Loading Overlay for Sending Invitations */}
+			{isSendingInvitations && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+					<div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center shadow-2xl">
+						<div className="mb-4">
+							<div className="inline-block animate-spin text-4xl mb-4">
+								⏳
+							</div>
+						</div>
+						<h3 className="text-xl font-semibold text-gray-800 mb-2">
+							Sending Invitations
+						</h3>
+						<p className="text-gray-600 mb-4">
+							Please wait while we send invitations to the
+							selected reviewers...
+						</p>
+						<div className="flex justify-center">
+							<div className="flex space-x-1">
+								<div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
+								<div
+									className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+									style={{ animationDelay: "0.1s" }}
+								></div>
+								<div
+									className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"
+									style={{ animationDelay: "0.2s" }}
+								></div>
+							</div>
+						</div>
+						<p className="text-sm text-gray-500 mt-4">
+							This may take a few moments...
+						</p>
 					</div>
 				</div>
 			)}

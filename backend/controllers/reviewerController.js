@@ -6,6 +6,24 @@ const mongoose = require("mongoose");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail"); // Adjust the path as necessary
 
+// Helper function to format full name including middle name if it exists
+const formatFullName = (user) => {
+	if (!user) return "Unknown";
+
+	const { firstName, middleName, lastName } = user;
+	let fullName = firstName || "";
+
+	if (middleName && middleName.trim() !== "") {
+		fullName += ` ${middleName}`;
+	}
+
+	if (lastName) {
+		fullName += ` ${lastName}`;
+	}
+
+	return fullName.trim() || "Unknown";
+};
+
 // Register a new reviewer
 exports.registerReviewer = async (req, res) => {
 	try {
@@ -154,7 +172,7 @@ exports.getAssignedManuscripts = async (req, res) => {
 			select: "title correspondingAuthor submissionDate status mergedFileUrl reviewerNotes editorNotes",
 			populate: {
 				path: "correspondingAuthor",
-				select: "firstName lastName email",
+				select: "firstName middleName lastName email",
 			},
 		});
 
@@ -175,11 +193,9 @@ exports.getAssignedManuscripts = async (req, res) => {
 					firstName: manuscript.correspondingAuthor?.firstName || "",
 					lastName: manuscript.correspondingAuthor?.lastName || "",
 					email: manuscript.correspondingAuthor?.email || "",
-					fullName:
-						manuscript.correspondingAuthor?.firstName &&
-						manuscript.correspondingAuthor?.lastName
-							? `${manuscript.correspondingAuthor.firstName} ${manuscript.correspondingAuthor.lastName}`
-							: "Unknown Author",
+					fullName: manuscript.correspondingAuthor
+						? formatFullName(manuscript.correspondingAuthor)
+						: "Unknown Author",
 				};
 
 				// Ensure mergedFileUrl is properly formatted
@@ -275,7 +291,7 @@ exports.submitReview = async (req, res) => {
 			visibility: ["editor", "reviewer"],
 			addedBy: {
 				_id: reviewer._id,
-				name: `${reviewer.firstName} ${reviewer.lastName}`,
+				name: formatFullName(reviewer),
 				email: reviewer.email,
 				role: "reviewer",
 			},
