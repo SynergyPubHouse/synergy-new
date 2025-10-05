@@ -23,6 +23,205 @@ const formatFullName = (user) => {
 	return fullName.trim() || "Unknown";
 };
 
+// Helper function to send status change notification emails to manuscript authors
+const sendStatusChangeNotification = async (
+	manuscript,
+	newStatus,
+	editorNote = "",
+	editorInfo
+) => {
+	try {
+		// Get all authors' emails from the manuscript
+		const populatedManuscript = await Manuscript.findById(manuscript._id)
+			.populate("authors", "firstName middleName lastName email")
+			.populate(
+				"correspondingAuthor",
+				"firstName middleName lastName email"
+			);
+
+		if (!populatedManuscript) {
+			console.error("Manuscript not found for email notification");
+			return;
+		}
+
+		// Collect all unique author emails
+		const authorEmails = new Set();
+
+		// Add all authors
+		if (
+			populatedManuscript.authors &&
+			populatedManuscript.authors.length > 0
+		) {
+			populatedManuscript.authors.forEach((author) => {
+				if (author && author.email) {
+					authorEmails.add(author.email.toLowerCase());
+				}
+			});
+		}
+
+		// Add corresponding author (if different)
+		if (
+			populatedManuscript.correspondingAuthor &&
+			populatedManuscript.correspondingAuthor.email
+		) {
+			authorEmails.add(
+				populatedManuscript.correspondingAuthor.email.toLowerCase()
+			);
+		}
+
+		// Convert Set to Array
+		const emailList = Array.from(authorEmails);
+
+		if (emailList.length === 0) {
+			console.error(
+				"No author emails found for manuscript:",
+				manuscript._id
+			);
+			return;
+		}
+
+		// Get status color and icon for email styling
+		const getStatusStyle = (status) => {
+			const styles = {
+				Pending: { color: "#2563eb", icon: "🔄", bg: "#dbeafe" },
+				"Under Review": { color: "#dc2626", icon: "👥", bg: "#fef2f2" },
+				Reviewed: { color: "#7c3aed", icon: "✅", bg: "#f3e8ff" },
+				"Revision Required": {
+					color: "#ea580c",
+					icon: "📝",
+					bg: "#fed7aa",
+				},
+				Accepted: { color: "#16a34a", icon: "🎉", bg: "#dcfce7" },
+				Rejected: { color: "#dc2626", icon: "❌", bg: "#fef2f2" },
+			};
+			return (
+				styles[status] || {
+					color: "#6b7280",
+					icon: "📄",
+					bg: "#f9fafb",
+				}
+			);
+		};
+
+		const statusStyle = getStatusStyle(newStatus);
+		const editorName = formatFullName(editorInfo);
+
+		// Create email content
+		const emailSubject = `Manuscript Status Update: ${populatedManuscript.title}`;
+
+		const emailContent = `
+			<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+				<div style="background: linear-gradient(135deg, #00796b 0%, #00acc1 100%); color: white; padding: 30px; text-align: center;">
+					<h1 style="margin: 0; font-size: 24px;">Synergy World Press</h1>
+					<p style="margin: 10px 0 0 0; opacity: 0.9;">Manuscript Status Update</p>
+				</div>
+				
+				<div style="padding: 30px;">
+					<div style="background-color: ${statusStyle.bg}; border-left: 4px solid ${
+			statusStyle.color
+		}; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
+						<h2 style="margin: 0 0 10px 0; color: ${statusStyle.color}; font-size: 20px;">
+							${statusStyle.icon} Status Changed to: ${newStatus}
+						</h2>
+						<p style="margin: 0; color: #374151; font-size: 14px;">
+							Your manuscript status has been updated by the editor.
+						</p>
+					</div>
+
+					<div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+						<h3 style="margin: 0 0 15px 0; color: #374151; font-size: 16px;">📄 Manuscript Details</h3>
+						<table style="width: 100%; border-collapse: collapse;">
+							<tr>
+								<td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 30%;">Title:</td>
+								<td style="padding: 8px 0; color: #374151; font-size: 14px; font-weight: 500;">${
+									populatedManuscript.title
+								}</td>
+							</tr>
+							<tr>
+								<td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Type:</td>
+								<td style="padding: 8px 0; color: #374151; font-size: 14px;">${
+									populatedManuscript.type
+								}</td>
+							</tr>
+							<tr>
+								<td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Status:</td>
+								<td style="padding: 8px 0; color: ${
+									statusStyle.color
+								}; font-size: 14px; font-weight: 600;">${newStatus}</td>
+							</tr>
+							<tr>
+								<td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Updated by:</td>
+								<td style="padding: 8px 0; color: #374151; font-size: 14px;">${editorName}</td>
+							</tr>
+							<tr>
+								<td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Update Date:</td>
+								<td style="padding: 8px 0; color: #374151; font-size: 14px;">${new Date().toLocaleDateString(
+									"en-US",
+									{
+										year: "numeric",
+										month: "long",
+										day: "numeric",
+										hour: "2-digit",
+										minute: "2-digit",
+									}
+								)}</td>
+							</tr>
+						</table>
+					</div>
+
+					${
+						editorNote && editorNote.trim()
+							? `
+						<div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin-bottom: 25px; border-radius: 4px;">
+							<h3 style="margin: 0 0 10px 0; color: #92400e; font-size: 16px;">📝 Editor's Note</h3>
+							<p style="margin: 0; color: #451a03; font-size: 14px; line-height: 1.6;">
+								${editorNote.trim()}
+							</p>
+						</div>
+					`
+							: ""
+					}
+
+					<div style="text-align: center; margin-top: 30px;">
+						<a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/my-submissions" 
+						   style="display: inline-block; background-color: #00796b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+							View Your Submissions
+						</a>
+					</div>
+
+					<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
+						<p style="margin: 0;">This is an automated notification from Synergy World Press.</p>
+						<p style="margin: 5px 0 0 0;">For questions, please contact: <a href="mailto:support@synergyworldpress.com" style="color: #00796b;">support@synergyworldpress.com</a></p>
+					</div>
+				</div>
+			</div>
+		`;
+
+		// Send emails to all authors
+		for (const email of emailList) {
+			try {
+				await sendEmail({
+					to: email,
+					subject: emailSubject,
+					text: emailContent,
+				});
+				console.log(`Status change notification sent to: ${email}`);
+			} catch (emailError) {
+				console.error(
+					`Failed to send status change notification to ${email}:`,
+					emailError
+				);
+			}
+		}
+
+		console.log(
+			`Status change notifications sent for manuscript ${manuscript._id} (${newStatus}) to ${emailList.length} authors`
+		);
+	} catch (error) {
+		console.error("Error sending status change notification:", error);
+	}
+};
+
 // Register a new editor
 exports.registerEditor = async (req, res) => {
 	try {
@@ -349,6 +548,9 @@ exports.updateManuscriptStatus = async (req, res) => {
 			return res.status(404).json({ message: "Manuscript not found" });
 		}
 
+		// Store old status for comparison
+		const oldStatus = currentManuscript.status;
+
 		// Prevent any status changes if the manuscript is already rejected
 		if (currentManuscript.status === "Rejected") {
 			return res.status(403).json({
@@ -406,6 +608,24 @@ exports.updateManuscriptStatus = async (req, res) => {
 			await manuscript.save();
 		}
 
+		// Send email notification to authors if status has changed
+		if (oldStatus !== status) {
+			try {
+				await sendStatusChangeNotification(
+					manuscript,
+					status,
+					note && note.trim() ? note.trim() : "",
+					req.editor
+				);
+			} catch (emailError) {
+				console.error(
+					"Failed to send status change email:",
+					emailError
+				);
+				// Continue execution even if email fails
+			}
+		}
+
 		res.json({
 			message: `Manuscript status updated to ${status}`,
 			manuscript,
@@ -456,6 +676,9 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 				continue;
 			}
 
+			// Store old status for comparison
+			const oldStatus = currentManuscript.status;
+
 			// Prevent any status changes if the manuscript is already rejected
 			if (currentManuscript.status === "Rejected") {
 				results.push({
@@ -498,6 +721,25 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 					}
 					await manuscript.save();
 				}
+
+				// Send email notification to authors if status has changed
+				if (oldStatus !== status) {
+					try {
+						await sendStatusChangeNotification(
+							manuscript,
+							status,
+							note && note.trim() ? note.trim() : "",
+							req.editor
+						);
+					} catch (emailError) {
+						console.error(
+							`Failed to send status change email for manuscript ${manuscriptId}:`,
+							emailError
+						);
+						// Continue execution even if email fails
+					}
+				}
+
 				results.push({ manuscriptId, success: true });
 			} else {
 				results.push({
@@ -541,6 +783,9 @@ exports.addRevisionRequiredNote = async (req, res) => {
 			return res.status(404).json({ message: "Manuscript not found" });
 		}
 
+		// Store old status for comparison
+		const oldStatus = currentManuscript.status;
+
 		// Prevent any status changes if the manuscript is already rejected
 		if (currentManuscript.status === "Rejected") {
 			return res.status(403).json({
@@ -574,6 +819,24 @@ exports.addRevisionRequiredNote = async (req, res) => {
 
 		if (!manuscript) {
 			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		// Send email notification to authors if status has changed
+		if (oldStatus !== "Revision Required") {
+			try {
+				await sendStatusChangeNotification(
+					manuscript,
+					"Revision Required",
+					text.trim(),
+					req.editor
+				);
+			} catch (emailError) {
+				console.error(
+					"Failed to send revision required email:",
+					emailError
+				);
+				// Continue execution even if email fails
+			}
 		}
 
 		res.json({
@@ -932,7 +1195,26 @@ exports.assignReviewersFromInvitations = async (req, res) => {
 		// Update manuscript status to "Under Review" if any reviewers were assigned
 		const successfulAssignments = results.filter((r) => r.success);
 		if (successfulAssignments.length > 0) {
+			const oldStatus = manuscript.status;
 			manuscript.status = "Under Review";
+
+			// Send email notification to authors if status has changed
+			if (oldStatus !== "Under Review") {
+				try {
+					await sendStatusChangeNotification(
+						manuscript,
+						"Under Review",
+						"", // No specific note for reviewer assignment
+						req.editor
+					);
+				} catch (emailError) {
+					console.error(
+						"Failed to send status change email for reviewer assignment:",
+						emailError
+					);
+					// Continue execution even if email fails
+				}
+			}
 		}
 
 		await manuscript.save();
