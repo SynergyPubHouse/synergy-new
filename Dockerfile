@@ -68,48 +68,102 @@
 
 
 
+# # Backend-only Dockerfile for Synergy World Press Application
+# FROM python:3.10-slim AS backend
+
+# # Install system dependencies
+# RUN apt-get update && apt-get install -y \
+#     curl \
+#     gnupg \
+#     build-essential \
+#     libreoffice \
+#     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+#     && apt-get install -y nodejs \
+#     && apt-get clean \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Set working directory
+# WORKDIR /app/backend
+
+# # Copy backend package files and requirements
+# COPY backend/package*.json ./
+# COPY backend/requirements.txt ./
+
+# # Install backend dependencies
+# RUN npm ci
+# RUN pip install --no-cache-dir -r requirements.txt
+# RUN python -m spacy download en_core_web_sm
+
+# # Copy backend source code
+# COPY backend/ ./
+
+# # Create uploads directory and set permissions
+# RUN mkdir -p uploads && chmod 755 uploads
+
+# # Create a non-root user for security
+# RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
+# USER appuser
+
+# # Expose backend port
+# EXPOSE 5000
+
+# # Health check
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+#   CMD curl -f http://localhost:5000/api/health || exit 1
+
+# # Start the backend server
+# CMD ["node", "server.js"]
+
+
+
+
+
+
+
 # Backend-only Dockerfile for Synergy World Press Application
 FROM python:3.10-slim AS backend
 
-# Install system dependencies
+# Install system dependencies and Node.js
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
     build-essential \
     libreoffice \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+ && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+ && apt-get install -y nodejs \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
+WORKDIR /app
+
+# Copy package and requirements first (to leverage Docker caching)
+COPY backend/package*.json ./backend/
+COPY backend/requirements.txt ./backend/
+
+# Install dependencies
 WORKDIR /app/backend
-
-# Copy backend package files and requirements
-COPY backend/package*.json ./
-COPY backend/requirements.txt ./
-
-# Install backend dependencies
-RUN npm ci
+RUN npm install --omit=dev
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -m spacy download en_core_web_sm
 
-# Copy backend source code
-COPY backend/ ./
+# Copy rest of backend code
+COPY backend/ ./ 
 
 # Create uploads directory and set permissions
 RUN mkdir -p uploads && chmod 755 uploads
 
 # Create a non-root user for security
-RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
+RUN useradd -m appuser
 USER appuser
 
 # Expose backend port
 EXPOSE 5000
 
-# Health check
+# Health check (optional)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:5000/api/health || exit 1
 
-# Start the backend server
+# Default command to start the Node server
 CMD ["node", "server.js"]
+
