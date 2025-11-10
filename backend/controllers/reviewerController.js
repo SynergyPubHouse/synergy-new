@@ -364,7 +364,8 @@ exports.forgotPassword = async (req, res) => {
 
 		await reviewer.save();
 
-		const resetUrl = `http://localhost:5173/reviewer/reset-password/${resetToken}`;
+		const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+		const resetUrl = `${baseUrl}/reviewer/reset-password/${resetToken}`;
 
 		const message = `
             <h1>You have requested a password reset</h1>

@@ -41,6 +41,8 @@ function EditorDashboard() {
 	const [inviteManuscript, setInviteManuscript] = useState(null);
 	const [editorNote, setEditorNote] = useState("");
 	const [isSendingInvitations, setIsSendingInvitations] = useState(false);
+	const [filterType, setFilterType] = useState("all"); // "all", "status", "activity"
+	const [filterValue, setFilterValue] = useState(""); // The specific status or activity to filter by
 
 	useEffect(() => {
 		const fetchUsers = async () => {
@@ -115,6 +117,12 @@ function EditorDashboard() {
 	const handleUserClick = (user) => {
 		setSelectedUser(user);
 		setManuscripts(user.manuscripts || []);
+		// Clear any active filters when switching users
+		setFilterType("all");
+		setFilterValue("");
+		// Clear bulk selections
+		setSelectedManuscriptIds([]);
+		setShowBulkActions(false);
 	};
 
 	// Handle manuscript click to open PDF
@@ -564,6 +572,76 @@ function EditorDashboard() {
 		setInviteEmails([""]);
 	};
 
+	// Filter manuscripts based on current filter
+	const getFilteredManuscripts = () => {
+		if (!selectedUser) return [];
+
+		const allManuscripts = manuscripts;
+
+		if (filterType === "all") {
+			return allManuscripts;
+		}
+
+		if (filterType === "status") {
+			return allManuscripts.filter(
+				(manuscript) => manuscript.status === filterValue
+			);
+		}
+
+		if (filterType === "activity") {
+			const today = new Date();
+			const weekAgo = new Date();
+			weekAgo.setDate(weekAgo.getDate() - 7);
+
+			switch (filterValue) {
+				case "todaySubmissions":
+					return allManuscripts.filter((manuscript) => {
+						if (!manuscript.submissionDate) return false;
+						const submissionDate = new Date(
+							manuscript.submissionDate
+						);
+						return (
+							submissionDate.toDateString() ===
+							today.toDateString()
+						);
+					});
+				case "weeklyUpdates":
+					return allManuscripts.filter((manuscript) => {
+						if (!manuscript.updatedAt) return false;
+						const updatedDate = new Date(manuscript.updatedAt);
+						return updatedDate >= weekAgo;
+					});
+				case "pendingAction":
+					return allManuscripts.filter(
+						(manuscript) =>
+							manuscript.status === "Pending" ||
+							manuscript.status === "Reviewed" ||
+							manuscript.status === "Revision Required"
+					);
+				default:
+					return allManuscripts;
+			}
+		}
+
+		return allManuscripts;
+	};
+
+	// Handle filter clicks
+	const handleStatusFilter = (status) => {
+		setFilterType("status");
+		setFilterValue(status);
+	};
+
+	const handleActivityFilter = (activity) => {
+		setFilterType("activity");
+		setFilterValue(activity);
+	};
+
+	const clearFilter = () => {
+		setFilterType("all");
+		setFilterValue("");
+	};
+
 	return (
 		<div className="min-h-screen bg-[#f8fafc] p-6">
 			<div className="max-w-6xl mx-auto">
@@ -627,9 +705,19 @@ function EditorDashboard() {
 								<div>
 									<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 										{statusOrder.map((status) => (
-											<div
+											<button
 												key={status}
-												className={`${statusColors[status]} text-white p-4 rounded-lg text-center`}
+												onClick={() =>
+													handleStatusFilter(status)
+												}
+												className={`${
+													statusColors[status]
+												} text-white p-4 rounded-lg text-center transition-all duration-200 transform hover:scale-105 hover:shadow-lg cursor-pointer ${
+													filterType === "status" &&
+													filterValue === status
+														? "ring-4 ring-white ring-opacity-50 shadow-xl"
+														: ""
+												}`}
 											>
 												<div className="text-2xl font-bold">
 													{statusCounts[status] || 0}
@@ -637,7 +725,13 @@ function EditorDashboard() {
 												<div className="text-sm">
 													{status}
 												</div>
-											</div>
+												{filterType === "status" &&
+													filterValue === status && (
+														<div className="text-xs mt-1 opacity-90">
+															📌 Filtered
+														</div>
+													)}
+											</button>
 										))}
 									</div>
 
@@ -647,9 +741,30 @@ function EditorDashboard() {
 											⏰ Recent Activity
 										</h3>
 										<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-											<div className="bg-white p-3 rounded border">
+											<button
+												onClick={() =>
+													handleActivityFilter(
+														"todaySubmissions"
+													)
+												}
+												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-blue-50 text-left ${
+													filterType === "activity" &&
+													filterValue ===
+														"todaySubmissions"
+														? "ring-2 ring-blue-400 bg-blue-50 shadow-md"
+														: ""
+												}`}
+											>
 												<div className="font-semibold text-blue-600">
 													📥 Today&apos;s Submissions
+													{filterType ===
+														"activity" &&
+														filterValue ===
+															"todaySubmissions" && (
+															<span className="ml-2 text-xs">
+																📌
+															</span>
+														)}
 												</div>
 												<div className="text-lg font-bold">
 													{
@@ -669,10 +784,31 @@ function EditorDashboard() {
 														).length
 													}
 												</div>
-											</div>
-											<div className="bg-white p-3 rounded border">
+											</button>
+											<button
+												onClick={() =>
+													handleActivityFilter(
+														"weeklyUpdates"
+													)
+												}
+												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-yellow-50 text-left ${
+													filterType === "activity" &&
+													filterValue ===
+														"weeklyUpdates"
+														? "ring-2 ring-yellow-400 bg-yellow-50 shadow-md"
+														: ""
+												}`}
+											>
 												<div className="font-semibold text-yellow-600">
 													🔄 Updated This Week
+													{filterType ===
+														"activity" &&
+														filterValue ===
+															"weeklyUpdates" && (
+															<span className="ml-2 text-xs">
+																📌
+															</span>
+														)}
 												</div>
 												<div className="text-lg font-bold">
 													{
@@ -696,10 +832,31 @@ function EditorDashboard() {
 														).length
 													}
 												</div>
-											</div>
-											<div className="bg-white p-3 rounded border">
+											</button>
+											<button
+												onClick={() =>
+													handleActivityFilter(
+														"pendingAction"
+													)
+												}
+												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-green-50 text-left ${
+													filterType === "activity" &&
+													filterValue ===
+														"pendingAction"
+														? "ring-2 ring-green-400 bg-green-50 shadow-md"
+														: ""
+												}`}
+											>
 												<div className="font-semibold text-green-600">
 													⚡ Pending Action
+													{filterType ===
+														"activity" &&
+														filterValue ===
+															"pendingAction" && (
+															<span className="ml-2 text-xs">
+																📌
+															</span>
+														)}
 												</div>
 												<div className="text-lg font-bold">
 													{
@@ -714,7 +871,7 @@ function EditorDashboard() {
 														).length
 													}
 												</div>
-											</div>
+											</button>
 										</div>
 									</div>
 								</div>
@@ -750,16 +907,54 @@ function EditorDashboard() {
 					{/* Manuscripts List */}
 					<div className="bg-white rounded-lg p-6 shadow-md border border-[#e2e8f0] col-span-2">
 						<div className="flex justify-between items-center mb-4">
-							<h2 className="text-2xl font-semibold text-[#496580]">
-								{selectedUser
-									? `Manuscripts by ${formatFullName(
-											selectedUser
-									  )}`
-									: "Select a User"}
-							</h2>
+							<div className="flex flex-col">
+								<h2 className="text-2xl font-semibold text-[#496580]">
+									{selectedUser
+										? `Manuscripts by ${formatFullName(
+												selectedUser
+										  )}`
+										: "Select a User"}
+								</h2>
+								{filterType !== "all" && selectedUser && (
+									<div className="flex items-center space-x-2 mt-2">
+										<span className="text-sm text-gray-600">
+											Filtered by:
+										</span>
+										<span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded font-medium">
+											{filterType === "status"
+												? `Status: ${filterValue}`
+												: filterType === "activity"
+												? `Activity: ${
+														filterValue ===
+														"todaySubmissions"
+															? "Today's Submissions"
+															: filterValue ===
+															  "weeklyUpdates"
+															? "Updated This Week"
+															: filterValue ===
+															  "pendingAction"
+															? "Pending Action"
+															: filterValue
+												  }`
+												: filterValue}
+										</span>
+										<button
+											onClick={clearFilter}
+											className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded transition-colors"
+											title="Clear filter"
+										>
+											✕ Clear
+										</button>
+										<span className="text-xs text-gray-500">
+											({getFilteredManuscripts().length}{" "}
+											manuscripts)
+										</span>
+									</div>
+								)}
+							</div>
 
 							{/* Bulk Actions Toggle */}
-							{manuscripts.length > 0 && (
+							{getFilteredManuscripts().length > 0 && (
 								<div className="flex items-center space-x-2">
 									<button
 										onClick={() =>
@@ -787,89 +982,92 @@ function EditorDashboard() {
 						</div>
 
 						{/* Bulk Actions Panel */}
-						{showBulkActions && manuscripts.length > 0 && (
-							<div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-								<h3 className="text-lg font-semibold text-blue-700 mb-3">
-									🔧 Bulk Actions
-								</h3>
-								<div className="flex flex-wrap gap-2 mb-3">
-									<button
-										onClick={() =>
-											setSelectedManuscriptIds(
-												manuscripts.map((m) => m._id)
-											)
-										}
-										className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-									>
-										Select All
-									</button>
-									<button
-										onClick={() =>
-											setSelectedManuscriptIds([])
-										}
-										className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
-									>
-										Clear All
-									</button>
-								</div>
-
-								{selectedManuscriptIds.length > 0 && (
-									<div className="flex flex-wrap gap-2">
+						{showBulkActions &&
+							getFilteredManuscripts().length > 0 && (
+								<div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+									<h3 className="text-lg font-semibold text-blue-700 mb-3">
+										🔧 Bulk Actions
+									</h3>
+									<div className="flex flex-wrap gap-2 mb-3">
 										<button
 											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
-													"Pending"
+												setSelectedManuscriptIds(
+													getFilteredManuscripts().map(
+														(m) => m._id
+													)
 												)
 											}
 											className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
 										>
-											🔄 Set to Pending (
-											{selectedManuscriptIds.length})
+											Select All
 										</button>
 										<button
 											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
-													"Reviewed"
-												)
+												setSelectedManuscriptIds([])
 											}
-											className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
+											className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
 										>
-											✅ Mark Reviewed (
-											{selectedManuscriptIds.length})
-										</button>
-										<button
-											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
-													"Revision Required"
-												)
-											}
-											className="px-3 py-1 text-sm bg-orange-500 text-white rounded hover:bg-orange-600"
-										>
-											📝 Revision Required (
-											{selectedManuscriptIds.length})
-										</button>
-										<button
-											onClick={() =>
-												handleBulkStatusUpdate(
-													selectedManuscriptIds,
-													"Accepted"
-												)
-											}
-											className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
-										>
-											🎉 Accept All (
-											{selectedManuscriptIds.length})
+											Clear All
 										</button>
 									</div>
-								)}
-							</div>
-						)}
+
+									{selectedManuscriptIds.length > 0 && (
+										<div className="flex flex-wrap gap-2">
+											<button
+												onClick={() =>
+													handleBulkStatusUpdate(
+														selectedManuscriptIds,
+														"Pending"
+													)
+												}
+												className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+											>
+												🔄 Set to Pending (
+												{selectedManuscriptIds.length})
+											</button>
+											<button
+												onClick={() =>
+													handleBulkStatusUpdate(
+														selectedManuscriptIds,
+														"Reviewed"
+													)
+												}
+												className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
+											>
+												✅ Mark Reviewed (
+												{selectedManuscriptIds.length})
+											</button>
+											<button
+												onClick={() =>
+													handleBulkStatusUpdate(
+														selectedManuscriptIds,
+														"Revision Required"
+													)
+												}
+												className="px-3 py-1 text-sm bg-orange-500 text-white rounded hover:bg-orange-600"
+											>
+												📝 Revision Required (
+												{selectedManuscriptIds.length})
+											</button>
+											<button
+												onClick={() =>
+													handleBulkStatusUpdate(
+														selectedManuscriptIds,
+														"Accepted"
+													)
+												}
+												className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+											>
+												🎉 Accept All (
+												{selectedManuscriptIds.length})
+											</button>
+										</div>
+									)}
+								</div>
+							)}
 
 						<div className="space-y-4">
-							{manuscripts.map((manuscript) => (
+							{getFilteredManuscripts().map((manuscript) => (
 								<div
 									key={manuscript._id}
 									data-manuscript-id={manuscript._id}

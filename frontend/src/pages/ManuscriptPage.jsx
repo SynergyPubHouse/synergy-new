@@ -1370,6 +1370,9 @@ const ManuscriptPage = () => {
 												/>
 												<span className="capitalize text-[#00796b]">
 													{doc}
+													<span className="text-red-500 ml-1">
+														*
+													</span>
 												</span>
 											</div>
 										))}
@@ -1481,6 +1484,9 @@ const ManuscriptPage = () => {
 														<p className="text-xs text-[#00796b]">
 															Upload {doc} (DOCX
 															or PDF)
+															<span className="text-red-500 ml-1">
+																*
+															</span>
 														</p>
 													</div>
 													<input

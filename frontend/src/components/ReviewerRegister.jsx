@@ -1,8 +1,21 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 
 const BASE_URL = "/journal/jics";
+
+// Utility function to get the correct login URL
+const getReviewerLoginUrl = () => {
+	const isProduction =
+		import.meta.env.VITE_BACKEND_URL?.includes("render.com") ||
+		window.location.hostname === "synergyworldpress.com";
+
+	if (isProduction) {
+		return "https://synergyworldpress.com/journal/jics/reviewer/login";
+	} else {
+		return `${BASE_URL}/reviewer/login`;
+	}
+};
 
 function ReviewerRegister() {
 	const [formData, setFormData] = useState({
@@ -247,6 +260,25 @@ function ReviewerRegister() {
 				>
 					Register as Reviewer
 				</button>
+
+				{/* Login Redirect Section */}
+				<div className="mt-6 pt-4 border-t border-[#e2e8f0]">
+					<p className="text-center text-[#496580] text-sm mb-3">
+						Already have a reviewer account?
+					</p>
+					<div className="text-center space-y-2">
+						<Link
+							to={getReviewerLoginUrl()}
+							className="inline-block w-full px-4 py-2 bg-white border border-[#496580] text-[#496580] rounded-lg hover:bg-[#496580] hover:text-white transition-all duration-300 font-medium"
+						>
+							🔐 Login as Reviewer
+						</Link>
+						<p className="text-xs text-gray-500 mt-1">
+							Use your existing reviewer credentials to access
+							invitations and reviews
+						</p>
+					</div>
+				</div>
 
 				<div className="mt-4 text-center">
 					<p className="text-[#64748b] text-sm">

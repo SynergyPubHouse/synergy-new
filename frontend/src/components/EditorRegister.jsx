@@ -1,8 +1,21 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const BASE_URL = "/journal/jics";
+
+// Utility function to get the correct login URL
+const getLoginUrl = () => {
+	const isProduction =
+		import.meta.env.VITE_BACKEND_URL?.includes("render.com") ||
+		window.location.hostname === "synergyworldpress.com";
+
+	if (isProduction) {
+		return "https://synergyworldpress.com/journal/jics/editor/login";
+	} else {
+		return `${BASE_URL}/editor/login`;
+	}
+};
 
 function EditorRegister() {
 	const [formData, setFormData] = useState({
@@ -216,6 +229,25 @@ function EditorRegister() {
 				>
 					Register as Editor
 				</button>
+
+				{/* Login Redirect Section */}
+				<div className="mt-6 pt-4 border-t border-[#e2e8f0]">
+					<p className="text-center text-[#496580] text-sm mb-3">
+						Already have an editor account?
+					</p>
+					<div className="text-center space-y-2">
+						<Link
+							to={getLoginUrl()}
+							className="inline-block w-full px-4 py-2 bg-white border border-[#496580] text-[#496580] rounded-lg hover:bg-[#496580] hover:text-white transition-all duration-300 font-medium"
+						>
+							🔐 Login as Editor
+						</Link>
+						<p className="text-xs text-gray-500 mt-1">
+							Use your existing editor credentials to access the
+							dashboard
+						</p>
+					</div>
+				</div>
 
 				<div className="mt-4 text-center">
 					<p className="text-[#496580] text-sm">
