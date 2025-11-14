@@ -6,15 +6,7 @@ const BASE_URL = "/journal/jics";
 
 // Utility function to get the correct login URL
 const getReviewerLoginUrl = () => {
-	const isProduction =
-		import.meta.env.VITE_BACKEND_URL?.includes("render.com") ||
-		window.location.hostname === "synergyworldpress.com";
-
-	if (isProduction) {
-		return "https://synergyworldpress.com/journal/jics/reviewer/login";
-	} else {
-		return `${BASE_URL}/reviewer/login`;
-	}
+	return "/login";
 };
 
 function ReviewerRegister() {
@@ -68,7 +60,7 @@ function ReviewerRegister() {
 				formData
 			);
 			alert("Reviewer Registration Successful!");
-			navigate(`${BASE_URL}/reviewer/login`);
+			navigate("/login");
 		} catch (error) {
 			setErrorMessage(
 				error.response?.data?.message || "Registration Failed"

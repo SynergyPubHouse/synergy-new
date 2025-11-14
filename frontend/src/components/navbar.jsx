@@ -11,15 +11,38 @@ const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
 
-  const handleLogout = () => {
-    if (window.confirm("Are you sure you want to log out?")) {
-      logout();
-      navigate("/");
-    }
+  const logoTarget =
+    user?.editor?.role === 'editor'
+      ? '/journal/jics/editor/dashboard'
+      : user?.reviewer?.role === 'reviewer'
+      ? '/journal/jics/reviewer/dashboard'
+      : '/';
+
+  // Build available roles and infer current role for the selector
+  const availableRoles = [
+    { key: 'author', label: 'Author', path: '/' },
+    ...(user?.reviewer?.role === 'reviewer'
+      ? [{ key: 'reviewer', label: 'Reviewer', path: '/journal/jics/reviewer/dashboard' }]
+      : []),
+    ...(user?.editor?.role === 'editor'
+      ? [{ key: 'editor', label: 'Editor', path: '/journal/jics/editor/dashboard' }]
+      : []),
+  ];
+  const currentRole = location.pathname.includes('/editor')
+    ? 'editor'
+    : location.pathname.includes('/reviewer')
+    ? 'reviewer'
+    : 'author';
+
+  const handleLogoutConfirm = () => {
+    logout();
+    setLogoutModalOpen(false);
+    navigate("/");
   };
 
   const navItems = [
@@ -46,7 +69,7 @@ const Navbar = () => {
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto flex justify-between items-center">
-<Link to='/' className="flex items-center hover:opacity-80 transition-opacity">
+<Link to={logoTarget} className="flex items-center hover:opacity-80 transition-opacity">
   <img 
     src="/images/SWP-bgremove.png" 
     alt="Synergy World Press Logo" 
@@ -103,22 +126,50 @@ const Navbar = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 text-[#212121] border border-[#e0e0e0]"
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl py-3 text-[#212121] border border-[#e0e0e0] ring-1 ring-black/5"
                   >
-                    <div className="px-4 py-2 text-sm">
-                      <p className="font-semibold">{user.name}</p>
-                      <p className="opacity-80">{user.email}</p>
+                    <div className="px-4 pb-3 text-sm">
+                      <p className="font-semibold truncate">{user.name}</p>
+                      <p className="opacity-70 text-xs truncate">{user.email}</p>
                     </div>
-                    <hr className="border-[#e0e0e0] my-2" />
+                    <hr className="border-[#e0e0e0] my-1" />
+                    {(user?.reviewer?.role === 'reviewer' || user?.editor?.role === 'editor') && (
+                      <>
+                        <div className="px-4 py-1 text-sm flex items-center justify-between gap-3">
+                          <span className="font-medium">Role</span>
+                          <select
+                            value={currentRole}
+                            onChange={(e) => {
+                              const sel = e.target.value;
+                              const target = (availableRoles.find(r => r.key === sel) || { path: '/' }).path;
+                              setUserDropdownOpen(false);
+                              navigate(target);
+                            }}
+                            className="border border-[#e0e0e0] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#00acc1]"
+                          >
+                            {availableRoles.map((r) => (
+                              <option key={r.key} value={r.key}>{r.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <hr className="border-[#e0e0e0] my-2" />
+                      </>
+                    )}
                     <Link
                       to={`${BASE_URL}/account`}
-                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
+                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
                     >
                       My Account
                     </Link>
                     <Link
+                      to="/journal/jics/my-submissions"
+                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+                    >
+                      My Submissions
+                    </Link>
+                    <Link
                       to={`${BASE_URL}/subscriptions`}
-                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
+                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
                     >
                       My Subscriptions
                     </Link>
@@ -129,8 +180,8 @@ const Navbar = () => {
                       Settings
                     </Link> */}
                     <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
+                      onClick={() => setLogoutModalOpen(true)}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-red-600/10 hover:text-red-700 transition-colors rounded-md mx-2"
                     >
                       Logout
                     </button>
@@ -206,7 +257,7 @@ const Navbar = () => {
                 Settings
               </Link>
               <button
-                onClick={handleLogout}
+                onClick={() => setLogoutModalOpen(true)}
                 className="text-lg font-medium transition-all hover:text-[#00acc1]"
               >
                 Logout
@@ -232,6 +283,45 @@ const Navbar = () => {
           )}
         </motion.div>
       )}
+      {/* Logout Confirm Modal */}
+      <AnimatePresence>
+        {logoutModalOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setLogoutModalOpen(false)}
+            />
+            <motion.div
+              className="relative z-10 w-full max-w-sm mx-4 bg-white rounded-lg shadow-lg p-6 text-[#1a365d]"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+            >
+              <h3 className="text-lg font-semibold mb-2">Confirm Logout</h3>
+              <p className="text-sm text-gray-600 mb-6">Are you sure you want to log out?</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setLogoutModalOpen(false)}
+                  className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogoutConfirm}
+                  className="px-4 py-2 text-sm rounded-md bg-[#00acc1] text-white hover:bg-[#0097a7]"
+                >
+                  Logout
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.nav>
   );
 };

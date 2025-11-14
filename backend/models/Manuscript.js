@@ -37,10 +37,16 @@ const noteSchema = new mongoose.Schema({
 
 const manuscriptSchema = new mongoose.Schema(
 	{
+		customId: {
+			type: String,
+			unique: true,
+			sparse: true, // Allow null values but ensure uniqueness when present
+		},
 		type: {
 			type: String,
 			required: true,
-			enum: ["Research Article", "Review Article"],
+			enum: ["Manuscript", "Research Article", "Review Article"],
+			default: "Manuscript",
 		},
 		classification: {
 			type: String,
@@ -79,6 +85,17 @@ const manuscriptSchema = new mongoose.Schema(
 			type: String,
 			enum: ["Yes", "No"],
 			required: true,
+		},
+		billingInfo: {
+			name: { type: String, default: "" },
+			organization: { type: String, default: "" },
+			address: { type: String, default: "" },
+			city: { type: String, default: "" },
+			state: { type: String, default: "" },
+			postalCode: { type: String, default: "" },
+			country: { type: String, default: "" },
+			awardNumber: { type: String, default: "" },
+			grantRecipient: { type: String, default: "" },
 		},
 		manuscriptFile: {
 			type: String,

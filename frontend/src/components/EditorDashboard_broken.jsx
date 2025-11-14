@@ -43,7 +43,7 @@ function EditorDashboard() {
 					alert("Session expired. Please login again.");
 					// Clear user data and redirect to login
 					localStorage.removeItem("user");
-					window.location.href = "/editor/login";
+					window.location.href = "/login";
 				}
 			}
 		};
@@ -77,7 +77,7 @@ function EditorDashboard() {
 					alert("Session expired. Please login again.");
 					// Clear user data and redirect to login
 					localStorage.removeItem("user");
-					window.location.href = "/editor/login";
+					window.location.href = "/login";
 				}
 			}
 		};

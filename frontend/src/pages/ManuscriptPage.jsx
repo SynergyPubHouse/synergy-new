@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../App";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useNavigate } from "react-router-dom";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const BASE_URL = "/journal/jics";
 
@@ -24,6 +26,17 @@ const ManuscriptPage = () => {
 		abstract: "",
 		author: [],
 		funding: "",
+		billingInfo: {
+			name: "",
+			organization: "",
+			address: "",
+			city: "",
+			state: "",
+			postalCode: "",
+			country: "",
+			awardNumber: "",
+			grantRecipient: "",
+		},
 	});
 
 	const [files, setFiles] = useState({
@@ -40,7 +53,6 @@ const ManuscriptPage = () => {
 
 	const [dragOver, setDragOver] = useState(false);
 
-	const [selectedFiles, setSelectedFiles] = useState([]);
 	const [completedSections, setCompletedSections] = useState([]);
 
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -65,11 +77,68 @@ const ManuscriptPage = () => {
 		isCorresponding: false,
 	});
 
+	// Institution autocomplete state
+	const [instQuery, setInstQuery] = useState("");
+	const [instSuggestions, setInstSuggestions] = useState([]);
+	const [instOpen, setInstOpen] = useState(false);
+	const instDebounceRef = useRef(null);
+	const isCreatingInstRef = useRef(false);
+
+	// Helper to create institution and apply selection
+	const createInstitutionIfNeeded = async (rawName) => {
+		const name = (rawName || "").trim();
+		if (!name) return;
+		if (isCreatingInstRef.current) return; // guard against double-trigger
+		try {
+			isCreatingInstRef.current = true;
+			const resp = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/institutions`,
+				{ name }
+			);
+			setNewAuthor((prev) => ({ ...prev, institution: resp.data.name }));
+			setInstOpen(false);
+			toast.success(`Added "${resp.data.name}"`, { position: "top-center", autoClose: 1500 });
+		} catch (err) {
+			toast.error(
+				`Failed to add institution: ${err.response?.data?.message || err.message}`,
+				{ position: "top-center", autoClose: 2500 }
+			);
+		} finally {
+			isCreatingInstRef.current = false;
+		}
+	};
+
 	const [isEmailVerified, setIsEmailVerified] = useState(false);
 
 	const [extractionDone, setExtractionDone] = useState(false);
 	const [lastExtractedFile, setLastExtractedFile] = useState(null);
 	const [isExtracting, setIsExtracting] = useState(false);
+
+	// State for step 4 item input
+	const [itemInput, setItemInput] = useState("");
+
+	// Calculate progress percentage
+	const progress = ((currentSection - 1) / (totalSections - 1)) * 100;
+
+	// Step labels for the stepper
+	const stepLabels = [
+		"Article Type",
+		"Upload Files",
+		"Classification",
+		"Add Items",
+		"Comments",
+		"Manuscript Details"
+	];
+
+	// Short labels for display in circles
+	const stepShortLabels = [
+		"Type",
+		"Upload",
+		"Class",
+		"Items",
+		"Notes",
+		"Details"
+	];
 
 	const classificationOptions = [
 		"Science and Technology – Engineering, Science & Technology (All Branch)",
@@ -325,31 +394,26 @@ const ManuscriptPage = () => {
 		}
 	}, [user]);
 
-	const handleCheckboxChange = (doc) => {
-		setUploadedFiles((prev) => ({ ...prev, [doc]: !prev[doc] }));
-	};
-
-	const handleFileSelection = (doc) => {
-		setSelectedFiles((prev) =>
-			prev.includes(doc) ? prev.filter((f) => f !== doc) : [...prev, doc]
-		);
-	};
-
 	const handleFileChange = (e, doc) => {
 		const file = e.target.files[0];
 		if (file) {
+			// Validate file type
+			const validTypes = ['.docx', '.pdf'];
+			const fileExtension = file.name.split('.').pop().toLowerCase();
+			
+			if (!validTypes.includes(`.${fileExtension}`)) {
+				toast.error('Please upload only DOCX or PDF files', {
+					position: "top-center",
+					autoClose: 3000,
+				});
+				return;
+			}
+			
 			setFiles((prev) => ({ ...prev, [doc]: file }));
 			setUploadedFiles((prev) => ({ ...prev, [doc]: true }));
 		}
 	};
 
-	const handleDelete = () => {
-		selectedFiles.forEach((doc) => {
-			setFiles((prev) => ({ ...prev, [doc]: null }));
-			setUploadedFiles((prev) => ({ ...prev, [doc]: false }));
-		});
-		setSelectedFiles([]);
-	};
 	const handleInputChange = (e) => {
 		const { name, value, checked } = e.target;
 		if (name === "classification") {
@@ -359,43 +423,108 @@ const ManuscriptPage = () => {
 					? [...prevData.classification, value]
 					: prevData.classification.filter((item) => item !== value),
 			}));
-		} else if (name === "additionalInfo") {
-			const isChecked = e.target.checked;
-
-			setFormData((prevData) => ({
-				...prevData,
-				additionalInfo: isChecked
-					? [...prevData.additionalInfo, value]
-					: prevData.additionalInfo.filter((item) => item !== value),
-			}));
 		} else {
 			setFormData({ ...formData, [name]: value });
 		}
 	};
 
+	// Handle adding items in step 4
+	const handleAddItem = () => {
+		if (itemInput.trim() === "") {
+			toast.warning("Please enter an item before adding", {
+				position: "top-center",
+				autoClose: 2000,
+			});
+			return;
+		}
+
+		setFormData((prevData) => ({
+			...prevData,
+			additionalInfo: [...prevData.additionalInfo, itemInput.trim()],
+		}));
+		setItemInput(""); // Clear input after adding
+		toast.success("Item added successfully", {
+			position: "top-center",
+			autoClose: 2000,
+		});
+	};
+
+	// Handle billing info nested fields
+	const handleBillingInfoChange = (e) => {
+		const { name, value } = e.target;
+		setFormData((prevData) => ({
+			...prevData,
+			billingInfo: {
+				...prevData.billingInfo,
+				[name]: value,
+			},
+		}));
+	};
+
 	const validateSection = (section) => {
 		switch (section) {
 			case 1:
-				return formData.type !== "";
+				if (formData.type === "") {
+					toast.error("Please select the type of article", {
+						position: "top-center",
+						autoClose: 3000,
+					});
+					return false;
+				}
+				return true;
 			case 2:
-				return (
-					files.manuscript && files.coverLetter && files.declaration
-				);
+				// Check if all required documents are uploaded
+				const missingDocs = [];
+				if (!files.manuscript) missingDocs.push("Manuscript");
+				if (!files.coverLetter) missingDocs.push("Cover Letter");
+				if (!files.declaration) missingDocs.push("Declaration");
+				
+				if (missingDocs.length > 0) {
+					toast.error(`Please upload the following required documents: ${missingDocs.join(", ")}`, {
+						position: "top-center",
+						autoClose: 4000,
+					});
+					return false;
+				}
+				return true;
 			case 3:
-				return formData.classification.length > 0;
+				if (formData.classification.length === 0) {
+					toast.error("Please select at least one classification", {
+						position: "top-center",
+						autoClose: 3000,
+					});
+					return false;
+				}
+				return true;
 			case 4:
-				return formData.additionalInfo.length === 5; // All 5 terms must be checked
+				if (formData.additionalInfo.length < 3) {
+					toast.error("Please add at least 3 items to proceed", {
+						position: "top-center",
+						autoClose: 3000,
+					});
+					return false;
+				}
+				return true;
 			case 5:
-				return formData.comments.trim() !== "";
+				// Comments are optional, no validation needed
+				return true;
 			case 6:
-				return (
-					formData.title.trim() !== "" &&
-					formData.keywords.trim() !== "" &&
-					formData.abstract.trim() !== "" &&
-					selectedAuthors.length > 0 && // Check if there are selected authors
-					correspondingAuthorId !== null && // Check if there is a corresponding author
-					(formData.funding === "Yes" || formData.funding === "No")
-				);
+				const errors = [];
+				if (formData.title.trim() === "") errors.push("Title");
+				if (formData.keywords.trim() === "") errors.push("Keywords");
+				if (formData.abstract.trim() === "") errors.push("Abstract");
+				if (selectedAuthors.length === 0) errors.push("At least one author");
+				if (correspondingAuthorId === null) errors.push("Corresponding author");
+				if (formData.funding !== "Yes" && formData.funding !== "No") errors.push("Funding information");
+				
+				if (errors.length > 0) {
+					toast.error(`Please provide the following required information: ${errors.join(", ")}`, {
+						position: "top-center",
+						autoClose: 4000,
+					});
+					return false;
+				}
+				return true;
 			default:
 				return false;
 		}
@@ -433,6 +562,7 @@ const ManuscriptPage = () => {
 						"Content-Type": "multipart/form-data",
 						Authorization: `Bearer ${user.token}`,
 					},
+					timeout: 30000, // 30 second timeout
 				}
 			);
 			if (response.data.extractedTitle) {
@@ -457,6 +587,20 @@ const ManuscriptPage = () => {
 			setLastExtractedFile(files.manuscript.name);
 		} catch (error) {
 			console.error("Error extracting title/abstract/keywords:", error);
+			if (error.code === 'ECONNABORTED') {
+				toast.error("Extraction timed out. Please try again or enter details manually.", {
+					position: "top-center",
+					autoClose: 5000,
+				});
+			} else {
+				toast.warning("Could not extract information automatically. Please enter details manually.", {
+					position: "top-center",
+					autoClose: 4000,
+				});
+			}
+			// Mark as done so user can proceed manually
+			setExtractionDone(true);
+			setLastExtractedFile(files.manuscript.name);
 		} finally {
 			setIsExtracting(false);
 		}
@@ -468,17 +612,24 @@ const ManuscriptPage = () => {
 			if (currentSection === 2 && files.manuscript && !extractionDone) {
 				await extractTitleAndAbstract();
 			}
-			setCompletedSections((prev) => [...prev, currentSection]);
+			// Add current section to completed sections if not already there
+			if (!completedSections.includes(currentSection)) {
+				setCompletedSections((prev) => [...prev, currentSection]);
+			}
 			setCurrentSection((prev) => Math.min(prev + 1, totalSections));
-		} else {
-			alert(
-				"Please complete all required fields in this section before proceeding."
-			);
 		}
+		// Validation function now handles alert messages
 	};
 
 	const handlePrev = () => {
-		setCurrentSection((prev) => Math.max(prev - 1, 1));
+		setCurrentSection((prev) => {
+			const newSection = Math.max(prev - 1, 1);
+			// Remove current section from completed sections when going back
+			setCompletedSections((completed) => 
+				completed.filter((section) => section < prev)
+			);
+			return newSection;
+		});
 	};
 
 	const handleStepClick = (step) => {
@@ -490,25 +641,48 @@ const ManuscriptPage = () => {
 		) {
 			setCurrentSection(step);
 		} else {
-			alert(
-				"Please complete the current section before proceeding to step " +
-					step
+			toast.warning(
+				`Please complete the current section before proceeding to step ${step}`,
+				{
+					position: "top-center",
+					autoClose: 3000,
+				}
 			);
 		}
+	};
+
+	// DnD: reorder authors on drag end
+	const handleAuthorDragEnd = (result) => {
+		const { source, destination } = result || {};
+		if (!destination) return;
+		if (source.index === destination.index) return;
+		setSelectedAuthors((prev) => {
+			const updated = Array.from(prev);
+			const [moved] = updated.splice(source.index, 1);
+			updated.splice(destination.index, 0, moved);
+			return updated;
+		});
 	};
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 
 		if (!user?.token) {
-			alert("Please log in to submit a manuscript");
+			toast.error("Please log in to submit a manuscript", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 			return;
 		}
 
 		for (let section = 1; section <= 6; section++) {
 			if (!validateSection(section)) {
-				alert(
-					`Please complete all required fields in Section ${section}`
+				toast.error(
+					`Please complete all required fields in Section ${section}`,
+					{
+						position: "top-center",
+						autoClose: 3000,
+					}
 				);
 				setCurrentSection(section);
 				return;
@@ -562,20 +736,30 @@ const ManuscriptPage = () => {
 			}
 
 			if (response.data.success) {
-				alert("Manuscript submitted successfully!");
+				toast.success("Manuscript submitted successfully!", {
+					position: "top-center",
+					autoClose: 3000,
+				});
 				clearForm();
-				navigate(`${BASE_URL}/my-submissions`);
+				setTimeout(() => navigate(`${BASE_URL}/my-submissions`), 1500);
 			} else {
 				throw new Error(response.data.message || "Submission failed");
 			}
 		} catch (error) {
 			console.error("Error submitting manuscript:", error);
 			if (error.response?.status === 401) {
-				alert("Your session has expired. Please log in again.");
+				toast.error("Your session has expired. Please log in again.", {
+					position: "top-center",
+					autoClose: 4000,
+				});
 			} else {
-				alert(
+				toast.error(
 					"Submission failed: " +
-						(error.response?.data?.message || error.message)
+						(error.response?.data?.message || error.message),
+					{
+						position: "top-center",
+						autoClose: 4000,
+					}
 				);
 			}
 		}
@@ -609,15 +793,22 @@ const ManuscriptPage = () => {
 		e.preventDefault();
 
 		if (!user?.token) {
-			alert("Please log in to submit a manuscript");
+			toast.error("Please log in to submit a manuscript", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 			return;
 		}
 
 		// Validate all sections
 		for (let section = 1; section <= 6; section++) {
 			if (!validateSection(section)) {
-				alert(
-					`Please complete all required fields in Section ${section}`
+				toast.error(
+					`Please complete all required fields in Section ${section}`,
+					{
+						position: "top-center",
+						autoClose: 3000,
+					}
 				);
 				setCurrentSection(section);
 				return;
@@ -626,8 +817,12 @@ const ManuscriptPage = () => {
 
 		// Check if all required files are present
 		if (!files.manuscript || !files.coverLetter || !files.declaration) {
-			alert(
-				"Please upload all required files: manuscript, cover letter, and declaration"
+			toast.error(
+				"Please upload all required files: manuscript, cover letter, and declaration",
+				{
+					position: "top-center",
+					autoClose: 4000,
+				}
 			);
 			setCurrentSection(2); // Navigate to the files section
 			return;
@@ -635,7 +830,9 @@ const ManuscriptPage = () => {
 
 		const data = new FormData();
 		Object.keys(formData).forEach((key) => {
-			if (key === "additionalInfo") {
+			if (key === "additionalInfo" || key === "billingInfo") {
+				data.append(key, JSON.stringify(formData[key]));
+			} else if (key === "classification") {
 				data.append(key, JSON.stringify(formData[key]));
 			} else {
 				data.append(key, formData[key]);
@@ -666,6 +863,7 @@ const ManuscriptPage = () => {
 						"Content-Type": "multipart/form-data",
 						Authorization: `Bearer ${user.token}`,
 					},
+					timeout: 60000, // 60 second timeout
 				}
 			);
 
@@ -689,11 +887,7 @@ const ManuscriptPage = () => {
 						},
 					}
 				);
-				alert("Manuscript saved successfully!");
-				setIsBuildingPdf(false);
-				setPdfUrl(response.data.mergedPdfUrl);
-				setAcceptOrRejectPdf(true);
-				// clearForm();
+				// Don't show toast here, let handleProceedAndBuildPdf handle it
 				return {
 					manuscriptId: response.data.data._id,
 					mergedFileUrl: response.data.mergedPdfUrl,
@@ -703,17 +897,32 @@ const ManuscriptPage = () => {
 			}
 		} catch (error) {
 			console.error("Error saving manuscript:", error);
-			if (error.response?.status === 401) {
-				alert("Your session has expired. Please log in again.");
+			setIsBuildingPdf(false);
+			
+			if (error.code === 'ECONNABORTED') {
+				toast.error("Request timed out. Please check your connection and try again.", {
+					position: "top-center",
+					autoClose: 5000,
+				});
+			} else if (error.response?.status === 401) {
+				toast.error("Your session has expired. Please log in again.", {
+					position: "top-center",
+					autoClose: 4000,
+				});
 				navigate("/login", {
 					state: { from: location.pathname },
 				});
 			} else {
-				alert(
+				toast.error(
 					"Save failed: " +
-						(error.response?.data?.message || error.message)
+						(error.response?.data?.message || error.message),
+					{
+						position: "top-center",
+						autoClose: 4000,
+					}
 				);
 			}
+			return null;
 		}
 	};
 
@@ -735,7 +944,10 @@ const ManuscriptPage = () => {
 			navigate(`${BASE_URL}/my-submissions`);
 		} catch (error) {
 			console.error("Error accepting manuscript:", error);
-			alert("Failed to accept manuscript. Please try again.");
+			toast.error("Failed to accept manuscript. Please try again.", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 		}
 	};
 
@@ -757,7 +969,10 @@ const ManuscriptPage = () => {
 			navigate(`${BASE_URL}/my-submissions`);
 		} catch (error) {
 			console.error("Error rejecting manuscript:", error);
-			alert("Failed to reject manuscript. Please try again.");
+			toast.error("Failed to reject manuscript. Please try again.", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 		}
 	};
 
@@ -766,7 +981,10 @@ const ManuscriptPage = () => {
 			window.open(mergedFileUrl, "_blank");
 			setPdfBuiltManuscripts((prev) => new Set([...prev, manuscriptId]));
 		} else {
-			alert("PDF is not available yet.");
+			toast.warning("PDF is not available yet.", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 		}
 	};
 	const [pdfBuiltManuscripts, setPdfBuiltManuscripts] = useState(new Set());
@@ -790,21 +1008,38 @@ const ManuscriptPage = () => {
 			return;
 		}
 
-		// Poll for PDF
-		let attempts = 0;
-		let url = null;
-		while (attempts < 12) {
-			// Poll for up to 1 minute (12 x 5s)
-			const resp = await axios.get(
-				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${
-					result.manuscriptId
-				}`,
-				{ headers: { Authorization: `Bearer ${user.token}` } }
-			);
-			url = resp.data.manuscript.mergedFileUrl;
-			if (url) break;
-			await new Promise((res) => setTimeout(res, 5000)); // wait 5 seconds
-			attempts++;
+		// Check if PDF URL is already available from the result
+		let url = result.mergedFileUrl;
+
+		// If URL not available, poll for PDF
+		if (!url) {
+			let attempts = 0;
+			try {
+				while (attempts < 12) {
+					// Poll for up to 1 minute (12 x 5s)
+					const resp = await axios.get(
+						`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${
+							result.manuscriptId
+						}`,
+						{ 
+							headers: { Authorization: `Bearer ${user.token}` },
+							timeout: 10000 // 10 second timeout per request
+						}
+					);
+					url = resp.data.manuscript.mergedFileUrl;
+					if (url) break;
+					await new Promise((res) => setTimeout(res, 5000)); // wait 5 seconds
+					attempts++;
+				}
+			} catch (pollError) {
+				console.error("Error polling for PDF:", pollError);
+				setIsBuildingPdf(false);
+				toast.error("Failed to check PDF status. Please try again.", {
+					position: "top-center",
+					autoClose: 4000,
+				});
+				return;
+			}
 		}
 
 		setIsBuildingPdf(false);
@@ -812,9 +1047,16 @@ const ManuscriptPage = () => {
 			setPdfUrl(url);
 			setManuscriptId(result.manuscriptId); // Store the manuscript ID
 			setAcceptOrRejectPdf(true); // Show accept/reject buttons after PDF is built
-			// Optionally: handleBuildPdf(result.manuscriptId, url);
+			toast.success("PDF built successfully!", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 		} else {
-			setBuildError("PDF is not available yet. Please try again later.");
+			setBuildError("PDF generation is taking longer than expected. Please check 'My Submissions' later.");
+			toast.warning("PDF generation is taking longer than expected. You can check your submission later.", {
+				position: "top-center",
+				autoClose: 5000,
+			});
 		}
 	};
 
@@ -822,14 +1064,21 @@ const ManuscriptPage = () => {
 		e.preventDefault();
 
 		if (!user?.token) {
-			alert("Please log in to preview the manuscript");
+			toast.error("Please log in to preview the manuscript", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 			return;
 		}
 
 		for (let section = 1; section <= 6; section++) {
 			if (!validateSection(section)) {
-				alert(
-					`Please complete all required fields in Section ${section}`
+				toast.error(
+					`Please complete all required fields in Section ${section}`,
+					{
+						position: "top-center",
+						autoClose: 3000,
+					}
 				);
 				setCurrentSection(section);
 				return;
@@ -879,11 +1128,18 @@ const ManuscriptPage = () => {
 		} catch (error) {
 			console.error("Error building PDF:", error);
 			if (error.response?.status === 401) {
-				alert("Your session has expired. Please log in again.");
+				toast.error("Your session has expired. Please log in again.", {
+					position: "top-center",
+					autoClose: 4000,
+				});
 			} else {
-				alert(
+				toast.error(
 					"Failed to build PDF: " +
-						(error.response?.data?.message || error.message)
+						(error.response?.data?.message || error.message),
+					{
+						position: "top-center",
+						autoClose: 4000,
+					}
 				);
 			}
 		}
@@ -900,12 +1156,39 @@ const ManuscriptPage = () => {
 			[name]: type === "checkbox" ? checked : value,
 		}));
 
+		// Institution autocomplete: debounce search
+		if (name === "institution") {
+			setInstQuery(value);
+			if (instDebounceRef.current) clearTimeout(instDebounceRef.current);
+			if (value && value.trim().length >= 2) {
+				instDebounceRef.current = setTimeout(async () => {
+					try {
+						const resp = await axios.get(
+							`${import.meta.env.VITE_BACKEND_URL}/api/institutions/search`,
+							{ params: { q: value.trim() } }
+						);
+						setInstSuggestions(resp.data || []);
+						setInstOpen(true);
+					} catch (err) {
+						setInstSuggestions([]);
+						setInstOpen(false);
+					}
+				}, 700);
+			} else {
+				setInstSuggestions([]);
+				setInstOpen(false);
+			}
+		}
+
 		// If email field is being changed, verify it
 		if (name === "email" && value) {
 			// Check if the email is the same as the current user's email
 			if (value.toLowerCase() === user.email.toLowerCase()) {
 				setIsEmailVerified(false);
-				alert("You cannot add yourself as a co-author.");
+				toast.error("You cannot add yourself as a co-author.", {
+					position: "top-center",
+					autoClose: 3000,
+				});
 				return;
 			}
 
@@ -929,7 +1212,10 @@ const ManuscriptPage = () => {
 
 					if (isAlreadyAdded) {
 						setIsEmailVerified(false);
-						alert("This author is already in the list.");
+						toast.warning("This author is already in the list.", {
+							position: "top-center",
+							autoClose: 3000,
+						});
 						return;
 					}
 
@@ -975,17 +1261,24 @@ const ManuscriptPage = () => {
 		);
 
 		if (missingFields.length > 0) {
-			alert(
+			toast.error(
 				`Please fill in all required fields: ${missingFields.join(
 					", "
-				)}`
+				)}`,
+				{
+					position: "top-center",
+					autoClose: 3000,
+				}
 			);
 			return;
 		}
 
 		// Check if trying to add self
 		if (newAuthor.email.toLowerCase() === user.email.toLowerCase()) {
-			alert("You cannot add yourself as a co-author.");
+			toast.error("You cannot add yourself as a co-author.", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 			return;
 		}
 
@@ -996,7 +1289,10 @@ const ManuscriptPage = () => {
 		);
 
 		if (isAlreadyAdded) {
-			alert("This author is already in the list.");
+			toast.warning("This author is already in the list.", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 			return;
 		}
 
@@ -1013,8 +1309,12 @@ const ManuscriptPage = () => {
 			);
 
 			if (!response.data.exists) {
-				alert(
-					"Cannot add author: Email does not exist in our database. Please enter a valid registered email."
+				toast.error(
+					"Cannot add author: Email does not exist in our database. Please enter a valid registered email.",
+					{
+						position: "top-center",
+						autoClose: 4000,
+					}
 				);
 				return;
 			}
@@ -1049,7 +1349,10 @@ const ManuscriptPage = () => {
 			setIsAuthorModalOpen(false);
 		} catch (error) {
 			console.error("Error adding author:", error);
-			alert("Error adding author. Please try again.");
+			toast.error("Error adding author. Please try again.", {
+				position: "top-center",
+				autoClose: 3000,
+			});
 		}
 	};
 
@@ -1109,9 +1412,6 @@ const ManuscriptPage = () => {
 		exit: { opacity: 0, x: 50 },
 	};
 
-	// Calculate progress percentage
-	const progress = ((currentSection - 1) / (totalSections - 1)) * 100;
-
 	const onDragEnd = (result) => {
 		if (!result.destination) return;
 
@@ -1154,6 +1454,9 @@ const ManuscriptPage = () => {
 
 	return (
 		<div className="min-h-screen bg-[#f8fafc] p-6 text-[#212121] relative">
+			{/* Toast Container for notifications */}
+			<ToastContainer />
+			
 			{/* PDF Building Loading Overlay */}
 			{isBuildingPdf && (
 				<div className="fixed inset-0 bg-opacity-50 z-50 flex items-center justify-center">
@@ -1205,53 +1508,53 @@ const ManuscriptPage = () => {
 				{[...Array(totalSections)].map((_, i) => (
 					<React.Fragment key={i}>
 						<motion.div
-							className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mx-2 
-						${
-							currentSection === i + 1
-								? "bg-[#00796b] text-white cursor-default"
-								: completedSections.includes(i + 1)
-								? "bg-[#BAFFF5] text-[#00796b] cursor-pointer"
-								: i + 1 <= Math.max(...completedSections) + 1
-								? "bg-[#e2e8f0] text-[#00796b] cursor-pointer"
-								: "bg-gray-300 text-gray-500 cursor-not-allowed"
-						}`}
-							whileHover={{
-								scale:
-									i + 1 <= Math.max(...completedSections) + 1
-										? 1.1
-										: 1,
-								cursor:
-									i + 1 <= Math.max(...completedSections) + 1
-										? "pointer"
-										: "not-allowed",
-							}}
-							onClick={() => {
-								if (
-									i + 1 <=
-									Math.max(...completedSections) + 1
-								) {
-									handleStepClick(i + 1);
-								}
-							}}
-						>
-							{i + 1}
-						</motion.div>
+						className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mx-2 
+					${
+						currentSection === i + 1
+							? "bg-[#00796b] text-white cursor-default"
+							: completedSections.includes(i + 1)
+							? "bg-[#BAFFF5] text-[#00796b] cursor-pointer"
+							: i + 1 <= Math.max(...completedSections) + 1
+							? "bg-[#e2e8f0] text-[#00796b] cursor-pointer"
+							: "bg-gray-300 text-gray-500 cursor-not-allowed"
+					}`}
+						whileHover={{
+							scale:
+								i + 1 <= Math.max(...completedSections) + 1
+									? 1.1
+									: 1,
+							cursor:
+								i + 1 <= Math.max(...completedSections) + 1
+									? "pointer"
+									: "not-allowed",
+						}}
+						onClick={() => {
+							if (
+								i + 1 <=
+								Math.max(...completedSections) + 1
+							) {
+								handleStepClick(i + 1);
+							}
+						}}
+						title={stepLabels[i]}
+					>
+						{i + 1}
+					</motion.div>
 
 						{/* Progress Bar */}
 						{i < totalSections - 1 && (
 							<motion.div
-								className="h-1 bg-[#e2e8f0] flex-1 mx-2 relative"
-								initial={{ width: 0 }}
-								animate={{
-									width:
-										i + 1 <= currentSection ? "100%" : "0%",
-								}}
+								className="h-1 bg-[#e2e8f0] flex-1 mx-2 relative overflow-hidden"
+								initial={{ width: "100%" }}
+								animate={{ width: "100%" }}
 								transition={{ duration: 0.5 }}
 							>
 								<motion.div
-									className="h-1 bg-[#00796b] absolute left-0"
-									initial={{ width: 0 }}
-									animate={{ width: `${progress}%` }}
+									className="h-1 bg-[#00796b] absolute left-0 top-0"
+									initial={{ width: "0%" }}
+									animate={{
+										width: completedSections.includes(i + 1) ? "100%" : "0%"
+									}}
 									transition={{ duration: 0.5 }}
 								/>
 							</motion.div>
@@ -1285,11 +1588,8 @@ const ManuscriptPage = () => {
 									className="px-4 py-2 rounded-lg bg-white text-[#00796b] border border-[#e0e0e0] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
 								>
 									<option value="">Select Type</option>
-									<option value="Review Article">
-										Review Article
-									</option>
-									<option value="Research Article">
-										Research Article
+									<option value="Manuscript">
+										Manuscript
 									</option>
 								</select>
 							</div>
@@ -1391,13 +1691,10 @@ const ManuscriptPage = () => {
 											<div className="flex items-center">
 												<input
 													type="checkbox"
-													checked={selectedFiles.includes(
-														doc
-													)}
-													onChange={() =>
-														handleFileSelection(doc)
-													}
-													className="mr-2"
+													checked={uploadedFiles[doc]}
+													readOnly
+													className="mr-2 cursor-default"
+													title={uploadedFiles[doc] ? "File uploaded" : "No file uploaded"}
 												/>
 												<label
 													className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white ${
@@ -1467,8 +1764,12 @@ const ManuscriptPage = () => {
 																	doc
 																);
 															} else {
-																alert(
-																	"Please upload only DOCX or PDF files"
+																toast.error(
+																	"Please upload only DOCX or PDF files",
+																	{
+																		position: "top-center",
+																		autoClose: 3000,
+																	}
 																);
 															}
 														}
@@ -1504,39 +1805,35 @@ const ManuscriptPage = () => {
 												</label>
 											</div>
 											{files[doc] && (
-												<p className="mt-2 text-sm text-[#00796b]">
-													{files[doc].name}
-												</p>
+												<div className="mt-2 flex items-center justify-between bg-gray-50 p-2 rounded">
+													<p className="text-sm text-[#00796b] truncate flex-1">
+														{files[doc].name}
+													</p>
+													<button
+														type="button"
+														onClick={() => {
+															setFiles((prev) => ({ ...prev, [doc]: null }));
+															setUploadedFiles((prev) => ({ ...prev, [doc]: false }));
+														}}
+														className="ml-2 text-red-600 hover:text-red-800 text-sm font-medium"
+														title="Remove file"
+													>
+														✕
+													</button>
+												</div>
 											)}
 										</div>
 									))}
 								</div>
 							</div>
 
-							<div className="flex gap-4">
+							<div className="flex justify-between gap-4">
 								{renderBackButton(2)}
-								{/* Delete Button */}
-								<motion.button
-									type="button"
-									onClick={handleDelete}
-									className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors block mr-auto"
-									disabled={selectedFiles.length === 0}
-									whileHover={{ scale: 1.05 }}
-									whileTap={{ scale: 0.95 }}
-								>
-									Delete Selected
-								</motion.button>
-
 								{/* Next Button */}
 								<motion.button
 									type="button"
 									onClick={handleNext}
 									className="mt-4 px-6 py-2 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269] transition-colors block"
-									disabled={
-										!Object.values(uploadedFiles).every(
-											Boolean
-										)
-									}
 									whileHover={{ scale: 1.05 }}
 									whileTap={{ scale: 0.95 }}
 								>
@@ -1557,6 +1854,9 @@ const ManuscriptPage = () => {
 							<label className="block font-medium mb-2 text-[#00796b]">
 								Classification:
 							</label>
+							<p className="text-sm text-gray-500 mb-3">
+								Note: Multiple classifications can be selected
+							</p>
 							<div className="relative" ref={dropdownRef}>
 								<div
 									className="cursor-pointer p-2 border border-[#e0e0e0] rounded-lg bg-white text-[#00796b]"
@@ -1579,12 +1879,12 @@ const ManuscriptPage = () => {
 										{classificationOptions.map((option) => (
 											<div
 												key={option}
-												className={`p-2 cursor-pointer flex items-center ${
+												className={`p-3 cursor-pointer transition-all duration-200 ${
 													formData.classification.includes(
 														option
 													)
-														? "bg-[#BAFFF5]"
-														: "hover:bg-[#e0f7fa]"
+														? "bg-[#BAFFF5] text-[#00796b] font-semibold border-l-4 border-[#00796b]"
+														: "hover:bg-[#e0f7fa] text-[#00796b]"
 												}`}
 												onClick={(e) => {
 													e.stopPropagation();
@@ -1600,19 +1900,7 @@ const ManuscriptPage = () => {
 													});
 												}}
 											>
-												<input
-													type="checkbox"
-													name="classification"
-													value={option}
-													checked={formData.classification.includes(
-														option
-													)}
-													onChange={handleInputChange}
-													className="mr-2"
-												/>
-												<label className="ml-2 text-[#00796b]">
-													{option}
-												</label>
+												{option}
 											</div>
 										))}
 									</div>
@@ -1635,27 +1923,42 @@ const ManuscriptPage = () => {
 							exit="exit"
 							className="mb-4"
 						>
-							<label className="block font-medium mb-2 text-[#00796b]">
-								Additional Information (All terms must be
-								accepted):
-							</label>
-							{[...Array(5)].map((_, i) => (
-								<div key={i} className="mb-2 flex items-center">
-									<input
-										type="checkbox"
-										name="additionalInfo"
-										value={`Term ${i + 1}`}
-										checked={formData.additionalInfo.includes(
-											`Term ${i + 1}`
-										)}
-										onChange={handleInputChange}
-										className="mr-2"
-									/>
-									<span className="text-[#00796b]">
-										Accept Term {i + 1}
-									</span>
-								</div>
-							))}
+							<p className="text-sm text-gray-500 mb-4">
+								Add specifications (minimum 3 required)
+							</p>
+
+							<textarea
+								value={formData.additionalInfo.join("\n")}
+								readOnly
+								rows={8}
+								className="w-full border border-[#e0e0e0] rounded-lg p-3 bg-gray-50 text-[#00796b] mb-4 font-mono"
+								placeholder="Your added specifications will appear here..."
+							/>
+
+							<div className="flex gap-2 mb-4">
+								<input
+									type="text"
+									value={itemInput}
+									onChange={(e) => setItemInput(e.target.value)}
+									onKeyPress={(e) => {
+										if (e.key === "Enter") {
+											handleAddItem();
+										}
+									}}
+									placeholder="Enter specification..."
+									className="flex-1 border border-[#e0e0e0] rounded-lg p-3 text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+								/>
+								<motion.button
+									type="button"
+									onClick={handleAddItem}
+									className="px-6 py-3 bg-[#00796b] text-white rounded-lg hover:bg-[#3a5269] transition-colors font-medium"
+									whileHover={{ scale: 1.05 }}
+									whileTap={{ scale: 0.95 }}
+								>
+									Add
+								</motion.button>
+							</div>
+
 							<div className="flex justify-between">
 								{renderBackButton(4)}
 								{renderNextButton(4)}
@@ -1787,142 +2090,165 @@ const ManuscriptPage = () => {
 												</th>
 											</tr>
 										</thead>
-										<tbody className="divide-y divide-[#e0e0e0]">
-											{selectedAuthors.map(
-												(authorId, index) => {
-													const author = authors.find(
-														(a) =>
-															a._id === authorId
-													);
-													if (!author) return null;
+										<DragDropContext onDragEnd={handleAuthorDragEnd}>
+											<Droppable droppableId="authors-droppable" direction="vertical">
+												{(provided) => (
+													<tbody
+														className="divide-y divide-[#e0e0e0]"
+														ref={provided.innerRef}
+														{...provided.droppableProps}
+													>
+														{selectedAuthors.map(
+															(authorId, index) => {
+																const author = authors.find(
+																	(a) =>
+																		a._id === authorId
+																);
+																if (!author) return null;
 
-													const isCorrespondingAuthor =
-														authorId ===
-														correspondingAuthorId;
+																const isCorrespondingAuthor =
+																	authorId ===
+																		correspondingAuthorId;
 
-													return (
-														<tr
-															key={authorId}
-															className="text-[#00796b]"
-														>
-															<td className="px-4 py-3">
-																<div className="flex space-x-1">
-																	<button
-																		onClick={() =>
-																			moveAuthorUp(
-																				index
-																			)
-																		}
-																		disabled={
-																			index ===
-																			0
-																		}
-																		className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-																	>
-																		↑
-																	</button>
-																	<button
-																		onClick={() =>
-																			moveAuthorDown(
-																				index
-																			)
-																		}
-																		disabled={
-																			index ===
-																			selectedAuthors.length -
-																				1
-																		}
-																		className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-																	>
-																		↓
-																	</button>
-																</div>
-															</td>
-															<td className="px-4 py-3">
-																<div className="text-sm">
-																	{
-																		author.title
-																	}{" "}
-																	{
-																		author.firstName
-																	}{" "}
-																	{author.middleName
-																		? `${author.middleName} `
-																		: ""}
-																	{
-																		author.lastName
-																	}
-																	{author.academicDegree && (
-																		<span className="text-[#9e9e9e]">
-																			,{" "}
-																			{
-																				author.academicDegree
-																			}
-																		</span>
-																	)}
-																</div>
-															</td>
-															<td className="px-4 py-3">
-																<div className="text-sm">
-																	{
-																		author.email
-																	}
-																</div>
-															</td>
-															<td className="px-4 py-3">
-																<div className="text-sm">
-																	<div>
-																		Author
-																	</div>
-																	{isCorrespondingAuthor && (
-																		<div className="text-[#00796b] text-xs mt-1">
-																			Corresponding
-																			Author
-																		</div>
-																	)}
-																</div>
-															</td>
-															<td className="px-4 py-3">
-																{authorId !==
-																	user._id && (
-																	<div className="flex space-x-2">
-																		<button
-																			onClick={() =>
-																				handleRemoveAuthor(
-																					authorId
-																				)
-																			}
-																			className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
-																		>
-																			Remove
-																		</button>
-																		<button
-																			onClick={() =>
-																				setCorrespondingAuthorId(
-																					authorId
-																				)
-																			}
-																			className={`px-3 py-1 rounded text-sm transition-colors ${
-																				isCorrespondingAuthor
-																					? "bg-[#BAFFF5] text-[#00796b] cursor-default"
-																					: "bg-[#00796b] hover:bg-[#3a5269] text-white"
-																			}`}
-																			disabled={
-																				isCorrespondingAuthor
-																			}
-																		>
-																			{isCorrespondingAuthor
-																				? "Current Corresponding"
-																				: "Make Corresponding"}
-																		</button>
-																	</div>
-																)}
-															</td>
-														</tr>
-													);
-												}
-											)}
-										</tbody>
+																return (
+																	<Draggable draggableId={String(authorId)} index={index} key={authorId}>
+																		{(provided) => (
+																			<tr
+																				ref={provided.innerRef}
+																				{...provided.draggableProps}
+																				{...provided.dragHandleProps}
+																				style={provided.draggableProps.style}
+																				className="text-[#00796b] cursor-grab active:cursor-grabbing"
+																			>
+																				<td className="px-4 py-3">
+																					<div className="flex items-center space-x-2">
+																						<span
+																							className="inline-flex h-6 w-6 items-center justify-center rounded border border-[#e0e0e0] text-[#00796b] cursor-grab active:cursor-grabbing select-none"
+																							title="Drag to reorder"
+																							aria-label="Drag to reorder"
+																							{...provided.dragHandleProps}
+																						>
+																							⋮⋮
+																						</span>
+																						<div className="flex space-x-1">
+																							<button
+																								onClick={() =>
+																									moveAuthorUp(
+																										index
+																									)
+																								}
+																								disabled={
+																									index ===
+																										0
+																								}
+																								className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+																							>
+																								↑
+																							</button>
+																							<button
+																								onClick={() =>
+																									moveAuthorDown(
+																										index
+																									)
+																								}
+																								disabled={
+																									index ===
+																										selectedAuthors.length -
+																											1
+																								}
+																								className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+																							>
+																								↓
+																							</button>
+																						</div>
+																					</div>
+																				</td>
+																				<td className="px-4 py-3">
+																					<div className="text-sm">
+																						{
+																							author.title
+																						}{" "}
+																						{
+																							author.firstName
+																						}{" "}
+																						{author.middleName
+																							? `${author.middleName} `
+																							: ""}
+																						{
+																							author.lastName
+																						}
+																						{author.academicDegree && (
+																							<span className="text-[#9e9e9e]">
+																								, {author.academicDegree}
+																							</span>
+																						)}
+																					</div>
+																				</td>
+																				<td className="px-4 py-3">
+																					<div className="text-sm">
+																						{author.email}
+																					</div>
+																				</td>
+																				<td className="px-4 py-3">
+																					<div className="text-sm">
+																						<div>
+																							Author
+																						</div>
+																						{isCorrespondingAuthor && (
+																							<div className="text-[#00796b] text-xs mt-1">
+																								Corresponding
+																								Author
+																							</div>
+																						)}
+																					</div>
+																				</td>
+																				<td className="px-4 py-3">
+																					{authorId !==
+																						user._id && (
+																						<div className="flex space-x-2">
+																							<button
+																								onClick={() =>
+																									handleRemoveAuthor(
+																										authorId
+																									)
+																								}
+																								className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
+																							>
+																								Remove
+																							</button>
+																							<button
+																								onClick={() =>
+																									setCorrespondingAuthorId(
+																										authorId
+																									)
+																								}
+																								className={`px-3 py-1 rounded text-sm transition-colors ${
+																									isCorrespondingAuthor
+																										? "bg-[#BAFFF5] text-[#00796b] cursor-default"
+																										: "bg-[#00796b] hover:bg-[#3a5269] text-white"
+																								}`}
+																								disabled={
+																									isCorrespondingAuthor
+																								}
+																							>
+																								{isCorrespondingAuthor
+																									? "Current Corresponding"
+																									: "Make Corresponding"}
+																							</button>
+																						</div>
+																					)}
+																				</td>
+																			</tr>
+																		)}
+																	</Draggable>
+																);
+															}
+														)}
+														{provided.placeholder}
+													</tbody>
+												)}
+											</Droppable>
+										</DragDropContext>
 									</table>
 								</div>
 							</div>
@@ -2090,18 +2416,58 @@ const ManuscriptPage = () => {
 														*
 													</span>
 												</label>
-												<input
-													type="text"
-													name="institution"
-													value={
-														newAuthor.institution
-													}
-													onChange={
-														handleNewAuthorChange
-													}
-													className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
-													required
-												/>
+												<div className="relative">
+													<input
+														type="text"
+														name="institution"
+														value={newAuthor.institution}
+														onChange={handleNewAuthorChange}
+														onFocus={() => {
+															if (newAuthor.institution?.trim().length >= 2) setInstOpen(true);
+														}}
+														onKeyDown={async (ev) => {
+															if (ev.key === 'Enter') {
+																ev.preventDefault();
+																// Only create when search has zero results
+																if ((instSuggestions || []).length === 0 && newAuthor.institution?.trim().length >= 2) {
+																	await createInstitutionIfNeeded(newAuthor.institution);
+																}
+															}
+														}}
+														className="w-full border rounded px-2 py-1 text-sm border-[#e0e0e0]"
+														required
+													/>
+													{instOpen && (
+														<ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border border-[#e0e0e0] bg-white shadow">
+															{instSuggestions.map((s) => (
+																<li
+																	key={s.id}
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() => {
+																		setNewAuthor(prev => ({ ...prev, institution: s.name }));
+																		setInstOpen(false);
+																	}}
+																	className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+																>
+																	{s.name}
+																</li>
+															))}
+															{/* Show add option only when there are zero search results */}
+															{newAuthor.institution?.trim().length >= 2 && (instSuggestions || []).length === 0 && (
+																<li
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={async () => {
+																		await createInstitutionIfNeeded(newAuthor.institution);
+																	}}
+																	className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-cyan-700 flex items-center gap-2 border-t border-[#e0e0e0]"
+																>
+																	<span className="text-cyan-600 font-semibold">+</span>
+																	Add "{newAuthor.institution.trim()}"
+																</li>
+															)}
+														</ul>
+													)}
+												</div>
 											</div>
 
 											<div className="grid grid-cols-[120px,1fr] items-center gap-1">
@@ -2209,6 +2575,133 @@ const ManuscriptPage = () => {
 									</label>
 								</div>
 							</div>
+
+							{formData.funding === "Yes" && (
+							<div className="mb-4 mt-4 p-4 border border-[#e0e0e0] rounded-lg bg-gray-50">
+								<h3 className="font-semibold mb-3 text-[#00796b]">
+									Billing Information
+								</h3>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<div>
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											Name *
+										</label>
+										<input
+											type="text"
+											name="name"
+											value={formData.billingInfo.name}
+											onChange={handleBillingInfoChange}
+											placeholder="Full name"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											Organization *
+										</label>
+										<input
+											type="text"
+											name="organization"
+											value={formData.billingInfo.organization}
+											onChange={handleBillingInfoChange}
+											placeholder="Organization name"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+									<div className="md:col-span-2">
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											Address *
+										</label>
+										<input
+											type="text"
+											name="address"
+											value={formData.billingInfo.address}
+											onChange={handleBillingInfoChange}
+											placeholder="Street address"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											City *
+										</label>
+										<input
+											type="text"
+											name="city"
+											value={formData.billingInfo.city}
+											onChange={handleBillingInfoChange}
+											placeholder="City"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											State/Province
+										</label>
+										<input
+											type="text"
+											name="state"
+											value={formData.billingInfo.state}
+											onChange={handleBillingInfoChange}
+											placeholder="State or Province"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											Postal Code *
+										</label>
+										<input
+											type="text"
+											name="postalCode"
+											value={formData.billingInfo.postalCode}
+											onChange={handleBillingInfoChange}
+											placeholder="Postal code"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											Country *
+										</label>
+										<input
+											type="text"
+											name="country"
+											value={formData.billingInfo.country}
+											onChange={handleBillingInfoChange}
+											placeholder="Country"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											Award Number
+										</label>
+										<input
+											type="text"
+											name="awardNumber"
+											value={formData.billingInfo.awardNumber}
+											onChange={handleBillingInfoChange}
+											placeholder="Grant award number"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-medium mb-1 text-[#00796b]">
+											Grant Recipient
+										</label>
+										<input
+											type="text"
+											name="grantRecipient"
+											value={formData.billingInfo.grantRecipient}
+											onChange={handleBillingInfoChange}
+											placeholder="Grant recipient name"
+											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+										/>
+									</div>
+								</div>
+							</div>
+						)}
 
 							<div className="flex justify-between">
 								{renderBackButton(6)}

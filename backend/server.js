@@ -14,6 +14,9 @@ const allowedOrigins = [
   "https://www.synergyworldpress.com",
   "https://synergyworldpress.com",
   "http://localhost:5173",
+  // Dev preview origins (Cascade/Vite)
+  "http://localhost:5174",
+  "http://127.0.0.1:63809",
   "https://orcid.org", // Include both www and non-www versions
   "https://accounts.google.com" // Google OAuth
 ];
@@ -69,6 +72,7 @@ app.use((req, res, next) => {
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/auth/editor", require("./routes/editorRoutes"));
 app.use("/api/auth/reviewer", require("./routes/reviewerRoutes"));
+app.use("/api/institutions", require("./routes/institutionRoutes"));
 
 
 // Root route to confirm backend is working

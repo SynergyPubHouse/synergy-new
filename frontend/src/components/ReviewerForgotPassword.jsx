@@ -75,7 +75,7 @@ function ReviewerForgotPassword() {
 
 				<div className="mt-6 text-center">
 					<a
-						href="/journal/jics/reviewer/login"
+						href="/login"
 						className="text-sm text-[#496580] hover:underline"
 					>
 						Back to Login

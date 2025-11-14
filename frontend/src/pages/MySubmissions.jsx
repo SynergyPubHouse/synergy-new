@@ -11,7 +11,6 @@ const MySubmissions = () => {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
 	const [showConfirmation, setShowConfirmation] = useState(null);
-	const [pdfBuiltManuscripts, setPdfBuiltManuscripts] = useState(new Set());
 	const [showNotes, setShowNotes] = useState(null);
 	const navigate = useNavigate();
 
@@ -40,10 +39,9 @@ const MySubmissions = () => {
 		}
 	};
 
-	const handleBuildPdf = (manuscriptId, mergedFileUrl) => {
+	const handleViewPdf = (manuscriptId, mergedFileUrl) => {
 		if (mergedFileUrl) {
 			window.open(mergedFileUrl, "_blank");
-			setPdfBuiltManuscripts((prev) => new Set([...prev, manuscriptId]));
 		} else {
 			alert("PDF is not available yet.");
 		}
@@ -234,7 +232,7 @@ const MySubmissions = () => {
 									<div className="text-right">
 										<div className="text-sm text-[#00796b] font-medium">
 											Manuscript ID:{" "}
-											{manuscript._id
+											{manuscript.customId || manuscript._id
 												.slice(-6)
 												.toUpperCase()}
 										</div>
@@ -357,14 +355,14 @@ const MySubmissions = () => {
 									<div className="flex flex-col space-y-3 items-center">
 										<button
 											onClick={() =>
-												handleBuildPdf(
+												handleViewPdf(
 													manuscript._id,
 													manuscript.mergedFileUrl
 												)
 											}
 											className="w-full px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-lg transition-colors"
 										>
-											Build PDF
+											View PDF
 										</button>
 										<button
 											onClick={() =>
@@ -373,72 +371,26 @@ const MySubmissions = () => {
 												)
 											}
 											className={`w-full px-4 py-2 ${
-												manuscript.status ===
-													"Under Review" ||
-												!pdfBuiltManuscripts.has(
-													manuscript._id
-												)
+												manuscript.status === "Under Review"
 													? "bg-gray-300 text-gray-500 cursor-not-allowed"
 													: "bg-red-500 hover:bg-red-600 text-white"
 											} font-semibold rounded-lg transition-colors`}
-											disabled={
-												manuscript.status ===
-													"Under Review" ||
-												!pdfBuiltManuscripts.has(
-													manuscript._id
-												)
-											}
+											disabled={manuscript.status === "Under Review"}
 										>
 											Withdrawal
 										</button>
 										{manuscript.status !== "Rejected" && (
-											<div className="w-full relative group">
-												<button
-													onClick={(e) => {
-														if (
-															!pdfBuiltManuscripts.has(
-																manuscript._id
-															)
-														) {
-															e.preventDefault();
-															alert(
-																"Please build PDF first to unlock this button"
-															);
-															return;
-														}
-														handleAccept(
-															manuscript._id
-														);
-													}}
-													className={`w-full px-4 py-2 ${
-														manuscript.status ===
-															"Under Review" ||
-														!pdfBuiltManuscripts.has(
-															manuscript._id
-														)
-															? "bg-gray-300 text-gray-500 cursor-not-allowed"
-															: "bg-green-500 hover:bg-green-600 text-white"
-													} font-semibold rounded-lg transition-colors`}
-													disabled={
-														manuscript.status ===
-															"Under Review" ||
-														!pdfBuiltManuscripts.has(
-															manuscript._id
-														)
-													}
-												>
-													Send to Editor
-												</button>
-												{!pdfBuiltManuscripts.has(
-													manuscript._id
-												) && (
-													<div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-														Build PDF to unlock this
-														button
-														<div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black"></div>
-													</div>
-												)}
-											</div>
+											<button
+												onClick={() => handleAccept(manuscript._id)}
+												className={`w-full px-4 py-2 ${
+													manuscript.status === "Under Review"
+														? "bg-gray-300 text-gray-500 cursor-not-allowed"
+														: "bg-green-500 hover:bg-green-600 text-white"
+												} font-semibold rounded-lg transition-colors`}
+												disabled={manuscript.status === "Under Review"}
+											>
+												Send to Editor
+											</button>
 										)}
 										<button
 											onClick={() =>

@@ -11,9 +11,9 @@ const getLoginUrl = () => {
 		window.location.hostname === "synergyworldpress.com";
 
 	if (isProduction) {
-		return "https://synergyworldpress.com/journal/jics/editor/login";
+		return "https://synergyworldpress.com/login";
 	} else {
-		return `${BASE_URL}/editor/login`;
+		return "/login";
 	}
 };
 
@@ -52,7 +52,7 @@ function EditorRegister() {
 				formData
 			);
 			alert("Editor Registration Successful!");
-			navigate(`${BASE_URL}/editor/login`);
+			navigate("/login");
 		} catch (error) {
 			setErrorMessage(
 				error.response?.data?.message || "Registration Failed"

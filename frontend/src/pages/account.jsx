@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
-import { useAuth } from "../App"; // Assuming you have an Auth context
+import { useAuth } from "../App";
 import { FaUserCircle, FaCamera } from "react-icons/fa";
+import { getUserRole, getUserFullName } from "../utils/roleUtils";
 
 function MyAccount() {
-  const { user } = useAuth(); // Fetch user details from Auth context
+  const { user } = useAuth();
+  const userRole = getUserRole(user);
+  const userFullName = getUserFullName(user);
 
   // Function to handle profile picture change
   const handleProfilePictureChange = (event) => {
@@ -89,13 +92,13 @@ function MyAccount() {
               <h3 className="text-xl font-semibold text-[#00796b] mb-4">Personal Details</h3>
               <div className="space-y-4">
                 <div>
-                  <p className="text-[#212121]"><strong>Name:</strong> {user?.name || "Not provided"}</p>
+                  <p className="text-[#212121]"><strong>Name:</strong> {userFullName || user?.name || "Not provided"}</p>
                 </div>
                 <div>
-                  <p className="text-[#212121]"><strong>Email:</strong> {user?.email || "Not provided"}</p>
+                  <p className="text-[#212121]"><strong>Email:</strong> {user?.email || user?.editor?.email || user?.reviewer?.email || "Not provided"}</p>
                 </div>
                 <div>
-                  <p className="text-[#212121]"><strong>Role:</strong> {user?.EditorRole === "yes" ? "Editor" : "Author"}</p>
+                  <p className="text-[#212121]"><strong>Role:</strong> {userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "Not specified"}</p>
                 </div>
               </div>
               <button className="mt-6 px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-xl shadow-md transition-all duration-300 transform hover:scale-105">

@@ -1,11 +1,14 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { useAuth } from "../App"; // Assuming you have an Auth context
+import { useAuth } from "../App";
+import { isReviewer, getUserFullName } from "../utils/roleUtils";
 
 const BASE_URL = "/journal/jics";
 
 function Reviewers() {
-	const { user } = useAuth(); // Fetch user details from Auth context
+	const { user } = useAuth();
+	const userIsReviewer = isReviewer(user);
+	const userFullName = getUserFullName(user);
 
 	return (
 		<div className="bg-[#f8fafc] text-[#1a365d] min-h-screen">
@@ -17,7 +20,7 @@ function Reviewers() {
 					transition={{ duration: 1 }}
 					className="text-4xl md:text-6xl font-extrabold text-[#496580] font-serif tracking-wide drop-shadow-lg"
 				>
-					{user && user.role === "reviewer"
+					{userIsReviewer
 						? "Welcome Reviewer!"
 						: "For Reviewers"}
 				</motion.h1>
@@ -28,8 +31,8 @@ function Reviewers() {
 					transition={{ duration: 1, delay: 0.5 }}
 					className="mt-4 text-lg text-[#496580] max-w-2xl"
 				>
-					{user && user.role === "reviewer"
-						? `Welcome back ${user.firstName}! Manage your review tasks and contribute to ensuring high-quality publications.`
+					{userIsReviewer
+						? `Welcome back ${userFullName}! Manage your review tasks and contribute to ensuring high-quality publications.`
 						: "Join our reviewer team and contribute to the advancement of research by providing valuable feedback on manuscripts."}
 				</motion.p>
 
@@ -49,13 +52,13 @@ function Reviewers() {
 								Join as Reviewer
 							</Link>
 							<Link
-								to={`${BASE_URL}/reviewer/login`}
+								to="/login"
 								className="px-8 py-4 bg-white hover:bg-gray-100 text-[#496580] font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 							>
 								Login as Reviewer
 							</Link>
 						</>
-					) : user.role !== "reviewer" ? (
+					) : !userIsReviewer ? (
 						<Link
 							to={`${BASE_URL}/reviewer/register`}
 							className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
@@ -67,7 +70,7 @@ function Reviewers() {
 			</section>
 
 			{/* Benefits Section */}
-			{(!user || user.role !== "reviewer") && (
+			{(!user || !userIsReviewer) && (
 				<motion.section
 					initial={{ opacity: 0, y: 50 }}
 					whileInView={{ opacity: 1, y: 0 }}
@@ -115,7 +118,7 @@ function Reviewers() {
 			)}
 
 			{/* Reviewer Dashboard */}
-			{user && user.role === "reviewer" && (
+			{userIsReviewer && (
 				<motion.section
 					initial={{ opacity: 0, y: 50 }}
 					whileInView={{ opacity: 1, y: 0 }}
@@ -168,7 +171,7 @@ function Reviewers() {
 			)}
 
 			{/* Call to Action Section */}
-			{(!user || user.role !== "reviewer") && (
+			{(!user || !userIsReviewer) && (
 				<motion.section
 					initial={{ opacity: 0, y: 50 }}
 					whileInView={{ opacity: 1, y: 0 }}

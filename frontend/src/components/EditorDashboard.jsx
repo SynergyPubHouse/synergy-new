@@ -64,13 +64,18 @@ function EditorDashboard() {
 					}
 				);
 				setUsers(response.data);
+				
+				// Initialize with all manuscripts visible by default
+				// This ensures the filter shows data immediately without needing to select a user first
+				const allManuscripts = response.data.flatMap(user => user.manuscripts || []);
+				setManuscripts(allManuscripts);
 			} catch (error) {
 				console.error("Error fetching users:", error);
 				if (error.response?.status === 401) {
 					alert("Session expired. Please login again.");
 					// Clear user data and redirect to login
 					localStorage.removeItem("user");
-					window.location.href = "/editor/login";
+					window.location.href = "/login";
 				}
 			}
 		};
@@ -104,7 +109,7 @@ function EditorDashboard() {
 					alert("Session expired. Please login again.");
 					// Clear user data and redirect to login
 					localStorage.removeItem("user");
-					window.location.href = "/editor/login";
+					window.location.href = "/login";
 				}
 			}
 		};
@@ -118,6 +123,19 @@ function EditorDashboard() {
 		setSelectedUser(user);
 		setManuscripts(user.manuscripts || []);
 		// Clear any active filters when switching users
+		setFilterType("all");
+		setFilterValue("");
+		// Clear bulk selections
+		setSelectedManuscriptIds([]);
+		setShowBulkActions(false);
+	};
+
+	// Handle showing all manuscripts (clear user selection)
+	const handleShowAllManuscripts = () => {
+		setSelectedUser(null);
+		const allManuscripts = users.flatMap(user => user.manuscripts || []);
+		setManuscripts(allManuscripts);
+		// Clear any active filters
 		setFilterType("all");
 		setFilterValue("");
 		// Clear bulk selections
@@ -574,9 +592,10 @@ function EditorDashboard() {
 
 	// Filter manuscripts based on current filter
 	const getFilteredManuscripts = () => {
-		if (!selectedUser) return [];
-
-		const allManuscripts = manuscripts;
+		// If no user is selected, show all manuscripts from all users
+		const allManuscripts = selectedUser 
+			? manuscripts 
+			: users.flatMap(user => user.manuscripts || []);
 
 		if (filterType === "all") {
 			return allManuscripts;
@@ -885,6 +904,18 @@ function EditorDashboard() {
 							Users with Manuscripts
 						</h2>
 						<div className="space-y-2">
+							{/* Show All Manuscripts Button */}
+							<button
+								onClick={handleShowAllManuscripts}
+								className={`w-full text-left p-3 rounded-lg transition-all font-medium ${
+									!selectedUser
+										? "bg-[#496580] text-white"
+										: "bg-[#e3f2fd] text-[#1976d2] hover:bg-[#bbdefb] border border-[#1976d2]"
+								}`}
+							>
+								📋 Show All Manuscripts
+							</button>
+							
 							{users.map((user, index) => (
 								<button
 									key={index}
@@ -1095,9 +1126,27 @@ function EditorDashboard() {
 												<h3 className="text-xl font-semibold text-[#1a365d] mb-2">
 													{manuscript.title}
 												</h3>
-												<p className="text-[#496580] text-sm">
-													Type: {manuscript.type}
-												</p>
+												<div className="flex items-center justify-between mb-2">
+													<p className="text-[#496580] text-sm">
+														Type: {manuscript.type}
+													</p>
+													<p className="text-[#00796b] text-sm font-medium">
+														ID: {manuscript.customId || manuscript._id.slice(-6).toUpperCase()}
+													</p>
+												</div>
+												{/* Show author info when viewing all manuscripts */}
+												{!selectedUser && (
+													<div className="mb-2">
+														<p className="text-[#496580] text-sm">
+															Author: {(() => {
+																const author = users.find(user => 
+																	user.manuscripts?.some(m => m._id === manuscript._id)
+																);
+																return author ? formatFullName(author) : "Unknown Author";
+															})()}
+														</p>
+													</div>
+												)}
 												<div className="flex items-center space-x-2 mb-1">
 													<p className="text-[#496580] text-sm">
 														Status:

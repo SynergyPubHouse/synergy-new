@@ -9,7 +9,6 @@ function ReviewerLogin() {
 	const [formData, setFormData] = useState({
 		email: "",
 		password: "",
-		accessKey: "",
 	});
 	const navigate = useNavigate();
 	const { login } = useAuth();
@@ -20,11 +19,6 @@ function ReviewerLogin() {
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
-
-		if (formData.accessKey !== "REVIEWER123") {
-			alert("Invalid Reviewer Access Key");
-			return;
-		}
 
 		try {
 			const response = await axios.post(
@@ -67,7 +61,6 @@ function ReviewerLogin() {
 						<input
 							type="email"
 							name="email"
-							value={formData.email}
 							placeholder="Enter your email"
 							onChange={handleChange}
 							required
@@ -82,23 +75,7 @@ function ReviewerLogin() {
 						<input
 							type="password"
 							name="password"
-							value={formData.password}
 							placeholder="Enter your password"
-							onChange={handleChange}
-							required
-							className="w-full px-4 py-3 rounded-xl bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none transition-all"
-						/>
-					</div>
-
-					<div>
-						<label className="block text-sm font-medium text-[#496580] mb-2">
-							Reviewer Access Key
-						</label>
-						<input
-							type="password"
-							name="accessKey"
-							value={formData.accessKey}
-							placeholder="Enter reviewer access key"
 							onChange={handleChange}
 							required
 							className="w-full px-4 py-3 rounded-xl bg-[#f8fafc] text-[#1a365d] border border-[#cbd5e1] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/50 outline-none transition-all"

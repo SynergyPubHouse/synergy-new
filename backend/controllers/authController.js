@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const User = require("../models/User");
+const sendEmail = require("../utils/sendEmail");
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -10,6 +11,96 @@ const generateToken = (id) => {
 	return jwt.sign({ id }, process.env.JWT_SECRET, {
 		expiresIn: "30d",
 	});
+};
+
+// @desc    Reset password using token
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ message: "Token and new password are required" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    if (decoded.purpose !== "password_reset" || !decoded.id) {
+      return res.status(400).json({ message: "Invalid token payload" });
+    }
+
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    return res.json({ message: "Password has been reset successfully" });
+  } catch (error) {
+    console.error("resetPassword error:", error);
+    return res.status(500).json({ message: "Failed to reset password" });
+  }
+};
+
+// @desc    Send login details email to existing user
+// @route   POST /api/auth/send-login-details
+// @access  Public
+exports.sendLoginDetails = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
+    const fullName = [user.title, user.firstName, user.middleName, user.lastName]
+      .filter(Boolean)
+      .join(" ");
+
+    // Generate a short-lived password reset token and link
+    const resetToken = jwt.sign(
+      { id: user._id.toString(), purpose: "password_reset" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+    const resetLink = `${frontendUrl}/reset-password/${resetToken}`;
+    const profileLink = `${frontendUrl}/account`;
+
+    const emailHtml = `
+      <div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#111; line-height:1.6">
+        <p>Dear ${fullName},</p>
+        <p>You have registered as a user on the Synergy World Press site.</p>
+        <p><strong>Your username is:</strong> ${user.username}</p>
+        <p>When you registered, you created your own password. For security reasons, passwords are never sent by email. If you need to reset your password, please click this link (valid for 1 hour):<br/>
+        <a href="${resetLink}">${resetLink}</a></p>
+        <p>You can change your password and other personal information at:<br/>
+        <a href="${profileLink}">${profileLink}</a></p>
+        <p>With best regards,<br/>Synergy World Press, Editorial Office</p>
+        <hr/>
+        <p style="font-size:12px; color:#555">This letter contains confidential information, is for your own use, and should not be forwarded to third parties.</p>
+      </div>
+    `;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Registration Welcome Notification for Synergy World Press",
+      text: emailHtml,
+    });
+
+    return res.json({ message: "Login details email sent" });
+  } catch (error) {
+    console.error("sendLoginDetails error:", error);
+    return res.status(500).json({ message: "Failed to send email" });
+  }
 };
 
 // @desc    Register new user
@@ -65,28 +156,134 @@ exports.registerUser = async (req, res) => {
 	}
 };
 
-// @desc    Authenticate user & get token
+// @desc    Authenticate user & get token (unified login for all roles)
 // @route   POST /api/auth/login
 // @access  Public
 exports.loginUser = async (req, res) => {
 	const { email, password } = req.body;
 
 	try {
-		const user = await User.findOne({ email });
+		// Import models here to avoid circular dependencies
+		const Editor = require("../models/Editor");
+		const Reviewer = require("../models/Reviewer");
+		
+		// Check all three models for the email
+		const [user, editor, reviewer] = await Promise.all([
+			User.findOne({ email }),
+			Editor.findOne({ email }),
+			Reviewer.findOne({ email })
+		]);
 
+		let authenticatedAccount = null;
+		let accountType = null;
+		let availableRoles = [];
+
+		// Check User account
 		if (user && (await bcrypt.compare(password, user.password))) {
+			authenticatedAccount = user;
+			accountType = 'user';
+			availableRoles.push('author');
+		}
+
+		// Check Editor account
+		if (editor && (await editor.comparePassword(password))) {
+			authenticatedAccount = editor;
+			accountType = 'editor';
+			availableRoles.push('editor');
+		}
+
+		// Check Reviewer account  
+		if (reviewer && (await reviewer.comparePassword(password))) {
+			authenticatedAccount = reviewer;
+			accountType = 'reviewer';
+			availableRoles.push('reviewer');
+		}
+
+		if (authenticatedAccount) {
+			// If multiple accounts exist with same email/password, collect all roles
+			const allRoles = [];
+			if (user && (await bcrypt.compare(password, user.password))) {
+				allRoles.push('author');
+			}
+			if (editor && (await editor.comparePassword(password))) {
+				allRoles.push('editor');
+			}
+			if (reviewer && (await reviewer.comparePassword(password))) {
+				allRoles.push('reviewer');
+			}
+
 			res.json({
-				_id: user._id,
-				firstName: user.firstName,
-				lastName: user.lastName,
-				email: user.email,
-				username: user.username,
-				token: generateToken(user._id),
+				_id: authenticatedAccount._id,
+				firstName: authenticatedAccount.firstName,
+				lastName: authenticatedAccount.lastName,
+				email: authenticatedAccount.email,
+				username: authenticatedAccount.username,
+				token: generateToken(authenticatedAccount._id),
+				accountType: accountType,
+				availableRoles: allRoles, // All roles this email can access
+				currentRole: accountType, // Currently logged in as
 			});
 		} else {
 			res.status(401).json({ message: "Invalid email or password" });
 		}
 	} catch (error) {
+		console.error("Login error:", error);
+		res.status(500).json({ message: "Server Error", error });
+	}
+};
+
+// @desc    Switch user role (for users with multiple roles)
+// @route   POST /api/auth/switch-role
+// @access  Private
+exports.switchRole = async (req, res) => {
+	const { email, targetRole } = req.body;
+
+	try {
+		// Import models
+		const Editor = require("../models/Editor");
+		const Reviewer = require("../models/Reviewer");
+
+		let targetAccount = null;
+		let newToken = null;
+
+		// Find the account for the target role
+		switch (targetRole) {
+			case 'author':
+				targetAccount = await User.findOne({ email });
+				break;
+			case 'editor':
+				targetAccount = await Editor.findOne({ email });
+				break;
+			case 'reviewer':
+				targetAccount = await Reviewer.findOne({ email });
+				break;
+			default:
+				return res.status(400).json({ message: "Invalid role specified" });
+		}
+
+		if (!targetAccount) {
+			return res.status(404).json({ 
+				message: `No ${targetRole} account found for this email` 
+			});
+		}
+
+		// Generate new token for the target account
+		newToken = generateToken(targetAccount._id);
+
+		res.json({
+			_id: targetAccount._id,
+			firstName: targetAccount.firstName,
+			lastName: targetAccount.lastName,
+			email: targetAccount.email,
+			username: targetAccount.username,
+			token: newToken,
+			accountType: targetRole,
+			currentRole: targetRole,
+			message: `Successfully switched to ${targetRole} role`
+		});
+
+	} catch (error) {
+		console.error("Role switch error:", error);
 		res.status(500).json({ message: "Server Error", error });
 	}
 };
@@ -300,7 +497,11 @@ exports.orcidCallback = async (req, res) => {
                 error: 'Missing ORCID credentials'
             });
         }
-const ORCID_REDIRECT_URI = `https://synergyworldpress.com/orcid-callback`;
+        
+        // Use localhost for development, production URL for production
+        const ORCID_REDIRECT_URI = process.env.NODE_ENV === 'production'
+            ? `https://synergyworldpress.com/orcid-callback`
+            : `http://localhost:5173/orcid-callback`;
         // Exchange authorization code for access token
 const tokenResponse = await axios.post(
   'https://orcid.org/oauth/token',

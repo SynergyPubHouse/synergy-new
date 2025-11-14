@@ -9,7 +9,6 @@ function EditorLogin() {
 	const [formData, setFormData] = useState({
 		email: "",
 		password: "",
-		accessKey: "",
 	});
 	const navigate = useNavigate();
 	const { login } = useAuth();
@@ -21,15 +20,13 @@ function EditorLogin() {
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 
-		if (formData.accessKey !== "EDITOR123") {
-			alert("Invalid Editor Access Key");
-			return;
-		}
-
 		try {
 			const response = await axios.post(
 				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/login`,
-				formData
+				{
+					email: formData.email,
+					password: formData.password,
+				}
 			);
 
 			if (response.data) {
@@ -86,20 +83,6 @@ function EditorLogin() {
 							type="password"
 							name="password"
 							placeholder="Enter your password"
-							onChange={handleChange}
-							required
-							className="w-full px-4 py-3 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#e2e8f0] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/30 outline-none transition-all duration-300"
-						/>
-					</div>
-
-					<div>
-						<label className="block text-sm font-medium text-[#496580] mb-2">
-							Editor Access Key
-						</label>
-						<input
-							type="password"
-							name="accessKey"
-							placeholder="Enter editor access key"
 							onChange={handleChange}
 							required
 							className="w-full px-4 py-3 rounded-lg bg-[#f8fafc] text-[#1a365d] border border-[#e2e8f0] focus:border-[#496580] focus:ring-2 focus:ring-[#496580]/30 outline-none transition-all duration-300"
