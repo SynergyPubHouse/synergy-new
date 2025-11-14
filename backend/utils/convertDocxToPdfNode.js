@@ -1,6 +1,5 @@
 const mammoth = require('mammoth');
-const puppeteer = require('puppeteer-core');
-const chromium = require('chrome-aws-lambda');
+const puppeteer = require('puppeteer');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -91,38 +90,22 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
 </html>`;
         
         // Step 3: Launch Puppeteer and generate PDF
-        // Use chrome-aws-lambda for serverless environments (like Render)
-        // Force serverless mode in production since Render doesn't have Chrome installed
-        const isServerless = true; // Always use chrome-aws-lambda for now
+        console.log('[convertDocxToPdfNode] Launching Puppeteer with bundled Chromium');
         
-        console.log(`[convertDocxToPdfNode] Environment check - NODE_ENV: ${process.env.NODE_ENV}, RENDER: ${process.env.RENDER}, isServerless: ${isServerless}`);
-        
-        if (isServerless) {
-            console.log('[convertDocxToPdfNode] Using chrome-aws-lambda for serverless environment');
-            browser = await puppeteer.launch({
-                headless: true,
-                args: chromium.args,
-                defaultViewport: chromium.defaultViewport,
-                executablePath: await chromium.executablePath
-            });
-        } else {
-            console.log('[convertDocxToPdfNode] Using regular Puppeteer for local environment');
-            browser = await puppeteer.launch({
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process'
-                ],
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-            });
-        }
+        browser = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process'
+            ]
+        });
         
         const page = await browser.newPage();
         await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
