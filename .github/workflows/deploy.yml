@@ -36,6 +36,6 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./frontend/dist/
-          server-dir: ${{ secrets.FTP_UPLOAD_PATH }}
+          server-dir: ${{ secrets.FTP_UPLOAD_PATH }}/
           protocol: ftps
           dangerous-clean-slate: false
