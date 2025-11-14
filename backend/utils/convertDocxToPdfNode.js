@@ -1,5 +1,6 @@
 const mammoth = require('mammoth');
 const puppeteer = require('puppeteer');
+const chromium = require('chrome-aws-lambda');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -90,9 +91,12 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
 </html>`;
         
         // Step 3: Launch Puppeteer and generate PDF
+        // Use chrome-aws-lambda for serverless environments (like Render)
+        const isServerless = process.env.NODE_ENV === 'production' || process.env.RENDER;
+        
         browser = await puppeteer.launch({
             headless: true,
-            args: [
+            args: isServerless ? chromium.args : [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
@@ -103,7 +107,7 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
                 '--no-zygote',
                 '--single-process'
             ],
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+            executablePath: isServerless ? await chromium.executablePath : (process.env.PUPPETEER_EXECUTABLE_PATH || undefined)
         });
         
         const page = await browser.newPage();
