@@ -10,13 +10,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Build React Vite frontend
       - name: Install Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'   # recommended for React Router 7
 
       - name: Install dependencies
         run: |
@@ -35,7 +35,7 @@ jobs:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
           local-dir: ./frontend/dist/
           server-dir: ${{ secrets.FTP_UPLOAD_PATH }}/
-          protocol: ftps
           dangerous-clean-slate: false
