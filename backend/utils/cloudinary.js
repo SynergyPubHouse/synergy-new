@@ -10,12 +10,19 @@ cloudinary.config({
 });
 
 // Function to upload a file to Cloudinary
-const uploadToCloudinary = (filePath, folder, resourceType = 'auto') => {
+const uploadToCloudinary = (filePath, folder, resourceType = 'auto', customFilename = null) => {
   return new Promise((resolve, reject) => {
-    cloudinary.uploader.upload(filePath, {
+    const uploadOptions = {
       folder,
       resource_type: resourceType,
-    }, (error, result) => {
+    };
+    
+    // Add custom filename if provided
+    if (customFilename) {
+      uploadOptions.public_id = customFilename;
+    }
+    
+    cloudinary.uploader.upload(filePath, uploadOptions, (error, result) => {
       if (error) return reject(error);
       resolve(result);
     });

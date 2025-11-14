@@ -8,6 +8,8 @@ import {
 	useLocation,
 } from "react-router-dom";
 import Login from "./components/Login";
+import SendLoginDetails from "./pages/SendLoginDetails";
+import ResetPassword from "./pages/ResetPassword";
 import Register from "./components/Register";
 import HomePage from "./pages/HomePage";
 import LandingPage from "./pages/LandingPage";
@@ -29,11 +31,9 @@ import TeamDevPage from "./pages/teamDev";
 import Settings from "./pages/settings";
 import AboutUs from "./pages/about";
 import EditorRegister from "./components/EditorRegister";
-import EditorLogin from "./components/EditorLogin";
 import EditorDashboard from "./components/EditorDashboard";
 import MySubmissions from "./pages/MySubmissions";
 import ReviewerRegister from "./components/ReviewerRegister";
-import ReviewerLogin from "./components/ReviewerLogin";
 import ReviewerForgotPassword from "./components/ReviewerForgotPassword";
 import ReviewerResetPassword from "./components/ReviewerResetPassword";
 import ReviewerDashboard from "./components/ReviewerDashboard";
@@ -179,6 +179,8 @@ function AppContent() {
 				<Route path={`/termsofservice`} element={<TermsOfService />} />
 				<Route path={`/privacy`} element={<PrivacyPolicy />} />
 				<Route path={`/login`} element={<Login />} />
+				<Route path={`/send-login-details`} element={<SendLoginDetails />} />
+				<Route path={`/reset-password/:token`} element={<ResetPassword />} />
 				<Route path={`/register`} element={<Register />} />
 				<Route path={`/account`} element={<MyAccount />} />
 				<Route path={`/subscriptions`} element={<MySubscriptions />} />
@@ -193,15 +195,15 @@ function AppContent() {
 				/>
 				<Route
 					path={`${JICS_URL}/editor/login`}
-					element={<EditorLogin />}
+					element={<Navigate to="/login" replace />}
 				/>
 				<Route
 					path={`${JICS_URL}/editor/dashboard`}
 					element={
-						user?.editor?.role === "editor" ? (
+						user?.accountType === "editor" || user?.availableRoles?.includes("editor") ? (
 							<EditorDashboard />
 						) : (
-							<Navigate to={`${JICS_URL}/editor/login`} replace />
+							<Navigate to="/login" replace />
 						)
 					}
 				/>
@@ -217,7 +219,7 @@ function AppContent() {
 				/>
 				<Route
 					path={`${JICS_URL}/reviewer/login`}
-					element={<ReviewerLogin />}
+					element={<Navigate to="/login" replace />}
 				/>
 				<Route
 					path={`${JICS_URL}/reviewer/forgot-password`}
@@ -230,13 +232,10 @@ function AppContent() {
 				<Route
 					path={`${JICS_URL}/reviewer/dashboard`}
 					element={
-						user?.reviewer?.role === "reviewer" ? (
+						user?.accountType === "reviewer" || user?.availableRoles?.includes("reviewer") ? (
 							<ReviewerDashboard />
 						) : (
-							<Navigate
-								to={`${JICS_URL}/reviewer/login`}
-								replace
-							/>
+							<Navigate to="/login" replace />
 						)
 					}
 				/>

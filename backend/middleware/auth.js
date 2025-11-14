@@ -17,38 +17,36 @@ const auth = async (req, res, next) => {
 		// Verify token
 		const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-		// Check if it's an editor
-		if (decoded.role === "editor") {
-			const editor = await Editor.findById(decoded.id);
-			if (!editor) {
-				throw new Error("Editor not found");
-			}
+		// With unified login, we need to check all possible account types
+		// Try to find the user in all three models
+		const [user, editor, reviewer] = await Promise.all([
+			User.findById(decoded.id),
+			Editor.findById(decoded.id),
+			Reviewer.findById(decoded.id)
+		]);
+
+		// Set the appropriate user object and continue
+		if (editor) {
 			req.editor = editor;
+			req.user = editor; // Also set as user for compatibility
 			req.token = token;
 			return next();
 		}
 
-		// If not an editor, check if it's a reviewer
-		if (decoded.role === "reviewer") {
-			const reviewer = await Reviewer.findById(decoded.id);
-			if (!reviewer) {
-				throw new Error("Reviewer not found");
-			}
+		if (reviewer) {
 			req.user = reviewer;
 			req.user._id = reviewer._id; // Ensure _id is set
 			req.token = token;
 			return next();
 		}
 
-		// If not a reviewer, check if it's a user
-		const user = await User.findById(decoded.id);
 		if (user) {
 			req.user = user;
 			req.token = token;
 			return next();
 		}
 
-		throw new Error("Not authorized");
+		throw new Error("User not found in any account type");
 	} catch (error) {
 		console.error("Auth middleware error:", error.message);
 		if (

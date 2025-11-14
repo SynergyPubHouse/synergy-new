@@ -11,7 +11,10 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const ORCID_CLIENT_ID = import.meta.env.VITE_ORCID_CLIENT_ID;
 
-const ORCID_REDIRECT_URI = `https://synergyworldpress.com/orcid-callback`;
+// Use localhost for development, production URL for production
+const ORCID_REDIRECT_URI = import.meta.env.DEV 
+  ? `http://localhost:5173/orcid-callback`
+  : `https://synergyworldpress.com/orcid-callback`;
 const ORCID_AUTH_URL = `https://orcid.org/oauth/authorize?client_id=${ORCID_CLIENT_ID}&response_type=code&scope=/authenticate%20/read-limited&redirect_uri=${encodeURIComponent(ORCID_REDIRECT_URI)}`;
 
 function Login() {
@@ -96,24 +99,38 @@ function Login() {
     setError("");
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, role) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/login`,
-        formData
-      );
+      // Use unified login endpoint for all roles
+      const url = `${import.meta.env.VITE_BACKEND_URL}/api/auth/login`;
+      const payload = { ...formData };
+
+      const response = await axios.post(url, payload);
       
       if (response.data) {
-        localStorage.setItem("user", JSON.stringify(response.data));
-        login(response.data);
+        // Unified login system - response contains user data with role information
+        const userData = { ...response.data };
+        let redirectPath = '/';
+
+        // Determine redirect path based on user's current role or available roles
+        if (userData.accountType === 'editor' || userData.availableRoles?.includes('editor')) {
+          redirectPath = '/journal/jics/editor/dashboard';
+        } else if (userData.accountType === 'reviewer' || userData.availableRoles?.includes('reviewer')) {
+          redirectPath = '/journal/jics/reviewer/dashboard';
+        } else {
+          redirectPath = '/';
+        }
+
+        localStorage.setItem("user", JSON.stringify(userData));
+        login(userData);
         setSuccess({
           show: true,
-          message: "Login successful! Taking you to your account..."
+          message: `Login successful as ${role}! Taking you to your account...`
         });
-        setTimeout(() => navigate(from, { replace: true }), 2000);
+        setTimeout(() => navigate(redirectPath, { replace: true }), 2000);
       } else {
         setError("Login Failed: User data missing");
       }
@@ -171,7 +188,7 @@ function Login() {
         <div className="bg-white p-8 lg:p-12 flex flex-col justify-center lg:w-3/5">
           <div className="max-w-md mx-auto w-full">
             <h2 className="text-3xl font-bold text-gray-900 mb-1">Welcome back</h2>
-            <p className="text-gray-500 mb-8">Sign in to your account</p>
+            <p className="text-gray-500 mb-6">Please Enter the Following</p>
 
             {error && (
               <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
@@ -179,77 +196,101 @@ function Login() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-gray-700">
-                  Email address
+                  Username:
                 </label>
                 <input
                   id="email"
                   type="email"
                   name="email"
-                  placeholder="you@example.com"
+                  placeholder="Enter your email"
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all"
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all"
                 />
               </div>
 
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label htmlFor="password" className="text-sm font-medium text-gray-700">
-                    Password
-                  </label>
-                  <a href="#" className="text-sm text-cyan-600 hover:text-cyan-700">
-                    Forgot?
-                  </a>
-                </div>
+                <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  Password:
+                </label>
                 <input
                   id="password"
                   type="password"
                   name="password"
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all"
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all"
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-teal-600 to-cyan-500 hover:from-teal-700 hover:to-cyan-600 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center"
-              >
-                {isLoading ? (
-                  <span className="inline-block h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-                ) : null}
-                Sign In
-              </button>
+              {/* Role-based Login Buttons */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmit(e, 'Author')}
+                  disabled={isLoading}
+                  className="py-2.5 px-4 rounded-lg bg-gradient-to-r from-gray-100 to-gray-200 hover:from-cyan-50 hover:to-cyan-100 text-gray-700 hover:text-cyan-700 font-medium text-sm transition-all border border-gray-300 hover:border-cyan-400 disabled:opacity-50"
+                >
+                  {isLoading ? '...' : 'Author Login'}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmit(e, 'Reviewer')}
+                  disabled={isLoading}
+                  className="py-2.5 px-4 rounded-lg bg-gradient-to-r from-gray-100 to-gray-200 hover:from-cyan-50 hover:to-cyan-100 text-gray-700 hover:text-cyan-700 font-medium text-sm transition-all border border-gray-300 hover:border-cyan-400 disabled:opacity-50"
+                >
+                  {isLoading ? '...' : 'Reviewer Login'}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmit(e, 'Editor')}
+                  disabled={isLoading}
+                  className="py-2.5 px-4 rounded-lg bg-gradient-to-r from-gray-100 to-gray-200 hover:from-cyan-50 hover:to-cyan-100 text-gray-700 hover:text-cyan-700 font-medium text-sm transition-all border border-gray-300 hover:border-cyan-400 disabled:opacity-50"
+                >
+                  {isLoading ? '...' : 'Editor Login'}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmit(e, 'Publisher')}
+                  disabled={isLoading}
+                  className="py-2.5 px-4 rounded-lg bg-gradient-to-r from-gray-100 to-gray-200 hover:from-cyan-50 hover:to-cyan-100 text-gray-700 hover:text-cyan-700 font-medium text-sm transition-all border border-gray-300 hover:border-cyan-400 disabled:opacity-50"
+                >
+                  {isLoading ? '...' : 'Publisher Login'}
+                </button>
+              </div>
             </form>
 
             {/* Social Login Divider */}
-            <div className="relative my-8">
+            <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-200"></div>
               </div>
               <div className="relative flex justify-center">
                 <span className="px-3 bg-white text-sm text-gray-500">
-                  Or continue with
+                  Or Login via:
                 </span>
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 mt-6">
+            <div className="flex flex-col gap-3 mt-6">
               {/* ORCID Login */}
-              {/* <button
+              <button
                 onClick={handleOrcidLogin}
-                className="flex items-center justify-center w-full bg-white text-[#212121] font-semibold py-3 px-4 rounded-xl border border-[#e0e0e0] hover:border-[#00acc1] transition-all"
+                type="button"
+                className="flex items-center justify-center w-full bg-white text-gray-700 font-medium py-3 px-4 rounded-xl border-2 border-gray-200 hover:border-[#a6ce39] hover:bg-gray-50 transition-all group"
               >
-                <SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39]" />
-                Sign in with ORCID
-              </button> */}
+                <SiOrcid className="w-6 h-6 mr-2 text-[#a6ce39] group-hover:scale-110 transition-transform" />
+                <span className="flex items-center">
+                  Sign in with ORCID
+                  <span className="ml-2 text-xs text-gray-500">What is ORCID?</span>
+                </span>
+              </button>
 
-              {/* Google Login now renders instantly */}
+              {/* Google Login */}
               <div className="flex justify-center">
                 <div className="w-full">
                   <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -268,19 +309,26 @@ function Login() {
               </div>
             </div>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
-                <span
-                  onClick={() => navigate("/register")}
-                  className="text-cyan-600 hover:underline cursor-pointer font-medium"
-                >
-                  Register
-                </span>
-              </p>
+            {/* Helper Links */}
+            <div className="mt-6 flex flex-wrap justify-center items-center gap-3 text-sm">
+              <span
+                onClick={() => navigate("/send-login-details")}
+                className="text-cyan-600 hover:text-cyan-700 hover:underline cursor-pointer"
+              >
+                Send Login Details
+              </span>
+              <span className="text-gray-300">•</span>
+              <span
+                onClick={() => navigate("/register")}
+                className="text-cyan-600 hover:text-cyan-700 hover:underline cursor-pointer"
+              >
+                Register Now
+              </span>
+              <span className="text-gray-300">•</span>
+              <a href="#" className="text-cyan-600 hover:text-cyan-700 hover:underline">
+                Login Help
+              </a>
             </div>
-
-
 
             <div className="mt-6 text-center">
               <p className="text-[#64748b] text-sm">

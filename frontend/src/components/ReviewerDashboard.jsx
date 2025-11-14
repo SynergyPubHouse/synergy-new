@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../App";
+import { getUserFullName } from "../utils/roleUtils";
 
 function ReviewerDashboard() {
+	const { user } = useAuth();
 	const [users, setUsers] = useState([]);
 	const [selectedUser, setSelectedUser] = useState(null);
 	const [manuscripts, setManuscripts] = useState([]);
@@ -17,21 +20,20 @@ function ReviewerDashboard() {
 	useEffect(() => {
 		const fetchManuscripts = async () => {
 			try {
-				const userData = JSON.parse(localStorage.getItem("user"));
-				if (!userData || !userData.token) {
+				if (!user || !user.token) {
 					console.error("No token found");
-					navigate("/reviewer/login");
+					navigate("/login");
 					return;
 				}
 
-				console.log("Fetching manuscripts with token:", userData.token);
+				console.log("Fetching manuscripts with token:", user.token);
 				const response = await axios.get(
 					`${
 						import.meta.env.VITE_BACKEND_URL
 					}/api/auth/reviewer/assigned-manuscripts`,
 					{
 						headers: {
-							Authorization: `Bearer ${userData.token}`,
+							Authorization: `Bearer ${user.token}`,
 						},
 					}
 				);
@@ -105,15 +107,14 @@ function ReviewerDashboard() {
 			} catch (error) {
 				console.error("Error fetching manuscripts:", error);
 				if (error.response?.status === 401) {
-					navigate("/reviewer/login");
+					navigate("/login");
 				}
 			}
 		};
 
 		const fetchInvitations = async () => {
 			try {
-				const userData = JSON.parse(localStorage.getItem("user"));
-				if (!userData || !userData.token) {
+				if (!user || !user.token) {
 					return;
 				}
 
@@ -123,7 +124,7 @@ function ReviewerDashboard() {
 					}/api/auth/reviewer/pending-invitations`,
 					{
 						headers: {
-							Authorization: `Bearer ${userData.token}`,
+							Authorization: `Bearer ${user.token}`,
 						},
 					}
 				);
@@ -133,9 +134,11 @@ function ReviewerDashboard() {
 			}
 		};
 
-		fetchManuscripts();
-		fetchInvitations();
-	}, [navigate]);
+		if (user && user.token) {
+			fetchManuscripts();
+			fetchInvitations();
+		}
+	}, [user, navigate]);
 
 	const handleUserClick = (user) => {
 		setSelectedUser(user);
@@ -156,7 +159,12 @@ function ReviewerDashboard() {
 
 	const handleAddReview = async (manuscriptId) => {
 		try {
-			const userData = JSON.parse(localStorage.getItem("user"));
+			if (!user || !user.token) {
+				alert("You must be logged in to submit a review");
+				navigate("/login");
+				return;
+			}
+
 			if (!reviewText.trim() || !recommendation) {
 				alert(
 					"Please provide both review comments and a recommendation"
@@ -165,11 +173,12 @@ function ReviewerDashboard() {
 			}
 
 			// Create a properly structured reviewer note
+			const reviewerName = getUserFullName(user);
 			const reviewerNote = {
 				text: reviewText,
 				action: recommendation,
 				addedBy: {
-					name: `${userData.firstName} ${userData.lastName}`,
+					name: reviewerName,
 					role: "reviewer",
 				},
 				addedAt: new Date(),
@@ -187,7 +196,7 @@ function ReviewerDashboard() {
 				},
 				{
 					headers: {
-						Authorization: `Bearer ${userData.token}`,
+						Authorization: `Bearer ${user.token}`,
 					},
 				}
 			);
@@ -202,7 +211,7 @@ function ReviewerDashboard() {
 				{ status: "Reviewed" },
 				{
 					headers: {
-						Authorization: `Bearer ${userData.token}`,
+						Authorization: `Bearer ${user.token}`,
 					},
 				}
 			);
@@ -216,52 +225,40 @@ function ReviewerDashboard() {
 				}/api/auth/reviewer/assigned-manuscripts`,
 				{
 					headers: {
-						Authorization: `Bearer ${userData.token}`,
+						Authorization: `Bearer ${user.token}`,
 					},
 				}
 			);
 
 			console.log("Updated manuscripts data:", updatedResponse.data);
 
-			// Update manuscripts state with fresh data
-			const userManuscripts = {};
-			updatedResponse.data.forEach((manuscript) => {
-				const authorFullName =
-					typeof manuscript.author === "string"
-						? manuscript.author
-						: manuscript.author.fullName ||
-						  `${manuscript.author.firstName} ${manuscript.author.lastName}`;
+            // Update manuscripts state with fresh data (use server data as-is to avoid duplicates)
+            const userManuscripts = {};
+            updatedResponse.data.forEach((manuscript) => {
+                const authorFullName =
+                    typeof manuscript.author === "string"
+                        ? manuscript.author
+                        : manuscript.author.fullName ||
+                          `${manuscript.author.firstName} ${manuscript.author.lastName}`;
 
-				if (!userManuscripts[authorFullName]) {
-					userManuscripts[authorFullName] = {
-						_id: manuscript._id,
-						firstName:
-							typeof manuscript.author === "string"
-								? manuscript.author.split(" ")[0]
-								: manuscript.author.firstName,
-						lastName:
-							typeof manuscript.author === "string"
-								? manuscript.author.split(" ")[1] || ""
-								: manuscript.author.lastName,
-						fullName: authorFullName,
-						manuscripts: [],
-					};
-				}
-				userManuscripts[authorFullName].manuscripts.push({
-					...manuscript,
-					status:
-						manuscript._id === manuscriptId
-							? "Reviewed"
-							: manuscript.status,
-					reviewerNotes:
-						manuscript._id === manuscriptId
-							? [
-									...(manuscript.reviewerNotes || []),
-									reviewerNote,
-							  ]
-							: manuscript.reviewerNotes,
-				});
-			});
+                if (!userManuscripts[authorFullName]) {
+                    userManuscripts[authorFullName] = {
+                        _id: manuscript._id,
+                        firstName:
+                            typeof manuscript.author === "string"
+                                ? manuscript.author.split(" ")[0]
+                                : manuscript.author.firstName,
+                        lastName:
+                            typeof manuscript.author === "string"
+                                ? manuscript.author.split(" ")[1] || ""
+                                : manuscript.author.lastName,
+                        fullName: authorFullName,
+                        manuscripts: [],
+                    };
+                }
+                // Push manuscript as returned from server to prevent double-adding the just-submitted note
+                userManuscripts[authorFullName].manuscripts.push(manuscript);
+            });
 
 			console.log("Processed user manuscripts:", userManuscripts);
 
@@ -295,7 +292,12 @@ function ReviewerDashboard() {
 	// Handle accepting invitation
 	const handleAcceptInvitation = async (manuscriptId) => {
 		try {
-			const userData = JSON.parse(localStorage.getItem("user"));
+			if (!user || !user.token) {
+				alert("You must be logged in to accept invitations");
+				navigate("/login");
+				return;
+			}
+
 			await axios.post(
 				`${
 					import.meta.env.VITE_BACKEND_URL
@@ -303,7 +305,7 @@ function ReviewerDashboard() {
 				{},
 				{
 					headers: {
-						Authorization: `Bearer ${userData.token}`,
+						Authorization: `Bearer ${user.token}`,
 					},
 				}
 			);
@@ -330,7 +332,12 @@ function ReviewerDashboard() {
 		}
 
 		try {
-			const userData = JSON.parse(localStorage.getItem("user"));
+			if (!user || !user.token) {
+				alert("You must be logged in to reject invitations");
+				navigate("/login");
+				return;
+			}
+
 			await axios.post(
 				`${
 					import.meta.env.VITE_BACKEND_URL
@@ -340,7 +347,7 @@ function ReviewerDashboard() {
 				},
 				{
 					headers: {
-						Authorization: `Bearer ${userData.token}`,
+						Authorization: `Bearer ${user.token}`,
 					},
 				}
 			);

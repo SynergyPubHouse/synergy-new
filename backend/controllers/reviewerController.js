@@ -169,7 +169,7 @@ exports.getAssignedManuscripts = async (req, res) => {
 		// Find the reviewer and populate their assigned manuscripts with corresponding author information
 		const reviewer = await Reviewer.findById(req.user._id).populate({
 			path: "assignedManuscripts",
-			select: "title correspondingAuthor submissionDate status mergedFileUrl reviewerNotes editorNotes",
+			select: "customId title correspondingAuthor submissionDate status mergedFileUrl reviewerNotes editorNotes",
 			populate: {
 				path: "correspondingAuthor",
 				select: "firstName middleName lastName email",
@@ -458,7 +458,7 @@ exports.getPendingInvitations = async (req, res) => {
 			"invitations.status": "pending",
 		})
 			.select(
-				"title type abstract keywords submissionDate invitations editorNotes"
+				"customId title type abstract keywords submissionDate invitations editorNotes"
 			)
 			.lean();
 

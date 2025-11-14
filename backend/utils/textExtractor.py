@@ -3,7 +3,6 @@ import io
 import docx2txt
 import os
 from pathlib import Path
-import spacy
 import json
 import re
 
@@ -45,7 +44,6 @@ def extract_text(file_path):
         return None
 
 def extract_title_abstract_keywords(text):
-    nlp = spacy.load("en_core_web_sm")
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     title = lines[0] if lines else ""
     abstract = ""

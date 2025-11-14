@@ -31,7 +31,7 @@ function ReviewerResetPassword() {
 			);
 			setMessage(response.data.message);
 			setTimeout(() => {
-				navigate(`${BASE_URL}/reviewer/login`);
+				navigate("/login");
 			}, 3000);
 		} catch (err) {
 			setError(err.response?.data?.message || "An error occurred");

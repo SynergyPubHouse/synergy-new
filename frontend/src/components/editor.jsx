@@ -16,7 +16,7 @@ function Editor() {
             </button>
           </Link>
 
-          <Link to="/editor/login">
+          <Link to="/login">
             <button className="w-full bg-[#496580] hover:bg-[#3a5269] text-white font-semibold py-3 px-4 rounded-lg transition duration-300 transform hover:scale-105">
               Sign in as Editor
             </button>

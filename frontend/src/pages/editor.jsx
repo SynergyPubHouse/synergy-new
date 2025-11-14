@@ -1,11 +1,14 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App";
+import { isEditor, getUserFullName } from "../utils/roleUtils";
 
 const BASE_URL = "/journal/jics";
 
 function Editors() {
 	const { user } = useAuth();
+	const userIsEditor = isEditor(user);
+	const userFullName = getUserFullName(user);
 
 	return (
 		<div className="bg-[#f8fafc] text-[#1a365d] min-h-screen">
@@ -17,7 +20,7 @@ function Editors() {
 					transition={{ duration: 1 }}
 					className="text-4xl md:text-6xl font-extrabold text-[#496580] font-serif tracking-wide drop-shadow-lg"
 				>
-					{user && user.role === "editor"
+					{userIsEditor
 						? "Welcome Editor!"
 						: "For Editors"}
 				</motion.h1>
@@ -28,8 +31,8 @@ function Editors() {
 					transition={{ duration: 1, delay: 0.5 }}
 					className="mt-4 text-lg text-[#496580] max-w-2xl"
 				>
-					{user && user.role === "editor"
-						? `Welcome back ${user.firstName}! Manage your editorial tasks and collaborate with authors to ensure high-quality publications.`
+					{userIsEditor
+						? `Welcome back ${userFullName}! Manage your editorial tasks and collaborate with authors to ensure high-quality publications.`
 						: "Join our editorial team and contribute to the advancement of research by ensuring the quality and integrity of publications."}
 				</motion.p>
 
@@ -49,13 +52,13 @@ function Editors() {
 								Join as Editor
 							</Link>
 							<Link
-								to={`${BASE_URL}/editor/login`}
+								to="/login"
 								className="px-8 py-4 bg-[#BAFFF5] hover:bg-[#a8e6dc] text-[#496580] font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
 							>
 								Login as Editor
 							</Link>
 						</>
-					) : user.role !== "editor" ? (
+					) : !userIsEditor ? (
 						<Link
 							to={`${BASE_URL}/editor/register`}
 							className="px-8 py-4 bg-[#496580] hover:bg-[#3a5269] text-white font-semibold text-lg rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
@@ -67,7 +70,7 @@ function Editors() {
 			</section>
 
 			{/* Benefits Section */}
-			{(!user || user.role !== "editor") && (
+			{(!user || !userIsEditor) && (
 				<motion.section
 					initial={{ opacity: 0, y: 50 }}
 					whileInView={{ opacity: 1, y: 0 }}
@@ -115,7 +118,7 @@ function Editors() {
 			)}
 
 			{/* Editor Dashboard */}
-			{user && user.role === "editor" && (
+			{userIsEditor && (
 				<motion.section
 					initial={{ opacity: 0, y: 50 }}
 					whileInView={{ opacity: 1, y: 0 }}
@@ -168,7 +171,7 @@ function Editors() {
 			)}
 
 			{/* Call to Action Section */}
-			{(!user || user.role !== "editor") && (
+			{(!user || !userIsEditor) && (
 				<motion.section
 					initial={{ opacity: 0, y: 50 }}
 					whileInView={{ opacity: 1, y: 0 }}

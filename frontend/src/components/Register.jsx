@@ -15,7 +15,10 @@ function Register() {
     username: "",
     password: "",
     confirmPassword: "",
+    specialization: "",
+    experience: "",
   });
+  const [role, setRole] = useState("Author");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -41,21 +44,30 @@ function Register() {
       return;
     }
 
-    try {
-      // 5. Capture the response from the POST request
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`, 
-        formData
-      );
+    if ((role === "Editor" || role === "Reviewer") && (!formData.specialization || !formData.experience)) {
+      setErrorMessage("Please provide specialization and experience for this role.");
+      setIsLoading(false);
+      return;
+    }
 
-      // 6. Check for data in the response and perform automatic login
-      if (response.data) {
-        login(response.data); // Update the application's auth state
-        localStorage.setItem("user", JSON.stringify(response.data)); // Persist session
-        navigate(from, { replace: true }); // Redirect to the previous page or homepage
+    try {
+      let endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`;
+      if (role === "Editor") endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/register`;
+      if (role === "Reviewer") endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/register`;
+
+      const response = await axios.post(endpoint, formData);
+
+      if (role === "Author") {
+        if (response.data) {
+          login(response.data); // Update the application's auth state
+          localStorage.setItem("user", JSON.stringify(response.data)); // Persist session
+          navigate(from, { replace: true }); // Redirect to the previous page or homepage
+        } else {
+          setErrorMessage("Registration successful, but auto-login failed. Please sign in.");
+        }
       } else {
-        // Fallback if backend registers user but doesn't send back data
-        setErrorMessage("Registration successful, but auto-login failed. Please sign in.");
+        alert(`${role} registration successful. Please log in.`);
+        navigate(`/login`);
       }
       
     } catch (error) {
@@ -115,6 +127,22 @@ function Register() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
+                  <select
+                    name="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                  >
+                    <option>Author</option>
+                    <option>Editor</option>
+                    <option>Reviewer</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-1">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
@@ -168,6 +196,34 @@ function Register() {
                   </div>
                 </div>
               </div>
+
+              {(role === "Editor" || role === "Reviewer") && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Specialization</label>
+                    <input
+                      type="text"
+                      name="specialization"
+                      value={formData.specialization}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Experience (years)</label>
+                    <input
+                      type="number"
+                      name="experience"
+                      value={formData.experience}
+                      onChange={handleChange}
+                      required
+                      min="0"
+                      className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
@@ -232,13 +288,17 @@ function Register() {
                 ) : null}
                 Register Account
               </button>
+
+              <div className="mt-6 text-center text-xs text-gray-500">
+                Already have an account?{' '}
+                <a href={`${BASE_URL}/login`} className="text-cyan-600 hover:underline">
+                  Sign in
+                </a>
+              </div>
             </form>
 
             <div className="mt-6 text-center text-xs text-gray-500">
-              Already have an account?{' '}
-              <a href={`${BASE_URL}/login`} className="text-cyan-600 hover:underline">
-                Sign in
-              </a>
+              
             </div>
           </div>
         </div>

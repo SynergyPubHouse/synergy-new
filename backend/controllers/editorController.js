@@ -132,7 +132,13 @@ const sendStatusChangeNotification = async (
 						<h3 style="margin: 0 0 15px 0; color: #374151; font-size: 16px;">📄 Manuscript Details</h3>
 						<table style="width: 100%; border-collapse: collapse;">
 							<tr>
-								<td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 30%;">Title:</td>
+								<td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 30%;">Manuscript ID:</td>
+								<td style="padding: 8px 0; color: #374151; font-size: 14px; font-weight: 500;">${
+									populatedManuscript.customId || populatedManuscript._id
+								}</td>
+							</tr>
+							<tr>
+								<td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Title:</td>
 								<td style="padding: 8px 0; color: #374151; font-size: 14px; font-weight: 500;">${
 									populatedManuscript.title
 								}</td>
@@ -439,7 +445,7 @@ exports.getUsersWithManuscripts = async (req, res) => {
 					status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 				})
 					.select(
-						"title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt invitations"
+						"customId title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt invitations"
 					)
 					.lean();
 
@@ -1023,7 +1029,7 @@ exports.sendInvitation = async (req, res) => {
 					<h2 style="color: #496580;">Reviewer Invitation - Synergy World Press</h2>
 					<p>Dear Reviewer,</p>
 					<p>You have been invited to review a manuscript titled: <strong>"${manuscript.title}"</strong></p>
-					<p><strong>Manuscript ID:</strong> ${manuscriptId}</p>
+					<p><strong>Manuscript ID:</strong> ${manuscript.customId || manuscriptId}</p>
 					<p><strong>Your Email:</strong> ${email}</p>
 					${editorNoteSection}
 					<p>To accept or reject this invitation, please:</p>
