@@ -38,4 +38,4 @@ jobs:
           protocol: ftps
           local-dir: ./frontend/dist/
           server-dir: ${{ secrets.FTP_UPLOAD_PATH }}/
-          dangerous-clean-slate: false
+          dangerous-clean-slate: true
