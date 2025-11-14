@@ -30,7 +30,7 @@ jobs:
 
       # Upload build folder to Hostinger
       - name: Upload files via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4
+        uses: SamKirkland/ftp-deploy-action@v4
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
@@ -39,3 +39,4 @@ jobs:
           server-dir: ${{ secrets.FTP_UPLOAD_PATH }}
           protocol: ftps
           dangerous-clean-slate: false
+
