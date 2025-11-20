@@ -39,7 +39,7 @@ const LandingPage = () => (
         <section className="bg-white rounded-xl shadow-md p-8">
           <h2 className="text-xl font-bold text-[#00796b] mb-4">Conference Publication</h2>
           <p className="text-[#212121]">
-            Details about conference publications go here. You can list events, papers, or schedules.
+           comming soon...
           </p>
         </section>
 
@@ -47,7 +47,7 @@ const LandingPage = () => (
         <section className="bg-white rounded-xl shadow-md p-8">
           <h2 className="text-xl font-bold text-[#00796b] mb-4">Web Series Cast</h2>
           <p className="text-[#212121]">
-            Details about web series cast go here. You can list names, roles, or short bios.
+          comming soon...
           </p>
         </section>
       </div>

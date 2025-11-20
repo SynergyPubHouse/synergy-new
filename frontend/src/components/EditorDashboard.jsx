@@ -581,67 +581,77 @@ console.log("EditorDashboard user:", user);
 	};
 
 	// Handle send invitations
-	const handleSendInvitations = async () => {
-		setIsSendingInvitations(true); // Start loading
-		try {
-			// Filter out empty emails and trim whitespace
-			const emailArray = inviteEmails
-				.map((email) => email.trim())
-				.filter((email) => email.length > 0);
+const handleSendInvitations = async () => {
+  setIsSendingInvitations(true); // Start loading
+  try {
+    // Filter out empty emails and trim whitespace
+    const emailArray = inviteEmails
+      .map((email) => email.trim())
+      .filter((email) => email.length > 0);
 
-			if (emailArray.length === 0) {
-				addToast("Please enter at least one email address", "error");
-				setIsSendingInvitations(false);
-				return;
-			}
+    // Minimum 3, maximum 6 emails check
+    if (emailArray.length < 3 || emailArray.length > 6) {
+      addToast("Please enter between 3 and 6 email addresses", "error");
+      setIsSendingInvitations(false);
+      return;
+    }
 
-			// Validate email format
-			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-			const invalidEmails = emailArray.filter(
-				(email) => !emailRegex.test(email)
-			);
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = emailArray.filter(
+      (email) => !emailRegex.test(email)
+    );
 
-			if (invalidEmails.length > 0) {
-				addToast(`Invalid email addresses: ${invalidEmails.join(", ")}`, "error");
-				setIsSendingInvitations(false);
-				return;
-			}
+    if (invalidEmails.length > 0) {
+      addToast(
+        `Invalid email addresses: ${invalidEmails.join(", ")}`,
+        "error"
+      );
+      setIsSendingInvitations(false);
+      return;
+    }
 
-			const requestData = {
-				emails: emailArray,
-			};
+    const requestData = {
+      emails: emailArray,
+    };
 
-			// Add editor note if provided
-			if (editorNote.trim()) {
-				requestData.editorNote = editorNote.trim();
-			}
+    // Add editor note if provided
+    if (editorNote.trim()) {
+      requestData.editorNote = editorNote.trim();
+      requestData.id = user._id;
+      requestData.fullName = formatFullName(
+        `${user.firstName} ${user.lastName}`
+      );
+      requestData.edittorEmail = user.email;
+    }
 
-			await axios.post(
-				`${
-					import.meta.env.VITE_BACKEND_URL
-				}/api/auth/editor/manuscripts/${
-					inviteManuscript._id
-				}/invite-reviewers`,
-				requestData,
-				{
-					headers: {
-						Authorization: `Bearer ${user.token}`,
-					},
-				}
-			);
+    await axios.post(
+      `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${
+        inviteManuscript._id
+      }/invite-reviewers`,
+      requestData,
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
 
-			addToast(`Invitations sent successfully to ${emailArray.length} reviewers!`, "success");
-			setShowInviteDialog(false);
-			setInviteEmails([""]);
-			setEditorNote("");
-			setInviteManuscript(null);
-		} catch (error) {
-			console.error("Error sending invitations:", error);
-			addToast("Failed to send invitations", "error");
-		} finally {
-			setIsSendingInvitations(false); // Stop loading
-		}
-	};
+    addToast(
+      `Invitations sent successfully to ${emailArray.length} reviewers!`,
+      "success"
+    );
+    setShowInviteDialog(false);
+    setInviteEmails([""]);
+    setEditorNote("");
+    setInviteManuscript(null);
+  } catch (error) {
+    console.error("Error sending invitations:", error);
+    addToast("Failed to send invitations", "error");
+  } finally {
+    setIsSendingInvitations(false); // Stop loading
+  }
+};
 
 	// Add a new email input field
 	const addEmailField = () => {
