@@ -172,6 +172,20 @@ const manuscriptSchema = new mongoose.Schema(
 		editorNotes: [noteSchema],
 		editorNotesForAuthor: [noteSchema],
 		reviewerNotes: [noteSchema],
+		reviewDocxUrl: {
+    type: String,
+    default: "",
+},
+	authorResponse: {
+			docxUrl: { type: String, default: "" },
+			pdfUrl: { type: String, default: "" },
+			uploadedAt: { type: Date },
+		},
+
+		revisionCombinedPdfUrl: { type: String, default: "" },
+		highlightedRevisionFileUrl: { type: String, default: "" },
+
+
 	},
 	{ timestamps: true }
 );

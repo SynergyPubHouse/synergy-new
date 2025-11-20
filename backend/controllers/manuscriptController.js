@@ -14,8 +14,10 @@ const { convertDocxToPdfNode } = require("../utils/convertDocxToPdfNode");
 const { PythonShell } = require("python-shell");
 const { generateUniqueManuscriptId } = require("../utils/manuscriptIdGenerator");
 const fsSync = require("fs"); // Add at the top if not already
+const axios = require("axios");
 // At the top of manuscriptController.js
 const { uploadToCloudinary } = require("../utils/cloudinary");
+const sendEmail = require("../utils/sendEmail");
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
@@ -53,6 +55,21 @@ const upload = multer({
 	{ name: "declaration", maxCount: 1 },
 ]);
 
+const responseUpload = multer({
+	storage: storage,
+	limits: { fileSize: 50 * 1024 * 1024 },
+	fileFilter: (req, file, cb) => {
+		const allowedTypes = /docx/;
+		const extname = allowedTypes.test(
+			path.extname(file.originalname).toLowerCase()
+		);
+		if (extname) {
+			return cb(null, true);
+		}
+		cb(new Error("Only Word documents (.docx) are allowed for responses!"));
+	},
+}).single("responseDoc");
+
 // Helper function to clean up temporary files
 async function cleanupFiles(filePaths) {
 	for (const filePath of filePaths) {
@@ -64,6 +81,58 @@ async function cleanupFiles(filePaths) {
 			console.error(`Error cleaning up file ${filePath}:`, error);
 		}
 	}
+}
+
+const isUserAuthor = (manuscript, userId) => {
+	if (!manuscript || !userId) return false;
+	const userIdStr = userId.toString();
+
+	const hasAuthor =
+		Array.isArray(manuscript.authors) &&
+		manuscript.authors.some((author) => {
+			const authorId = author?._id ? author._id.toString() : author?.toString();
+			return authorId === userIdStr;
+		});
+
+	if (hasAuthor) return true;
+
+	if (manuscript.correspondingAuthor) {
+		const correspondingId = manuscript.correspondingAuthor._id
+			? manuscript.correspondingAuthor._id.toString()
+			: manuscript.correspondingAuthor.toString();
+		if (correspondingId === userIdStr) {
+			return true;
+		}
+	}
+
+	return false;
+};
+
+async function downloadFileToTemp(fileUrl, prefix, fallbackExt = ".pdf") {
+	if (!fileUrl) {
+		throw new Error("File URL is required");
+	}
+	const response = await axios.get(fileUrl, {
+		responseType: "arraybuffer",
+	});
+
+	let extension = fallbackExt;
+	try {
+		const parsed = new URL(fileUrl);
+		const ext = path.extname(parsed.pathname);
+		if (ext) {
+			extension = ext;
+		}
+	} catch (error) {
+		// ignore parsing issues and use fallback extension
+	}
+
+	const tempPath = path.join(
+		os.tmpdir(),
+		`${prefix}_${Date.now()}${extension}`
+	);
+	await fs.writeFile(tempPath, response.data);
+	return tempPath;
 }
 
 // Helper: Check if a file is a valid PDF
@@ -663,7 +732,9 @@ exports.createManuscript = async (req, res) => {
                 );
                 return res.status(500).json({
                     success: false,
-                    message: "DOCX to PDF conversion failed.",
+                    // message: "DOCX to PDF conversion failed.",
+                    message: err.message || "DOCX to PDF conversion failed.",
+
                 });
             }
 
@@ -994,6 +1065,14 @@ exports.updateManuscriptStatus = async (req, res) => {
             return res.status(404).json({ message: "Manuscript not found" });
         }
 
+		if (currentManuscript.revisionLocked && status !== "Rejected") {
+			return res.status(403).json({
+				success: false,
+				message:
+					"All revision attempts have been exhausted. You can no longer update this manuscript.",
+			});
+		}
+
         // Prevent any status changes if the manuscript is already rejected
         if (currentManuscript.status === "Rejected") {
             return res.status(403).json({
@@ -1001,6 +1080,22 @@ exports.updateManuscriptStatus = async (req, res) => {
                     "Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
             });
         }
+
+		if (
+			status === "Pending" &&
+			currentManuscript.status === "Revision Required"
+		) {
+			const maxAttempts = currentManuscript.maxRevisionAttempts || 3;
+			if (
+				(currentManuscript.revisionAttempts || 0) >= maxAttempts
+			) {
+				return res.status(403).json({
+					success: false,
+					message:
+						"All revision attempts have been exhausted. This manuscript has been rejected.",
+				});
+			}
+		}
 
         const manuscript = await Manuscript.findByIdAndUpdate(
             manuscriptId,
@@ -1026,7 +1121,8 @@ exports.getMySubmissions = async (req, res) => {
     try {
         const user = await User.findById(req.user._id).populate({
             path: "manuscripts",
-            select: "customId title type status createdAt updatedAt mergedFileUrl", // Include only needed fields for author view
+			select:
+				"customId title type status createdAt updatedAt mergedFileUrl reviewDocxUrl editorNotesForAuthor authorResponse revisedPdfBuiltAt revisionAttempts maxRevisionAttempts revisionLocked revisionCombinedPdfUrl",
         });
 
         if (!user) {
@@ -1391,6 +1487,424 @@ exports.getManuscriptNotesForAuthor = async (req, res) => {
 			error: error.message,
 		});
 	}
+};
+
+exports.uploadResponseDoc = async (req, res) => {
+	const { manuscriptId } = req.params;
+
+	responseUpload(req, res, async (err) => {
+		if (err) {
+			return res.status(400).json({
+				success: false,
+				message: err.message,
+			});
+		}
+
+		if (!req.file) {
+			return res.status(400).json({
+				success: false,
+				message: "No response document uploaded",
+			});
+		}
+
+		let tempPdfPath;
+		try {
+			const manuscript = await Manuscript.findById(manuscriptId)
+				.populate("authors", "_id")
+				.populate("correspondingAuthor", "_id");
+
+			if (!manuscript) {
+				await fs.unlink(req.file.path).catch(() => {});
+				return res.status(404).json({
+					success: false,
+					message: "Manuscript not found",
+				});
+			}
+
+			if (manuscript.revisionLocked || manuscript.status === "Rejected") {
+				await fs.unlink(req.file.path).catch(() => {});
+				return res.status(403).json({
+					success: false,
+					message:
+						"All revision attempts have been exhausted. You can no longer upload responses for this manuscript.",
+				});
+			}
+
+			if (!isUserAuthor(manuscript, req.user?._id)) {
+				await fs.unlink(req.file.path).catch(() => {});
+				return res.status(403).json({
+					success: false,
+					message:
+						"You are not authorized to upload responses for this manuscript",
+				});
+			}
+
+			const customId = manuscript.customId || manuscript._id.toString();
+			const timestamp = Date.now();
+			const responseFileName = `${customId}_response_${timestamp}.docx`;
+			const responsePdfName = `response_${customId}_${timestamp}`;
+
+			const fileUploadManager = new FileUploadManager();
+			fileUploadManager.useGoogleDrive =
+				process.env.USE_GOOGLE_DRIVE === "true";
+
+			const driveResult = await fileUploadManager.uploadFile(
+				req.file.path,
+				responseFileName,
+				"responses"
+			);
+
+			tempPdfPath = await convertDocxToPdf(req.file.path);
+			if (!isValidPdf(tempPdfPath)) {
+				throw new Error("Response PDF failed validation");
+			}
+
+			const pdfUpload = await uploadToCloudinary(
+				tempPdfPath,
+				"responses",
+				"raw",
+				responsePdfName
+			);
+
+			manuscript.authorResponse = {
+				docxUrl:
+					driveResult?.webViewLink ||
+					driveResult?.webContentLink ||
+					driveResult?.url,
+				pdfUrl: pdfUpload.secure_url || pdfUpload.url,
+				uploadedAt: new Date(),
+			};
+
+			await manuscript.save();
+
+			await fs.unlink(req.file.path).catch(() => {});
+			if (tempPdfPath) {
+				await fs.unlink(tempPdfPath).catch(() => {});
+			}
+
+			return res.json({
+				success: true,
+				message: "Response document uploaded successfully",
+				authorResponse: manuscript.authorResponse,
+			});
+		} catch (error) {
+			console.error("[uploadResponseDoc]", error);
+			await fs.unlink(req.file.path).catch(() => {});
+			if (tempPdfPath) {
+				await fs.unlink(tempPdfPath).catch(() => {});
+			}
+			return res.status(500).json({
+				success: false,
+				message: "Failed to upload response document",
+				error: error.message,
+			});
+		}
+	});
+};
+
+exports.uploadNotesWord = async (req, res) => {
+  const manuscriptId = req.params.manuscriptId;
+
+
+  console .log("Uploading review notes for manuscript ID:", manuscriptId);
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, os.tmpdir()),
+    filename: (req, file, cb) =>
+      cb(null, `notes_${Date.now()}${path.extname(file.originalname)}`),
+  });
+  const upload = multer({ storage }).single("file");
+  upload(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+    try {
+      // Get manuscript to extract customId for filename
+      const manuscript = await Manuscript.findById(manuscriptId)
+        .populate("authors", "firstName middleName lastName email")
+        .populate("correspondingAuthor", "firstName middleName lastName email");
+      if (!manuscript) {
+        await fs.unlink(req.file.path);
+        return res.status(404).json({ success: false, message: "Manuscript not found" });
+      }
+      // Generate filename from manuscript customId (extract prefix before first hyphen)
+      // Format: customId is like "ART-25-001", we want "ART-review.docx"
+      let fileName = "review.docx";
+      if (manuscript.customId) {
+        const prefix = manuscript.customId.split("-")[0];
+        fileName = `${prefix}-review.docx`;
+      } else {
+        // Fallback: use first letters of title if no customId
+        const titleWords = manuscript.title.split(" ").filter(w => w.length > 0);
+        const prefix = titleWords.slice(0, 3).map(w => w.charAt(0).toUpperCase()).join("");
+        fileName = `${prefix || "REV"}-review.docx`;
+      }
+      const fileUploadManager = new FileUploadManager();
+      fileUploadManager.useGoogleDrive = process.env.USE_GOOGLE_DRIVE === "true";
+      const driveResult = await fileUploadManager.uploadFile(
+        req.file.path,
+        fileName,
+        "notes"
+      );
+ let docxUrl;
+
+if (driveResult?.webViewLink || driveResult?.webContentLink || driveResult?.url) {
+    docxUrl = driveResult.webViewLink || driveResult.webContentLink || driveResult.url;
+} else {
+// Generate ALWAYS unique final filename
+// Generate ALWAYS unique final filename
+const uniqueFileName = `${Date.now()}_${fileName}`;
+
+// Copy to uploads
+const finalPath = path.join(uploadDir, uniqueFileName);
+await fs.copyFile(req.file.path, finalPath);
+
+// Final URL
+docxUrl = `${process.env.BACKEND_URL || "http://localhost:5000"}/uploads/${uniqueFileName}`;
+
+
+}
+
+      // Store the link in manuscript
+      manuscript.reviewDocxUrl = docxUrl;
+      await manuscript.save();
+      console.log("Updated reviewDocxUrl:", manuscript.reviewDocxUrl);
+      // Cleanup temp file (async version)
+      await fs.unlink(req.file.path);
+      // Collect all unique author emails
+      const authorEmails = new Set();
+      if (manuscript.authors && manuscript.authors.length > 0) {
+        manuscript.authors.forEach((author) => {
+          if (author && author.email) {
+            authorEmails.add(author.email.toLowerCase());
+          }
+        });
+      }
+      if (manuscript.correspondingAuthor && manuscript.correspondingAuthor.email) {
+        authorEmails.add(manuscript.correspondingAuthor.email.toLowerCase());
+      }
+      const emailList = Array.from(authorEmails);
+      // Send email to all authors
+      if (emailList.length > 0) {
+        const emailSubject = `Review Comments Available - ${manuscript.title}`;
+        const emailContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">
+            <div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 30px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px;">Synergy World Press</h1>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">Review Comments Available</p>
+            </div>
+            <div style="padding: 30px;">
+              <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                Dear Author,
+              </p>
+              <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                The review comments and notes for your manuscript have been compiled into a Word document and are now available for download.
+              </p>
+              <div style="background-color: #F3F4F6; padding: 20px; margin: 25px 0; border-radius: 8px; border-left: 4px solid #00796B;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #6B7280; font-size: 14px; font-weight: 600;">Manuscript Title:</td>
+                    <td style="padding: 8px 0; color: #374151; font-size: 14px;">${manuscript.title}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6B7280; font-size: 14px; font-weight: 600;">Manuscript ID:</td>
+                    <td style="padding: 8px 0; color: #374151; font-size: 14px;">${manuscript.customId || manuscript._id}</td>
+                  </tr>
+                </table>
+              </div>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${docxUrl}"
+                   style="display: inline-block; background-color: #00796B; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                  Download Review Comments (DOCX)
+                </a>
+              </div>
+              <p style="color: #374151; font-size: 14px; line-height: 1.6;">
+                This document contains all review comments and notes from editors and reviewers. Please review the feedback and take necessary actions.
+              </p>
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/journal/jics/my-submissions"
+                   style="display: inline-block; background-color: #F3F4F6; color: #00796B; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; border: 1px solid #00796B;">
+                  View Your Submissions
+                </a>
+              </div>
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB; color: #6B7280; font-size: 12px; text-align: center;">
+                <p style="margin: 0;">This is an automated notification from Synergy World Press.</p>
+                <p style="margin: 5px 0 0 0;">For questions, please contact: <a href="mailto:support@synergyworldpress.com" style="color: #00796B;">support@synergyworldpress.com</a></p>
+              </div>
+            </div>
+          </div>
+        `;
+        // Send emails to all authors
+        for (const email of emailList) {
+          try {
+            await sendEmail({
+              to: email,
+              subject: emailSubject,
+              html: emailContent,
+            });
+            console.log(`Review DOCX notification sent to: ${email}`);
+          } catch (emailError) {
+            console.error(`Failed to send review DOCX notification to ${email}:`, emailError);
+          }
+        }
+      }
+      res.json({
+        success: true,
+        message: "Notes uploaded successfully and authors have been notified",
+        link: docxUrl,
+      });
+    } catch (error) {
+      console.error("[uploadNotesWord]", error);
+      // Attempt cleanup even if upload failed
+      try { await fs.unlink(req.file.path); } catch (_) {}
+      res.status(500).json({ success: false, message: "Upload failed", error: error.message });
+    }
+  });
+};
+
+exports.buildRevisionPdf = async (req, res) => {
+	const { manuscriptId } = req.params;
+	const tempFiles = [];
+	try {
+		const manuscript = await Manuscript.findById(manuscriptId)
+			.populate("authors", "firstName middleName lastName _id")
+			.populate("correspondingAuthor", "firstName middleName lastName _id email");
+
+		if (!manuscript) {
+			return res.status(404).json({
+				success: false,
+				message: "Manuscript not found",
+			});
+		}
+
+		if (manuscript.revisionLocked || manuscript.status === "Rejected") {
+			return res.status(403).json({
+				success: false,
+				message:
+					"All revision attempts have been exhausted. The manuscript has been rejected and cannot be rebuilt.",
+			});
+		}
+
+		if (!isUserAuthor(manuscript, req.user?._id)) {
+			return res.status(403).json({
+				success: false,
+				message: "You are not allowed to build this manuscript PDF",
+			});
+		}
+
+		if (!manuscript.authorResponse?.pdfUrl) {
+			return res.status(400).json({
+				success: false,
+				message: "Please upload a response document before building the PDF",
+			});
+		}
+
+		const customId = manuscript.customId || manuscript._id.toString();
+
+		const manuscriptPdfPath = await downloadFileToTemp(
+			manuscript.manuscriptFile,
+			`manuscript_${customId}`
+		);
+		const coverLetterPdfPath = await downloadFileToTemp(
+			manuscript.coverLetterFile,
+			`coverLetter_${customId}`
+		);
+		const declarationPdfPath = await downloadFileToTemp(
+			manuscript.declarationFile,
+			`declaration_${customId}`
+		);
+		const responsePdfPath = await downloadFileToTemp(
+			manuscript.authorResponse.pdfUrl,
+			`response_${customId}`
+		);
+
+		tempFiles.push(
+			manuscriptPdfPath,
+			coverLetterPdfPath,
+			declarationPdfPath,
+			responsePdfPath
+		);
+
+		const tableData = {
+			type: manuscript.type,
+			title: manuscript.title,
+			keywords: manuscript.keywords,
+			abstract: manuscript.abstract,
+			classification: manuscript.classification,
+			additionalInfo: manuscript.additionalInfo,
+			comments: manuscript.comments,
+			funding: manuscript.funding,
+			billingInfo: manuscript.billingInfo,
+		};
+
+		const tablePdfPath = await createTablePdf(tableData, customId);
+		tempFiles.push(tablePdfPath);
+
+		const mergedPdfPath = path.join(
+			os.tmpdir(),
+			`revision_${customId}_${Date.now()}.pdf`
+		);
+		await mergePdfs(
+			[
+				tablePdfPath,
+				responsePdfPath,
+				manuscriptPdfPath,
+				coverLetterPdfPath,
+				declarationPdfPath,
+			],
+			mergedPdfPath
+		);
+		tempFiles.push(mergedPdfPath);
+
+		const mergedUpload = await uploadToCloudinary(
+			mergedPdfPath,
+			"merged_manuscripts",
+			"raw",
+			`manuscript_${customId}_revision_${Date.now()}`
+		);
+
+		manuscript.revisionCombinedPdfUrl = mergedUpload.secure_url || mergedUpload.url;
+console.log("Before save:", manuscript.revisionCombinedPdfUrl);
+		manuscript.revisedPdfBuiltAt = new Date();
+		await manuscript.save();
+console.log("After save:", manuscript.revisionCombinedPdfUrl);
+	return res.json({
+    success: true,
+    revisionUrl: manuscript.revisionCombinedPdfUrl,
+});
+	} catch (error) {
+		console.error("[buildRevisionPdf]", error);
+		return res.status(500).json({
+			success: false,
+			message: "Failed to build revision PDF",
+			error: error.message,
+		});
+	} finally {
+		await cleanupFiles(tempFiles);
+	}
+};
+exports.uploadHighlightedFile = async (req, res) => {
+    try {
+        const manuscript = await Manuscript.findById(req.params.id);
+        if (!manuscript) return res.status(404).json({ message: "Manuscript not found" });
+
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+        // Example: Cloudinary upload
+      const uploadedFile = await uploadToCloudinary(
+  req.file.path,
+  "highlighted_revisions",
+  "raw",
+  `highlighted_${manuscript.customId}_${Date.now()}`
+);
+
+manuscript.highlightedRevisionFileUrl = uploadedFile.secure_url || uploadedFile.url;
+await manuscript.save();
+
+
+        return res.json({ success: true, highlightedRevisionFileUrl: manuscript.highlightedRevisionFileUrl });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
 };
 
 module.exports.convertDocxToPdf = convertDocxToPdf;

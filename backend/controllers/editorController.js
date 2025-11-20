@@ -23,6 +23,92 @@ const formatFullName = (user) => {
 	return fullName.trim() || "Unknown";
 };
 
+const buildRevisionExhaustedMessage = (maxAttempts) =>
+	`All ${maxAttempts} revision attempts have been exhausted. Manuscript automatically rejected.`;
+
+const applyRevisionRequiredUpdate = async ({ manuscript, text, editor }) => {
+	if (!manuscript) {
+		throw new Error("MANUSCRIPT_NOT_FOUND");
+	}
+
+	// Ensure editor is provided
+	if (!editor) {
+		const err = new Error("Editor authentication required");
+		err.code = "EDITOR_REQUIRED";
+		throw err;
+	}
+
+	if (manuscript.revisionLocked) {
+		const error = new Error(
+			"All revision attempts have already been exhausted for this manuscript."
+		);
+		error.code = "REVISION_LOCKED";
+		throw error;
+	}
+
+	const trimmedText = text.trim();
+	const maxAttempts = manuscript.maxRevisionAttempts || 3;
+	const nextAttempt = (manuscript.revisionAttempts || 0) + 1;
+	const attemptsExhausted = nextAttempt >= maxAttempts;
+
+	const annotatedNoteText = `${trimmedText} (Revision attempt ${Math.min(
+		nextAttempt,
+		maxAttempts
+	)}/${maxAttempts})`;
+
+	const baseNote = {
+		text: annotatedNoteText,
+		action: "Revision Required",
+		visibility: ["author", "editor"],
+		addedBy: {
+			_id: editor._id,
+			name: formatFullName(editor),
+			email: editor.email,
+			role: "editor",
+		},
+		addedAt: new Date(),
+	};
+
+	const notesToAdd = [baseNote];
+
+	if (attemptsExhausted) {
+		notesToAdd.push({
+			text: buildRevisionExhaustedMessage(maxAttempts),
+			action: "Rejected",
+			visibility: ["author", "editor"],
+			addedBy: {
+				_id: editor._id,
+				name: formatFullName(editor),
+				email: editor.email,
+				role: "editor",
+			},
+			addedAt: new Date(),
+		});
+	}
+
+	const updatedManuscript = await Manuscript.findByIdAndUpdate(
+		manuscript._id,
+		{
+			$push: {
+				editorNotesForAuthor: {
+					$each: notesToAdd,
+				},
+			},
+			revisionAttempts: nextAttempt,
+			revisionLocked: attemptsExhausted,
+			status: attemptsExhausted ? "Rejected" : "Revision Required",
+		},
+		{ new: true }
+	);
+
+	return {
+		updatedManuscript,
+		attemptsExhausted,
+		maxAttempts,
+		noteText: annotatedNoteText,
+	};
+};
+
 // Helper function to send status change notification emails to manuscript authors
 const sendStatusChangeNotification = async (
 	manuscript,
@@ -413,7 +499,7 @@ exports.getManuscriptsByAuthor = async (req, res) => {
 			status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 		})
 			.select(
-				"title type status submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt"
+				"title type status submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked reviewDocxUrl authorResponse revisedPdfBuiltAt"
 			)
 			.sort({ submissionDate: -1 });
 
@@ -445,7 +531,7 @@ exports.getUsersWithManuscripts = async (req, res) => {
 					status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
 				})
 					.select(
-						"customId title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt invitations"
+						"customId title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt invitations reviewDocxUrl authorResponse revisedPdfBuiltAt revisionAttempts maxRevisionAttempts revisionLocked revisionCombinedPdfUrl highlightedRevisionFileUrl"
 					)
 					.lean();
 
@@ -456,6 +542,7 @@ exports.getUsersWithManuscripts = async (req, res) => {
 						const filename = manuscript.mergedFile.split("/").pop();
 						manuscript.mergedFileUrl = `/uploads/${filename}`;
 					}
+					manuscript.authorName = formatFullName(user);
 					return manuscript;
 				});
 
@@ -487,15 +574,21 @@ exports.addNote = async (req, res) => {
 		const { manuscriptId } = req.params;
 		const { text, noteType, action, visibility } = req.body;
 
+		// Determine actor (prefer editor, fall back to generic user/reviewer)
+		const actor = req.editor || req.user;
+		if (!actor) {
+			return res.status(401).json({ message: "Not authenticated" });
+		}
+
 		const note = {
 			text,
 			action,
 			visibility: visibility || ["author", "editor"],
 			addedBy: {
-				_id: req.editor._id,
-				name: formatFullName(req.editor),
-				email: req.editor.email,
-				role: "editor",
+				_id: actor._id,
+				name: formatFullName(actor),
+				email: actor.email,
+				role: req.editor ? "editor" : actor.role || "user",
 			},
 			addedAt: new Date(),
 		};
@@ -545,6 +638,11 @@ exports.getReviewers = async (req, res) => {
 // Update manuscript status
 exports.updateManuscriptStatus = async (req, res) => {
 	try {
+		// Require authentication (editor or other account types)
+		if (!req.editor && !req.user) {
+			return res.status(401).json({ message: "Authentication required" });
+		}
+		const actor = req.editor || req.user;
 		const { manuscriptId } = req.params;
 		const { status, note } = req.body;
 
@@ -552,6 +650,13 @@ exports.updateManuscriptStatus = async (req, res) => {
 		const currentManuscript = await Manuscript.findById(manuscriptId);
 		if (!currentManuscript) {
 			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		if (currentManuscript.revisionLocked) {
+			return res.status(403).json({
+				message:
+					"All revision attempts have been exhausted. This manuscript has been automatically rejected.",
+			});
 		}
 
 		// Store old status for comparison
@@ -582,6 +687,57 @@ exports.updateManuscriptStatus = async (req, res) => {
 			});
 		}
 
+		if (status === "Revision Required") {
+			const revisionText =
+				(note && note.trim().length > 0
+					? note.trim()
+					: "Revision required by editor.");
+			try {
+				const {
+					updatedManuscript,
+					attemptsExhausted,
+					maxAttempts,
+				} = await applyRevisionRequiredUpdate({
+					manuscript: currentManuscript,
+					text: revisionText,
+					editor: actor,
+				});
+
+				if (oldStatus !== updatedManuscript.status) {
+					try {
+						await sendStatusChangeNotification(
+							updatedManuscript,
+							updatedManuscript.status,
+							attemptsExhausted
+								? buildRevisionExhaustedMessage(maxAttempts)
+								: revisionText,
+							actor
+						);
+					} catch (emailError) {
+						console.error(
+							"Failed to send revision required email:",
+							emailError
+						);
+					}
+				}
+
+				return res.json({
+					message: attemptsExhausted
+						? `Revision attempts exhausted. Manuscript rejected after ${maxAttempts} rounds.`
+						: "Revision required note added and status updated successfully",
+					manuscript: updatedManuscript,
+				});
+			} catch (error) {
+				if (error.code === "REVISION_LOCKED") {
+					return res.status(403).json({
+						message:
+							"All revision attempts have been exhausted. This manuscript has already been rejected.",
+					});
+				}
+				throw error;
+			}
+		}
+
 		const manuscript = await Manuscript.findByIdAndUpdate(
 			manuscriptId,
 			{ status },
@@ -590,14 +746,15 @@ exports.updateManuscriptStatus = async (req, res) => {
 
 		// If a note is provided, add it to the appropriate notes array
 		if (note && note.trim()) {
+			const actorForNote = req.editor || req.user;
 			const editorNote = {
 				text: note,
 				action: status,
 				addedBy: {
-					_id: req.editor._id,
-					name: formatFullName(req.editor),
-					email: req.editor.email,
-					role: "editor",
+					_id: actorForNote._id,
+					name: formatFullName(actorForNote),
+					email: actorForNote.email,
+					role: req.editor ? "editor" : actorForNote.role || "user",
 				},
 				addedAt: new Date(),
 			};
@@ -648,6 +805,11 @@ exports.updateManuscriptStatus = async (req, res) => {
 // Bulk update manuscript status (for multiple manuscripts)
 exports.bulkUpdateManuscriptStatus = async (req, res) => {
 	try {
+		// Require authentication (editor or other account types)
+		if (!req.editor && !req.user) {
+			return res.status(401).json({ message: "Authentication required" });
+		}
+		const actor = req.editor || req.user;
 		const { manuscriptIds, status, note } = req.body;
 
 		// Validate status
@@ -692,6 +854,59 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 					success: false,
 					error: "Cannot modify status of a rejected manuscript",
 				});
+				continue;
+			}
+
+			if (status === "Revision Required") {
+				const revisionText =
+					(note && note.trim().length > 0
+						? note.trim()
+						: "Revision required by editor.");
+				try {
+					const {
+						updatedManuscript,
+						attemptsExhausted,
+						maxAttempts,
+					} = await applyRevisionRequiredUpdate({
+						manuscript: currentManuscript,
+						text: revisionText,
+						editor: actor,
+					});
+
+					if (oldStatus !== updatedManuscript.status) {
+						try {
+							await sendStatusChangeNotification(
+								updatedManuscript,
+								updatedManuscript.status,
+								attemptsExhausted
+									? buildRevisionExhaustedMessage(maxAttempts)
+									: revisionText,
+								actor
+							);
+						} catch (emailError) {
+							console.error(
+								`Failed to send status change email for manuscript ${manuscriptId}:`,
+								emailError
+							);
+						}
+					}
+
+					results.push({ manuscriptId, success: true });
+				} catch (error) {
+					if (error.code === "REVISION_LOCKED") {
+						results.push({
+							manuscriptId,
+							success: false,
+							error: "All revision attempts exhausted. Manuscript already rejected.",
+						});
+					} else {
+						results.push({
+							manuscriptId,
+							success: false,
+							error: error.message || "Failed to set revision required status",
+						});
+					}
+				}
 				continue;
 			}
 
@@ -774,6 +989,10 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 // Add revision required note and update status
 exports.addRevisionRequiredNote = async (req, res) => {
 	try {
+		// Require editor authentication for adding revision notes
+	if (!req.editor && !req.user) {
+			return res.status(401).json({ message: "Authentication required" });
+		}
 		const { manuscriptId } = req.params;
 		const { text } = req.body;
 
@@ -800,41 +1019,28 @@ exports.addRevisionRequiredNote = async (req, res) => {
 			});
 		}
 
-		const note = {
+		const actor = req.editor || req.user;
+		const {
+			updatedManuscript,
+			attemptsExhausted,
+			maxAttempts,
+		} = await applyRevisionRequiredUpdate({
+			manuscript: currentManuscript,
 			text: text.trim(),
-			action: "Revision Required",
-			visibility: ["author", "editor"],
-			addedBy: {
-				_id: req.editor._id,
-				name: formatFullName(req.editor),
-				email: req.editor.email,
-				role: "editor",
-			},
-			addedAt: new Date(),
-		};
-
-		// Update the manuscript with the new note and status
-		const manuscript = await Manuscript.findByIdAndUpdate(
-			manuscriptId,
-			{
-				$push: { editorNotesForAuthor: note },
-				status: "Revision Required",
-			},
-			{ new: true }
-		);
-
-		if (!manuscript) {
-			return res.status(404).json({ message: "Manuscript not found" });
-		}
+			editor: actor,
+		});
+		const notificationText = attemptsExhausted
+			? buildRevisionExhaustedMessage(maxAttempts)
+			: text.trim();
 
 		// Send email notification to authors if status has changed
-		if (oldStatus !== "Revision Required") {
+		if (oldStatus !== updatedManuscript.status) {
 			try {
 				await sendStatusChangeNotification(
-					manuscript,
-					"Revision Required",
-					text.trim(),
-					req.editor
+					updatedManuscript,
+					updatedManuscript.status,
+					notificationText,
+					actor
 				);
 			} catch (emailError) {
 				console.error(
@@ -846,12 +1052,15 @@ exports.addRevisionRequiredNote = async (req, res) => {
 		}
 
 		res.json({
-			message:
-				"Revision required note added and status updated successfully",
-			note,
+			message: attemptsExhausted
+				? `Revision attempts exhausted. Manuscript rejected after ${maxAttempts} rounds.`
+				: "Revision required note added and status updated successfully",
 			manuscript: {
-				_id: manuscript._id,
-				status: manuscript.status,
+				_id: updatedManuscript._id,
+				status: updatedManuscript.status,
+				revisionAttempts: updatedManuscript.revisionAttempts,
+				maxRevisionAttempts: updatedManuscript.maxRevisionAttempts,
+				revisionLocked: updatedManuscript.revisionLocked,
 			},
 		});
 	} catch (error) {
@@ -933,8 +1142,10 @@ exports.sendInvitation = async (req, res) => {
 			email: req.editor?.email,
 		});
 
+		console.log("req.editor:", req);
+
 		const { manuscriptId } = req.params;
-		const { emails, editorNote } = req.body;
+		const { emails, editorNote,id, fullName, editorEmail } = req.body;
 
 		if (!emails || !Array.isArray(emails) || emails.length === 0) {
 			return res.status(400).json({
@@ -950,22 +1161,19 @@ exports.sendInvitation = async (req, res) => {
 		// Add editor note if provided
 		if (editorNote && editorNote.trim()) {
 			console.log("Adding editor note:", editorNote.trim());
-			console.log("Editor info:", {
-				id: req.editor._id,
-				name: formatFullName(req.editor),
-				email: req.editor.email,
-			});
+			console.log("Editor info:", req.user);
 
 			const note = {
 				text: editorNote.trim(),
 				action: "Reviewer Invitation",
 				visibility: ["editor", "reviewer"],
 				addedBy: {
-					_id: req.editor._id,
-					name: formatFullName(req.editor),
-					email: req.editor.email,
-					role: "editor",
-				},
+   _id: req.user._id,
+   name:  req.user.firstName + " " + (req.user.lastName || ""),
+   email: req.user.email,
+   role: "editor"
+},
+
 				addedAt: new Date(),
 			};
 

@@ -400,7 +400,7 @@ const ManuscriptPage = () => {
 			// Validate file type
 			const validTypes = ['.docx', '.pdf'];
 			const fileExtension = file.name.split('.').pop().toLowerCase();
-			
+
 			if (!validTypes.includes(`.${fileExtension}`)) {
 				toast.error('Please upload only DOCX or PDF files', {
 					position: "top-center",
@@ -408,7 +408,7 @@ const ManuscriptPage = () => {
 				});
 				return;
 			}
-			
+
 			setFiles((prev) => ({ ...prev, [doc]: file }));
 			setUploadedFiles((prev) => ({ ...prev, [doc]: true }));
 		}
@@ -438,16 +438,29 @@ const ManuscriptPage = () => {
 			return;
 		}
 
-		setFormData((prevData) => ({
-			...prevData,
-			additionalInfo: [...prevData.additionalInfo, itemInput.trim()],
+		const newList = [...formData.additionalInfo, itemInput.trim()];
+
+		setFormData(prev => ({
+			...prev,
+			additionalInfo: newList,
 		}));
-		setItemInput(""); // Clear input after adding
+
+		setItemInput("");
+
 		toast.success("Item added successfully", {
 			position: "top-center",
 			autoClose: 2000,
 		});
+
+		// Auto move to next section ONLY once
+		if (newList.length === 3) {
+			setTimeout(() => {
+				setCurrentSection(5);
+				setCompletedSections([1, 2, 3, 4]) // section 4 → section 5
+			}, 300);
+		}
 	};
+
 
 	// Handle billing info nested fields
 	const handleBillingInfoChange = (e) => {
@@ -478,7 +491,7 @@ const ManuscriptPage = () => {
 				if (!files.manuscript) missingDocs.push("Manuscript");
 				if (!files.coverLetter) missingDocs.push("Cover Letter");
 				if (!files.declaration) missingDocs.push("Declaration");
-				
+
 				if (missingDocs.length > 0) {
 					toast.error(`Please upload the following required documents: ${missingDocs.join(", ")}`, {
 						position: "top-center",
@@ -516,7 +529,7 @@ const ManuscriptPage = () => {
 				if (selectedAuthors.length === 0) errors.push("At least one author");
 				if (correspondingAuthorId === null) errors.push("Corresponding author");
 				if (formData.funding !== "Yes" && formData.funding !== "No") errors.push("Funding information");
-				
+
 				if (errors.length > 0) {
 					toast.error(`Please provide the following required information: ${errors.join(", ")}`, {
 						position: "top-center",
@@ -625,7 +638,7 @@ const ManuscriptPage = () => {
 		setCurrentSection((prev) => {
 			const newSection = Math.max(prev - 1, 1);
 			// Remove current section from completed sections when going back
-			setCompletedSections((completed) => 
+			setCompletedSections((completed) =>
 				completed.filter((section) => section < prev)
 			);
 			return newSection;
@@ -755,7 +768,7 @@ const ManuscriptPage = () => {
 			} else {
 				toast.error(
 					"Submission failed: " +
-						(error.response?.data?.message || error.message),
+					(error.response?.data?.message || error.message),
 					{
 						position: "top-center",
 						autoClose: 4000,
@@ -877,8 +890,7 @@ const ManuscriptPage = () => {
 
 				// Update status to "Under Review"
 				await axios.put(
-					`${
-						import.meta.env.VITE_BACKEND_URL
+					`${import.meta.env.VITE_BACKEND_URL
 					}/api/manuscripts/${id}/status`,
 					{ status: "Under Review" },
 					{
@@ -898,7 +910,7 @@ const ManuscriptPage = () => {
 		} catch (error) {
 			console.error("Error saving manuscript:", error);
 			setIsBuildingPdf(false);
-			
+
 			if (error.code === 'ECONNABORTED') {
 				toast.error("Request timed out. Please check your connection and try again.", {
 					position: "top-center",
@@ -915,7 +927,7 @@ const ManuscriptPage = () => {
 			} else {
 				toast.error(
 					"Save failed: " +
-						(error.response?.data?.message || error.message),
+					(error.response?.data?.message || error.message),
 					{
 						position: "top-center",
 						autoClose: 4000,
@@ -929,19 +941,20 @@ const ManuscriptPage = () => {
 	const handleAcceptPdf = async () => {
 		try {
 			await axios.put(
-				`${
-					import.meta.env.VITE_BACKEND_URL
-				}/api/manuscripts/${manuscriptId}/status`,
-				{ status: "Saved" },
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
+				{ status: "Pending" },  // 👈 Saved → Pending
 				{
 					headers: {
 						Authorization: `Bearer ${user.token}`,
 					},
 				}
 			);
+
 			setAcceptOrRejectPdf(false);
-			// Redirect to my submissions page
+
+			// Editor ko request chali jayegi, user ko list par redirect
 			navigate(`${BASE_URL}/my-submissions`);
+
 		} catch (error) {
 			console.error("Error accepting manuscript:", error);
 			toast.error("Failed to accept manuscript. Please try again.", {
@@ -954,8 +967,7 @@ const ManuscriptPage = () => {
 	const handleRejectPdf = async () => {
 		try {
 			await axios.put(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/manuscripts/${manuscriptId}/status`,
 				{ status: "Rejected" },
 				{
@@ -993,7 +1005,7 @@ const ManuscriptPage = () => {
 	const [buildError, setBuildError] = useState(null);
 	const [AcceptOrRejectPdf, setAcceptOrRejectPdf] = useState(false);
 	const [pdfViewed, setPdfViewed] = useState(false);
-
+	console.log("pdfUrl", pdfUrl)
 	const handleProceedAndBuildPdf = async (e) => {
 		setIsBuildingPdf(true);
 		setPdfUrl(null);
@@ -1018,10 +1030,9 @@ const ManuscriptPage = () => {
 				while (attempts < 12) {
 					// Poll for up to 1 minute (12 x 5s)
 					const resp = await axios.get(
-						`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${
-							result.manuscriptId
+						`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${result.manuscriptId
 						}`,
-						{ 
+						{
 							headers: { Authorization: `Bearer ${user.token}` },
 							timeout: 10000 // 10 second timeout per request
 						}
@@ -1119,9 +1130,8 @@ const ManuscriptPage = () => {
 
 			if (response.data.success) {
 				const mergedPdfPath = response.data.mergedPdfPath;
-				const downloadUrl = `${
-					import.meta.env.VITE_BACKEND_URL
-				}/${mergedPdfPath}`;
+				const downloadUrl = `${import.meta.env.VITE_BACKEND_URL
+					}/${mergedPdfPath}`;
 				window.open(downloadUrl, "_blank");
 				setPdfBuilt(true);
 			}
@@ -1135,7 +1145,7 @@ const ManuscriptPage = () => {
 			} else {
 				toast.error(
 					"Failed to build PDF: " +
-						(error.response?.data?.message || error.message),
+					(error.response?.data?.message || error.message),
 					{
 						position: "top-center",
 						autoClose: 4000,
@@ -1451,12 +1461,20 @@ const ManuscriptPage = () => {
 		}
 		// eslint-disable-next-line
 	}, [files.manuscript]);
+	const handleEdit = () => {
+		setCurrentSection(2); // User goes back to Step 1 (File Upload)
+		setPdfBuilt(false);   // PDF build screen hide
+		setPdfViewed(false);  // So buttons disable again
+		setAcceptOrRejectPdf(false); // Hide accept/reject buttons
+		setCompletedSections([1])
+		setPdfUrl(null);
 
+	};
 	return (
 		<div className="min-h-screen bg-[#f8fafc] p-6 text-[#212121] relative">
 			{/* Toast Container for notifications */}
 			<ToastContainer />
-			
+
 			{/* PDF Building Loading Overlay */}
 			{isBuildingPdf && (
 				<div className="fixed inset-0 bg-opacity-50 z-50 flex items-center justify-center">
@@ -1508,38 +1526,37 @@ const ManuscriptPage = () => {
 				{[...Array(totalSections)].map((_, i) => (
 					<React.Fragment key={i}>
 						<motion.div
-						className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mx-2 
-					${
-						currentSection === i + 1
-							? "bg-[#00796b] text-white cursor-default"
-							: completedSections.includes(i + 1)
-							? "bg-[#BAFFF5] text-[#00796b] cursor-pointer"
-							: i + 1 <= Math.max(...completedSections) + 1
-							? "bg-[#e2e8f0] text-[#00796b] cursor-pointer"
-							: "bg-gray-300 text-gray-500 cursor-not-allowed"
-					}`}
-						whileHover={{
-							scale:
-								i + 1 <= Math.max(...completedSections) + 1
-									? 1.1
-									: 1,
-							cursor:
-								i + 1 <= Math.max(...completedSections) + 1
-									? "pointer"
-									: "not-allowed",
-						}}
-						onClick={() => {
-							if (
-								i + 1 <=
-								Math.max(...completedSections) + 1
-							) {
-								handleStepClick(i + 1);
-							}
-						}}
-						title={stepLabels[i]}
-					>
-						{i + 1}
-					</motion.div>
+							className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mx-2 
+					${currentSection === i + 1
+									? "bg-[#00796b] text-white cursor-default"
+									: completedSections.includes(i + 1)
+										? "bg-[#BAFFF5] text-[#00796b] cursor-pointer"
+										: i + 1 <= Math.max(...completedSections) + 1
+											? "bg-[#e2e8f0] text-[#00796b] cursor-pointer"
+											: "bg-gray-300 text-gray-500 cursor-not-allowed"
+								}`}
+							whileHover={{
+								scale:
+									i + 1 <= Math.max(...completedSections) + 1
+										? 1.1
+										: 1,
+								cursor:
+									i + 1 <= Math.max(...completedSections) + 1
+										? "pointer"
+										: "not-allowed",
+							}}
+							onClick={() => {
+								if (
+									i + 1 <=
+									Math.max(...completedSections) + 1
+								) {
+									handleStepClick(i + 1);
+								}
+							}}
+							title={stepLabels[i]}
+						>
+							{i + 1}
+						</motion.div>
 
 						{/* Progress Bar */}
 						{i < totalSections - 1 && (
@@ -1697,11 +1714,10 @@ const ManuscriptPage = () => {
 													title={uploadedFiles[doc] ? "File uploaded" : "No file uploaded"}
 												/>
 												<label
-													className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white ${
-														dragOver
-															? "border-[#00796b] bg-[#e0f7fa]"
-															: "border-[#e0e0e0] hover:bg-[#e0f7fa]"
-													}`}
+													className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white ${dragOver
+														? "border-[#00796b] bg-[#e0f7fa]"
+														: "border-[#e0e0e0] hover:bg-[#e0f7fa]"
+														}`}
 													onDragEnter={(e) => {
 														e.preventDefault();
 														e.stopPropagation();
@@ -1751,14 +1767,14 @@ const ManuscriptPage = () => {
 															) {
 																// Create a synthetic event to reuse your existing handler
 																const syntheticEvent =
-																	{
-																		target: {
-																			files: e
-																				.dataTransfer
-																				.files,
-																			name: doc,
-																		},
-																	};
+																{
+																	target: {
+																		files: e
+																			.dataTransfer
+																			.files,
+																		name: doc,
+																	},
+																};
 																handleFileChange(
 																	syntheticEvent,
 																	doc
@@ -1879,13 +1895,12 @@ const ManuscriptPage = () => {
 										{classificationOptions.map((option) => (
 											<div
 												key={option}
-												className={`p-3 cursor-pointer transition-all duration-200 ${
-													formData.classification.includes(
-														option
-													)
-														? "bg-[#BAFFF5] text-[#00796b] font-semibold border-l-4 border-[#00796b]"
-														: "hover:bg-[#e0f7fa] text-[#00796b]"
-												}`}
+												className={`p-3 cursor-pointer transition-all duration-200 ${formData.classification.includes(
+													option
+												)
+													? "bg-[#BAFFF5] text-[#00796b] font-semibold border-l-4 border-[#00796b]"
+													: "hover:bg-[#e0f7fa] text-[#00796b]"
+													}`}
 												onClick={(e) => {
 													e.stopPropagation();
 													handleInputChange({
@@ -2108,7 +2123,7 @@ const ManuscriptPage = () => {
 
 																const isCorrespondingAuthor =
 																	authorId ===
-																		correspondingAuthorId;
+																	correspondingAuthorId;
 
 																return (
 																	<Draggable draggableId={String(authorId)} index={index} key={authorId}>
@@ -2139,7 +2154,7 @@ const ManuscriptPage = () => {
 																								}
 																								disabled={
 																									index ===
-																										0
+																									0
 																								}
 																								className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
 																							>
@@ -2153,8 +2168,8 @@ const ManuscriptPage = () => {
 																								}
 																								disabled={
 																									index ===
-																										selectedAuthors.length -
-																											1
+																									selectedAuthors.length -
+																									1
 																								}
 																								className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed text-sm"
 																							>
@@ -2205,38 +2220,37 @@ const ManuscriptPage = () => {
 																				<td className="px-4 py-3">
 																					{authorId !==
 																						user._id && (
-																						<div className="flex space-x-2">
-																							<button
-																								onClick={() =>
-																									handleRemoveAuthor(
-																										authorId
-																									)
-																								}
-																								className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
-																							>
-																								Remove
-																							</button>
-																							<button
-																								onClick={() =>
-																									setCorrespondingAuthorId(
-																										authorId
-																									)
-																								}
-																								className={`px-3 py-1 rounded text-sm transition-colors ${
-																									isCorrespondingAuthor
+																							<div className="flex space-x-2">
+																								<button
+																									onClick={() =>
+																										handleRemoveAuthor(
+																											authorId
+																										)
+																									}
+																									className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
+																								>
+																									Remove
+																								</button>
+																								<button
+																									onClick={() =>
+																										setCorrespondingAuthorId(
+																											authorId
+																										)
+																									}
+																									className={`px-3 py-1 rounded text-sm transition-colors ${isCorrespondingAuthor
 																										? "bg-[#BAFFF5] text-[#00796b] cursor-default"
 																										: "bg-[#00796b] hover:bg-[#3a5269] text-white"
-																								}`}
-																								disabled={
-																									isCorrespondingAuthor
-																								}
-																							>
-																								{isCorrespondingAuthor
-																									? "Current Corresponding"
-																									: "Make Corresponding"}
-																							</button>
-																						</div>
-																					)}
+																										}`}
+																									disabled={
+																										isCorrespondingAuthor
+																									}
+																								>
+																									{isCorrespondingAuthor
+																										? "Current Corresponding"
+																										: "Make Corresponding"}
+																								</button>
+																							</div>
+																						)}
 																				</td>
 																			</tr>
 																		)}
@@ -2394,11 +2408,10 @@ const ManuscriptPage = () => {
 														onChange={
 															handleNewAuthorChange
 														}
-														className={`w-full border rounded px-2 py-1 text-sm border-[#e0e0e0] ${
-															isEmailVerified
-																? "border-green-500"
-																: ""
-														}`}
+														className={`w-full border rounded px-2 py-1 text-sm border-[#e0e0e0] ${isEmailVerified
+															? "border-green-500"
+															: ""
+															}`}
 														required
 													/>
 													{isEmailVerified && (
@@ -2577,131 +2590,131 @@ const ManuscriptPage = () => {
 							</div>
 
 							{formData.funding === "Yes" && (
-							<div className="mb-4 mt-4 p-4 border border-[#e0e0e0] rounded-lg bg-gray-50">
-								<h3 className="font-semibold mb-3 text-[#00796b]">
-									Billing Information
-								</h3>
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-									<div>
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											Name *
-										</label>
-										<input
-											type="text"
-											name="name"
-											value={formData.billingInfo.name}
-											onChange={handleBillingInfoChange}
-											placeholder="Full name"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
-									</div>
-									<div>
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											Organization *
-										</label>
-										<input
-											type="text"
-											name="organization"
-											value={formData.billingInfo.organization}
-											onChange={handleBillingInfoChange}
-											placeholder="Organization name"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
-									</div>
-									<div className="md:col-span-2">
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											Address *
-										</label>
-										<input
-											type="text"
-											name="address"
-											value={formData.billingInfo.address}
-											onChange={handleBillingInfoChange}
-											placeholder="Street address"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
-									</div>
-									<div>
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											City *
-										</label>
-										<input
-											type="text"
-											name="city"
-											value={formData.billingInfo.city}
-											onChange={handleBillingInfoChange}
-											placeholder="City"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
-									</div>
-									<div>
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											State/Province
-										</label>
-										<input
-											type="text"
-											name="state"
-											value={formData.billingInfo.state}
-											onChange={handleBillingInfoChange}
-											placeholder="State or Province"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
-									</div>
-									<div>
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											Postal Code *
-										</label>
-										<input
-											type="text"
-											name="postalCode"
-											value={formData.billingInfo.postalCode}
-											onChange={handleBillingInfoChange}
-											placeholder="Postal code"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
-									</div>
-									<div>
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											Country *
-										</label>
-										<input
-											type="text"
-											name="country"
-											value={formData.billingInfo.country}
-											onChange={handleBillingInfoChange}
-											placeholder="Country"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
-									</div>
-									<div>
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											Award Number
-										</label>
-										<input
-											type="text"
-											name="awardNumber"
-											value={formData.billingInfo.awardNumber}
-											onChange={handleBillingInfoChange}
-											placeholder="Grant award number"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
-									</div>
-									<div>
-										<label className="block text-sm font-medium mb-1 text-[#00796b]">
-											Grant Recipient
-										</label>
-										<input
-											type="text"
-											name="grantRecipient"
-											value={formData.billingInfo.grantRecipient}
-											onChange={handleBillingInfoChange}
-											placeholder="Grant recipient name"
-											className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-										/>
+								<div className="mb-4 mt-4 p-4 border border-[#e0e0e0] rounded-lg bg-gray-50">
+									<h3 className="font-semibold mb-3 text-[#00796b]">
+										Billing Information
+									</h3>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										<div>
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												Name *
+											</label>
+											<input
+												type="text"
+												name="name"
+												value={formData.billingInfo.name}
+												onChange={handleBillingInfoChange}
+												placeholder="Full name"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
+										<div>
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												Organization *
+											</label>
+											<input
+												type="text"
+												name="organization"
+												value={formData.billingInfo.organization}
+												onChange={handleBillingInfoChange}
+												placeholder="Organization name"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
+										<div className="md:col-span-2">
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												Address *
+											</label>
+											<input
+												type="text"
+												name="address"
+												value={formData.billingInfo.address}
+												onChange={handleBillingInfoChange}
+												placeholder="Street address"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
+										<div>
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												City *
+											</label>
+											<input
+												type="text"
+												name="city"
+												value={formData.billingInfo.city}
+												onChange={handleBillingInfoChange}
+												placeholder="City"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
+										<div>
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												State/Province
+											</label>
+											<input
+												type="text"
+												name="state"
+												value={formData.billingInfo.state}
+												onChange={handleBillingInfoChange}
+												placeholder="State or Province"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
+										<div>
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												Postal Code *
+											</label>
+											<input
+												type="text"
+												name="postalCode"
+												value={formData.billingInfo.postalCode}
+												onChange={handleBillingInfoChange}
+												placeholder="Postal code"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
+										<div>
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												Country *
+											</label>
+											<input
+												type="text"
+												name="country"
+												value={formData.billingInfo.country}
+												onChange={handleBillingInfoChange}
+												placeholder="Country"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
+										<div>
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												Award Number
+											</label>
+											<input
+												type="text"
+												name="awardNumber"
+												value={formData.billingInfo.awardNumber}
+												onChange={handleBillingInfoChange}
+												placeholder="Grant award number"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
+										<div>
+											<label className="block text-sm font-medium mb-1 text-[#00796b]">
+												Grant Recipient
+											</label>
+											<input
+												type="text"
+												name="grantRecipient"
+												value={formData.billingInfo.grantRecipient}
+												onChange={handleBillingInfoChange}
+												placeholder="Grant recipient name"
+												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+											/>
+										</div>
 									</div>
 								</div>
-							</div>
-						)}
+							)}
 
 							<div className="flex justify-between">
 								{renderBackButton(6)}
@@ -2719,7 +2732,7 @@ const ManuscriptPage = () => {
 											>
 												{isBuildingPdf
 													? "Building PDF..."
-													: "Proceed and Build PDF"}
+													: "Build PDF"}
 											</button>
 										)}
 
@@ -2744,11 +2757,10 @@ const ManuscriptPage = () => {
 												type="button"
 												onClick={handleAcceptPdf}
 												disabled={!pdfViewed}
-												className={`px-6 py-2 rounded-lg ${
-													pdfViewed
-														? "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
-														: "bg-gray-400 text-gray-700 cursor-not-allowed"
-												}`}
+												className={`px-6 py-2 rounded-lg ${pdfViewed
+													? "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
+													: "bg-gray-400 text-gray-700 cursor-not-allowed"
+													}`}
 												title={
 													!pdfViewed
 														? "Please view the PDF first"
@@ -2764,11 +2776,10 @@ const ManuscriptPage = () => {
 												type="button"
 												onClick={handleRejectPdf}
 												disabled={!pdfViewed}
-												className={`px-6 py-2 rounded-lg ${
-													pdfViewed
-														? "bg-red-600 text-white hover:bg-red-700 cursor-pointer"
-														: "bg-gray-400 text-gray-700 cursor-not-allowed"
-												}`}
+												className={`px-6 py-2 rounded-lg ${pdfViewed
+													? "bg-red-600 text-white hover:bg-red-700 cursor-pointer"
+													: "bg-gray-400 text-gray-700 cursor-not-allowed"
+													}`}
 												title={
 													!pdfViewed
 														? "Please view the PDF first"
@@ -2778,7 +2789,26 @@ const ManuscriptPage = () => {
 												Reject
 											</button>
 										)}
+										{AcceptOrRejectPdf && (
+											<button
+												type="button"
+												onClick={handleEdit}
+												disabled={!pdfViewed}
+												className={`px-6 py-2 rounded-lg ${pdfViewed
+													? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+													: "bg-gray-400 text-gray-700 cursor-not-allowed"
+													}`}
+												title={
+													!pdfViewed
+														? "Please view the PDF first"
+														: "Edit and restart from File Upload"
+												}
+											>
+												Edit
+											</button>
+										)}
 									</div>
+
 
 									{/* Show message when accept/reject buttons are visible but PDF not viewed */}
 									{AcceptOrRejectPdf && !pdfViewed && (

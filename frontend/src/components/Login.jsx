@@ -22,10 +22,14 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState({ show: false, message: "" });
+  const [editorPassKey, setEditorPassKey] = useState("");
+const [showEditorKeyInput, setShowEditorKeyInput] = useState(false);
+
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from || '/';
   const { login } = useAuth();
+  console.log("from", from);
   
   // NO LONGER NEEDED: const [googleClientId, setGoogleClientId] = useState('');
 
@@ -71,6 +75,7 @@ function Login() {
         { token: credentialResponse.credential }
       );
       
+    
       if (response.data) {
         localStorage.setItem("user", JSON.stringify(response.data));
         login(response.data);
@@ -84,7 +89,10 @@ function Login() {
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Google Login Failed";
+
+      console.log("errormsg", errorMessage)
       setError(errorMessage);
+     
     } finally {
       setIsLoading(false);
     }
@@ -99,48 +107,53 @@ function Login() {
     setError("");
   };
 
-  const handleSubmit = async (e, role) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-    try {
-      // Use unified login endpoint for all roles
-      const url = `${import.meta.env.VITE_BACKEND_URL}/api/auth/login`;
-      const payload = { ...formData };
+const handleSubmit = async (e, role, passKey = "") => {
+  e.preventDefault();
+  setIsLoading(true);
+  setError("");
+  try {
+    const url = `${import.meta.env.VITE_BACKEND_URL}/api/auth/login`;
+    const payload = { ...formData };
 
-      const response = await axios.post(url, payload);
-      
-      if (response.data) {
-        // Unified login system - response contains user data with role information
-        const userData = { ...response.data };
-        let redirectPath = '/';
-
-        // Determine redirect path based on user's current role or available roles
-        if (userData.accountType === 'editor' || userData.availableRoles?.includes('editor')) {
-          redirectPath = '/journal/jics/editor/dashboard';
-        } else if (userData.accountType === 'reviewer' || userData.availableRoles?.includes('reviewer')) {
-          redirectPath = '/journal/jics/reviewer/dashboard';
-        } else {
-          redirectPath = '/';
-        }
-
-        localStorage.setItem("user", JSON.stringify(userData));
-        login(userData);
-        setSuccess({
-          show: true,
-          message: `Login successful as ${role}! Taking you to your account...`
-        });
-        setTimeout(() => navigate(redirectPath, { replace: true }), 2000);
-      } else {
-        setError("Login Failed: User data missing");
-      }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || "Login Failed";
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+    if (role === "Editor") {
+      payload.passKey = passKey; // send the editor key to backend
     }
-  };
+
+    const response = await axios.post(url, payload);
+
+    if (response.data) {
+
+      console.log("Login response data:", response.data);
+      const userData = { ...response.data };
+      let redirectPath = from;
+      if (userData.accountType === 'editor' || userData.availableRoles?.includes('editor')) {
+        redirectPath = '/journal/jics/editor/dashboard';
+      } else if (userData.accountType === 'reviewer' || userData.availableRoles?.includes('reviewer')) {
+        redirectPath = '/journal/jics/reviewer/dashboard';
+      }
+
+      localStorage.setItem("user", JSON.stringify(userData));
+      login(userData);
+      setSuccess({
+        show: true,
+        message: `Login successful as ${role}! Taking you to your account...`
+      });
+      setTimeout(() => navigate(redirectPath, { replace: true }), 2000);
+    } else {
+      setError("Login Failed: User data missing");
+    }
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || "Login Failed";
+   
+    setError(errorMessage);
+      if (errorMessage== "Editor key required") {
+        setShowEditorKeyInput(true);
+      }
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const handleOrcidLogin = () => {
     window.location.href = ORCID_AUTH_URL;
@@ -155,14 +168,14 @@ function Login() {
         <div className="bg-gradient-to-br from-teal-600 to-cyan-500 p-8 lg:p-12 flex flex-col justify-center items-center lg:items-start text-white lg:w-2/5">
           <div className="bg-white/20 backdrop-blur-sm p-4 rounded-2xl mb-8">
             <img
-              src="/images/SynergyLogo.png"
+              src="/images/JICSLogo.png"
               alt="Synergy World Press Logo"
               className="w-20 h-20 object-contain"
             />
           </div>
           
           <h1 className="text-3xl lg:text-4xl font-bold mb-2 text-center lg:text-left">
-            Synergy World Press
+           Journal of Intelligent Computing System
           </h1>
           <p className="text-cyan-100 text-center lg:text-left">
             Access your account to continue your publishing journey
@@ -226,7 +239,29 @@ function Login() {
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all"
                 />
               </div>
-
+ {showEditorKeyInput && (
+  <div className="mt-3 space-y-2">
+    <label htmlFor="editorKey" className="text-sm font-medium text-gray-700">
+      Enter SSH / Editor Key:
+    </label>
+    <input
+      id="editorKey"
+      type="password"
+      placeholder="Enter editor pass key"
+      value={editorPassKey}
+      onChange={(e) => setEditorPassKey(e.target.value)}
+      className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all"
+    />
+    <button
+      type="button"
+      onClick={(e) => handleSubmit(e, 'Editor', editorPassKey)}
+      disabled={isLoading || !editorPassKey}
+      className="w-full py-2.5 px-4 rounded-lg bg-cyan-500 text-white font-medium hover:bg-cyan-600 disabled:opacity-50"
+    >
+      {isLoading ? "..." : "Submit Key & Login"}
+    </button>
+  </div>
+)}
               {/* Role-based Login Buttons */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
@@ -247,7 +282,7 @@ function Login() {
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => handleSubmit(e, 'Editor')}
+                   onClick={() => setShowEditorKeyInput(true)}
                   disabled={isLoading}
                   className="py-2.5 px-4 rounded-lg bg-gradient-to-r from-gray-100 to-gray-200 hover:from-cyan-50 hover:to-cyan-100 text-gray-700 hover:text-cyan-700 font-medium text-sm transition-all border border-gray-300 hover:border-cyan-400 disabled:opacity-50"
                 >
@@ -335,6 +370,8 @@ function Login() {
                 &copy; {new Date().getFullYear()} Synergy World Press. All rights reserved.
               </p>
             </div>
+           
+
           </div>
         </div>
       </div>

@@ -108,7 +108,8 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
         });
         
         const page = await browser.newPage();
-        await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+        await page.setContent(fullHtml, { waitUntil: 'networkidle0', timeout: 0 });
+
         
         // Generate PDF with appropriate settings
         await page.pdf({

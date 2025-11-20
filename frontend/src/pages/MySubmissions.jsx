@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "../App";
 import { Link, useNavigate } from "react-router-dom";
+import { CLOSING } from "ws";
 
 const BASE_URL = "/journal/jics";
 
@@ -12,8 +13,11 @@ const MySubmissions = () => {
 	const [error, setError] = useState(null);
 	const [showConfirmation, setShowConfirmation] = useState(null);
 	const [showNotes, setShowNotes] = useState(null);
+	const [uploadingResponseFor, setUploadingResponseFor] = useState(null);
+	const [buildingPdfFor, setBuildingPdfFor] = useState(null);
+	const [pdfViewedIds, setPdfViewedIds] = useState(new Set());
 	const navigate = useNavigate();
-
+	console.log("menuscript", manuscripts)
 	useEffect(() => {
 		fetchManuscripts();
 	}, [user?.token]);
@@ -21,8 +25,7 @@ const MySubmissions = () => {
 	const fetchManuscripts = async () => {
 		try {
 			const response = await axios.get(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/manuscripts/my-submissions`,
 				{
 					headers: {
@@ -31,6 +34,15 @@ const MySubmissions = () => {
 				}
 			);
 			setManuscripts(response.data);
+			setPdfViewedIds((prev) => {
+				const updated = new Set();
+				(response.data || []).forEach((manuscript) => {
+					if (prev.has(manuscript._id)) {
+						updated.add(manuscript._id);
+					}
+				});
+				return updated;
+			});
 			setLoading(false);
 		} catch (err) {
 			console.error("Error fetching manuscripts:", err);
@@ -42,16 +54,154 @@ const MySubmissions = () => {
 	const handleViewPdf = (manuscriptId, mergedFileUrl) => {
 		if (mergedFileUrl) {
 			window.open(mergedFileUrl, "_blank");
+			setPdfViewedIds((prev) => {
+				const updated = new Set(prev);
+				updated.add(manuscriptId);
+				return updated;
+			});
 		} else {
 			alert("PDF is not available yet.");
+		}
+	};
+
+	const handleResponseUpload = async (manuscriptId, file) => {
+		if (!file) return;
+		if (!file.name.toLowerCase().endsWith(".docx")) {
+			alert("Please upload a DOCX file for your response.");
+			return;
+		}
+
+		const manuscript = manuscripts.find((m) => m._id === manuscriptId);
+		if (!manuscript) {
+			alert("Manuscript not found.");
+			return;
+		}
+		if (manuscript.revisionLocked || manuscript.status === "Rejected") {
+			alert(
+				"All revision attempts are exhausted. You cannot upload additional responses."
+			);
+			return;
+		}
+
+		try {
+			setUploadingResponseFor(manuscriptId);
+			const formData = new FormData();
+			formData.append("responseDoc", file);
+			await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL
+				}/api/manuscripts/${manuscriptId}/upload-response`,
+				formData,
+				{
+					headers: {
+						"Content-Type": "multipart/form-data",
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			alert("Response document uploaded successfully.");
+			await fetchManuscripts();
+		} catch (error) {
+			console.error("Error uploading response document:", error);
+			alert("Failed to upload response document. Please try again.");
+		} finally {
+			setUploadingResponseFor(null);
+		}
+	};
+
+	const handleBuildRevisionPdf = async (manuscriptId) => {
+		const manuscript = manuscripts.find((m) => m._id === manuscriptId);
+		if (!manuscript) {
+			alert("Manuscript not found.");
+			return;
+		}
+		if (manuscript.revisionLocked || manuscript.status === "Rejected") {
+			alert(
+				"All revision attempts are exhausted. You cannot build a new PDF."
+			);
+			return;
+		}
+
+		try {
+			setBuildingPdfFor(manuscriptId);
+			const response = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL
+				}/api/manuscripts/${manuscriptId}/build-revision-pdf`,
+				{},
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			if (response.data?.success) {
+				alert(
+					"Updated PDF built successfully. Please review it before sending to the editor."
+				);
+				await fetchManuscripts();
+			} else {
+				alert("PDF build completed, but no URL was returned.");
+			}
+		} catch (error) {
+			console.error("Error building updated PDF:", error);
+			alert(
+				error.response?.data?.message ||
+				"Failed to build updated PDF. Please try again."
+			);
+		} finally {
+			setBuildingPdfFor(null);
+		}
+	};
+
+	const handleSendToEditor = async (manuscriptId) => {
+		const manuscript = manuscripts.find((m) => m._id === manuscriptId);
+		if (!manuscript) {
+			alert("Manuscript not found.");
+			return;
+		}
+		if (manuscript.revisionLocked || manuscript.status === "Rejected") {
+			alert(
+				"All revision attempts are exhausted. This manuscript is already rejected."
+			);
+			return;
+		}
+
+		try {
+			await axios.put(
+				`${import.meta.env.VITE_BACKEND_URL
+				}/api/manuscripts/${manuscriptId}/status`,
+				{ status: "Pending" },
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			alert("Revision sent to the editor successfully.");
+			setPdfViewedIds((prev) => {
+				const updated = new Set(prev);
+				updated.delete(manuscriptId);
+				return updated;
+			});
+			await fetchManuscripts();
+		} catch (error) {
+			console.error("Error sending manuscript to editor:", error);
+			alert("Failed to update manuscript status. Please try again.");
+		}
+	};
+
+	const handleDownloadReviewDocx = (reviewDocxUrl) => {
+		if (reviewDocxUrl) {
+			window.open(reviewDocxUrl, "_blank");
+		} else {
+			alert("Review comments document is not available yet.");
 		}
 	};
 
 	const handleWithdrawal = async (manuscriptId) => {
 		try {
 			await axios.delete(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/manuscripts/${manuscriptId}`,
 				{
 					headers: {
@@ -71,8 +221,7 @@ const MySubmissions = () => {
 	const handleAccept = async (manuscriptId) => {
 		try {
 			await axios.put(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/manuscripts/${manuscriptId}/status`,
 				{ status: "Pending" },
 				{
@@ -129,16 +278,15 @@ const MySubmissions = () => {
 								{note.action && (
 									<div className="mt-2">
 										<span
-											className={`px-2 py-1 text-xs rounded ${
-												note.action === "Rejected"
-													? "bg-red-500"
-													: note.action ===
-													  "Under Review"
+											className={`px-2 py-1 text-xs rounded ${note.action === "Rejected"
+												? "bg-red-500"
+												: note.action ===
+													"Under Review"
 													? "bg-yellow-500"
 													: note.action === "Accepted"
-													? "bg-green-500"
-													: "bg-blue-500"
-											} text-white`}
+														? "bg-green-500"
+														: "bg-blue-500"
+												} text-white`}
 										>
 											{note.action}
 										</span>
@@ -197,6 +345,38 @@ const MySubmissions = () => {
 		);
 	}
 
+
+
+	const handleUploadHighlightedFile = async (manuscriptId, file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("highlightedFile", file);
+
+    try {
+        await axios.post(
+            `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/upload-highlighted`,
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                    Authorization: `Bearer ${user.token}`,
+                },
+            }
+        );
+
+        alert("Highlighted revision file uploaded successfully.");
+        await fetchManuscripts();
+    } catch (err) {
+        alert("Failed to upload highlighted file");
+        console.error(err);
+    }
+};
+
+
+
+
+
 	return (
 		<div className="min-h-screen bg-[#f9f9f9] p-6 text-[#212121] mt-20 md:mt-16">
 			<div className="max-w-6xl mx-auto">
@@ -220,212 +400,406 @@ const MySubmissions = () => {
 					</div>
 				) : (
 					<div className="space-y-6">
-						{manuscripts.map((manuscript) => (
-							<div
-								key={manuscript._id}
-								className="bg-white rounded-lg p-6 shadow-md border border-[#e0e0e0]"
-							>
-								<div className="flex justify-between items-center mb-4 border-b border-[#e0e0e0] pb-4">
-									<h2 className="text-xl font-bold text-[#00796b]">
-										{manuscript.title}
-									</h2>
-									<div className="text-right">
-										<div className="text-sm text-[#00796b] font-medium">
-											Manuscript ID:{" "}
-											{manuscript.customId || manuscript._id
-												.slice(-6)
-												.toUpperCase()}
-										</div>
-										<div className="text-xs text-gray-500 mt-1">
-											{manuscript.createdAt
-												? `Submitted: ${new Date(
+						{manuscripts.map((manuscript) => {
+							const attemptsUsed = manuscript.revisionAttempts || 0;
+							const maxAttempts = manuscript.maxRevisionAttempts || 3;
+							const attemptsExhausted =
+								manuscript.revisionLocked ||
+								attemptsUsed >= maxAttempts ||
+								manuscript.status === "Rejected";
+							const hasResponseDoc =
+								Boolean(manuscript.authorResponse?.pdfUrl) ||
+								Boolean(manuscript.authorResponse?.docxUrl);
+							const hasBuiltRevision = Boolean(
+								manuscript.revisedPdfBuiltAt
+							);
+							const canSendToEditor =
+								manuscript.status === "Revision Required" &&
+								hasBuiltRevision &&
+								pdfViewedIds.has(manuscript._id) &&
+								!attemptsExhausted;
+
+
+							return (
+								<div
+									key={manuscript._id}
+									className="bg-white rounded-lg p-6 shadow-md border border-[#e0e0e0]"
+								>
+									<div className="flex justify-between items-center mb-4 border-b border-[#e0e0e0] pb-4">
+										<h2 className="text-xl font-bold text-[#00796b]">
+											{manuscript.title}
+										</h2>
+										<div className="text-right">
+											<div className="text-sm text-[#00796b] font-medium">
+												Manuscript ID:{" "}
+												{manuscript.customId || manuscript._id
+													.slice(-6)
+													.toUpperCase()}
+											</div>
+											<div className="text-xs text-gray-500 mt-1">
+												{manuscript.createdAt
+													? `Submitted: ${new Date(
 														manuscript.createdAt
-												  ).toLocaleDateString(
+													).toLocaleDateString(
 														"en-US",
 														{
 															month: "short",
 															day: "numeric",
 															year: "numeric",
 														}
-												  )} at ${new Date(
+													)} at ${new Date(
 														manuscript.createdAt
-												  ).toLocaleTimeString(
+													).toLocaleTimeString(
 														"en-US",
 														{
 															hour: "2-digit",
 															minute: "2-digit",
 														}
-												  )}`
-												: "Date not available"}
+													)}`
+													: "Date not available"}
+											</div>
 										</div>
 									</div>
-								</div>
 
-								{/* Timestamp Section */}
-								<div className="mb-4 bg-[#f5f5f5] p-3 rounded-lg border border-[#e0e0e0]">
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-										<div className="flex items-center">
-											<span className="font-semibold text-[#00796b] mr-2">
-												Submitted:
-											</span>
-											<span className="text-[#212121]">
-												{manuscript.createdAt
-													? new Date(
+									{/* Timestamp Section */}
+									<div className="mb-4 bg-[#f5f5f5] p-3 rounded-lg border border-[#e0e0e0]">
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+											<div className="flex items-center">
+												<span className="font-semibold text-[#00796b] mr-2">
+													Submitted:
+												</span>
+												<span className="text-[#212121]">
+													{manuscript.createdAt
+														? new Date(
 															manuscript.createdAt
-													  ).toLocaleDateString(
+														).toLocaleDateString(
 															"en-US",
 															{
 																year: "numeric",
 																month: "long",
 																day: "numeric",
 															}
-													  )
-													: "N/A"}
-											</span>
-										</div>
-										<div className="flex items-center">
-											<span className="font-semibold text-[#00796b] mr-2">
-												Time:
-											</span>
-											<span className="text-[#212121]">
-												{manuscript.createdAt
-													? new Date(
+														)
+														: "N/A"}
+												</span>
+											</div>
+											<div className="flex items-center">
+												<span className="font-semibold text-[#00796b] mr-2">
+													Time:
+												</span>
+												<span className="text-[#212121]">
+													{manuscript.createdAt
+														? new Date(
 															manuscript.createdAt
-													  ).toLocaleTimeString(
+														).toLocaleTimeString(
 															"en-US",
 															{
 																hour: "2-digit",
 																minute: "2-digit",
 																hour12: true,
 															}
-													  )
-													: "N/A"}
-											</span>
-										</div>
-										{manuscript.updatedAt &&
-											manuscript.updatedAt !==
+														)
+														: "N/A"}
+												</span>
+											</div>
+											{manuscript.updatedAt &&
+												manuscript.updatedAt !==
 												manuscript.createdAt && (
-												<>
-													<div className="flex items-center">
-														<span className="font-semibold text-[#00796b] mr-2">
-															Last Updated:
-														</span>
-														<span className="text-[#212121]">
-															{new Date(
-																manuscript.updatedAt
-															).toLocaleDateString(
-																"en-US",
-																{
-																	year: "numeric",
-																	month: "long",
-																	day: "numeric",
-																}
-															)}
-														</span>
-													</div>
-													<div className="flex items-center">
-														<span className="font-semibold text-[#00796b] mr-2">
-															Updated Time:
-														</span>
-														<span className="text-[#212121]">
-															{new Date(
-																manuscript.updatedAt
-															).toLocaleTimeString(
-																"en-US",
-																{
-																	hour: "2-digit",
-																	minute: "2-digit",
-																	hour12: true,
-																}
-															)}
-														</span>
-													</div>
-												</>
-											)}
-									</div>
-								</div>
-
-								<div className="grid grid-cols-3 gap-4">
-									<div className="flex items-center justify-center">
-										<div className="text-lg font-semibold text-[#00796b]">
-											{manuscript.type}
+													<>
+														<div className="flex items-center">
+															<span className="font-semibold text-[#00796b] mr-2">
+																Last Updated:
+															</span>
+															<span className="text-[#212121]">
+																{new Date(
+																	manuscript.updatedAt
+																).toLocaleDateString(
+																	"en-US",
+																	{
+																		year: "numeric",
+																		month: "long",
+																		day: "numeric",
+																	}
+																)}
+															</span>
+														</div>
+														<div className="flex items-center">
+															<span className="font-semibold text-[#00796b] mr-2">
+																Updated Time:
+															</span>
+															<span className="text-[#212121]">
+																{new Date(
+																	manuscript.updatedAt
+																).toLocaleTimeString(
+																	"en-US",
+																	{
+																		hour: "2-digit",
+																		minute: "2-digit",
+																		hour12: true,
+																	}
+																)}
+															</span>
+														</div>
+													</>
+												)}
 										</div>
 									</div>
 
-									<div className="flex flex-col space-y-3 items-center">
-										<button
-											onClick={() =>
-												handleViewPdf(
-													manuscript._id,
-													manuscript.mergedFileUrl
-												)
-											}
-											className="w-full px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-lg transition-colors"
-										>
-											View PDF
-										</button>
-										<button
-											onClick={() =>
-												setShowConfirmation(
-													manuscript._id
-												)
-											}
-											className={`w-full px-4 py-2 ${
-												manuscript.status === "Under Review"
-													? "bg-gray-300 text-gray-500 cursor-not-allowed"
-													: "bg-red-500 hover:bg-red-600 text-white"
-											} font-semibold rounded-lg transition-colors`}
-											disabled={manuscript.status === "Under Review"}
-										>
-											Withdrawal
-										</button>
-										{manuscript.status !== "Rejected" && (
-											<button
-												onClick={() => handleAccept(manuscript._id)}
-												className={`w-full px-4 py-2 ${
-													manuscript.status === "Under Review"
+									<div className="grid grid-cols-3 gap-4">
+										<div className="flex items-center justify-center">
+											<div className="text-lg font-semibold text-[#00796b]">
+												{manuscript.type}
+											</div>
+										</div>
+
+										<div className="flex flex-col space-y-3 items-center">
+											{manuscript.reviewDocxUrl && (
+												<button
+													onClick={() =>
+														handleDownloadReviewDocx(
+															manuscript.reviewDocxUrl
+														)
+													}
+													className="w-full px-4 py-2 bg-[#9c27b0] hover:bg-[#7b1fa2] text-white font-semibold rounded-lg transition-colors"
+												>
+													📄 Download Review Comments
+												</button>
+											)}
+											{manuscript.reviewDocxUrl  && (
+												<button
+													onClick={() =>
+														handleBuildRevisionPdf(
+															manuscript._id
+														)
+													}
+													disabled={
+														!hasResponseDoc ||
+														buildingPdfFor ===
+														manuscript._id ||
+														attemptsExhausted
+													}
+													className={`w-full px-4 py-2 font-semibold rounded-lg transition-colors ${!hasResponseDoc
 														? "bg-gray-300 text-gray-500 cursor-not-allowed"
-														: "bg-green-500 hover:bg-green-600 text-white"
-												} font-semibold rounded-lg transition-colors`}
-												disabled={manuscript.status === "Under Review"}
-											>
-												Send to Editor
-											</button>
-										)}
-										<button
-											onClick={() =>
-												handleNotesClick(manuscript._id)
-											}
-											className={`w-full px-4 py-2 
+														: buildingPdfFor ===
+															manuscript._id
+															? "bg-[#ff9800] text-white cursor-wait"
+															: attemptsExhausted
+																? "bg-gray-300 text-gray-500 cursor-not-allowed"
+																: "bg-[#ff9800] hover:bg-[#fb8c00] text-white"
+														}`}
+												>
+													{buildingPdfFor === manuscript._id
+														? "Building..."
+														: "Build Updated PDF"}
+												</button>
+											)}
+										{/* Original PDF */}
+{manuscript.mergedFileUrl && (
+  <button
+    onClick={() => {
+      window.open(manuscript.mergedFileUrl, "_blank");
+      setPdfViewedIds((prev) => {
+        const updated = new Set(prev);
+        updated.add(manuscript._id);
+        return updated;
+      });
+    }}
+    className="w-full px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-lg transition-colors mb-2"
+  >
+    📄 View Original PDF
+  </button>
+)}
+
+{/* Highlighted Revision */}
+{manuscript.highlightedRevisionFileUrl && (
+  <button
+    onClick={() => {
+      const url = manuscript.highlightedRevisionFileUrl;
+      const viewerUrl = url.endsWith(".pdf")
+        ? url
+        : `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+      window.open(viewerUrl, "_blank");
+    }}
+    className="w-full px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-lg transition-colors mb-2"
+  >
+    ✏️ View Highlighted Revision
+  </button>
+)}
+
+{/* Combined Revision PDF */}
+{manuscript.revisionCombinedPdfUrl && (
+  <button
+    onClick={() => {
+      window.open(manuscript.revisionCombinedPdfUrl, "_blank");
+      setPdfViewedIds((prev) => {
+        const updated = new Set(prev);
+        updated.add(manuscript._id);
+        return updated;
+      });
+    }}
+    className="w-full px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-lg transition-colors"
+  >
+    📑 View Combined Revision PDF
+  </button>
+)}
+
+											{manuscript.revisedPdfBuiltAt &&
+												!pdfViewedIds.has(manuscript._id) &&
+												manuscript.status ===
+												"Revision Required" && (
+													<p className="text-xs text-[#00796b] text-center">
+														View the updated PDF to
+														enable "Send to Editor".
+													</p>
+												)}
+											{canSendToEditor && (
+												<button
+													onClick={() =>
+														handleSendToEditor(
+															manuscript._id
+														)
+													}
+													className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+												>
+													Send to Editor
+												</button>
+											)}
+											<button
+												onClick={() =>
+													handleNotesClick(manuscript._id)
+												}
+												className={`w-full px-4 py-2 
 												 bg-purple-500 hover:bg-purple-600 text-white
 													
 											 font-semibold rounded-lg transition-colors`}
-										>
-											Notes
-										</button>
+											>
+												Notes
+											</button>
+										</div>
+
+										<div className="flex items-center justify-center">
+											<span
+												className={`text-lg font-semibold ${getStatusColor(
+													manuscript.status
+												)}`}
+											>
+												{manuscript.status || "Pending"}
+											</span>
+										</div>
 									</div>
 
-									<div className="flex items-center justify-center">
-										<span
-											className={`text-lg font-semibold ${getStatusColor(
-												manuscript.status
-											)}`}
-										>
-											{manuscript.status || "Pending"}
-										</span>
-									</div>
+									{manuscript.status === "Revision Required" && (
+										<p className="text-xs text-[#496580] mt-2">
+											Revision attempts used: {attemptsUsed}/
+											{maxAttempts}
+										</p>
+									)}
+									{attemptsExhausted && (
+										<p className="text-xs text-red-600 font-semibold mt-1">
+											All revision attempts exhausted. Manuscript automatically rejected.
+										</p>
+									)}
+
+									{manuscript.reviewDocxUrl && (
+	<div className="mt-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
+		<p className="text-sm font-semibold text-[#00796b] mb-2">
+			Response to Reviewers
+		</p>
+
+		{/* RESPONSE DOCX UPLOAD */}
+		<div className="flex flex-col md:flex-row gap-3">
+			<input
+				type="file"
+				accept=".docx"
+				onChange={(e) => {
+					handleResponseUpload(
+						manuscript._id,
+						e.target.files?.[0]
+					);
+					e.target.value = null;
+				}}
+				disabled={
+					uploadingResponseFor === manuscript._id ||
+					attemptsExhausted
+				}
+				className="w-full border border-dashed border-[#00796b] rounded-lg px-3 py-2 text-sm text-[#00796b] bg-white"
+			/>
+			{manuscript.authorResponse?.docxUrl && (
+				<a
+					href={manuscript.authorResponse.docxUrl}
+					target="_blank"
+					rel="noreferrer"
+					className="text-sm text-[#00796b] underline"
+				>
+					View uploaded response
+				</a>
+			)}
+		</div>
+
+		{/* Show uploading text */}
+		{uploadingResponseFor === manuscript._id && (
+			<p className="text-xs text-[#00796b] mt-2">Uploading response...</p>
+		)}
+
+		{/* HIGHLIGHTED FILE UPLOAD */}
+		<div className="mt-3">
+			<p className="text-sm font-semibold text-[#00796b] mb-1">
+				Upload Highlighted Revision File
+			</p>
+
+			<input
+				type="file"
+				accept=".doc,.docx,.pdf"
+				onChange={(e) => {
+					handleUploadHighlightedFile(
+						manuscript._id,
+						e.target.files?.[0]
+					);
+					e.target.value = null;
+				}}
+				disabled={attemptsExhausted}
+				className="w-full border border-dashed border-[#00796b] rounded-lg px-3 py-2 text-sm text-[#00796b] bg-white"
+			/>
+
+			{manuscript.highlightedRevisionFileUrl && (
+				<a
+					href={manuscript.highlightedRevisionFileUrl}
+					target="_blank"
+					rel="noreferrer"
+					className="text-sm text-[#00796b] underline mt-2 inline-block"
+				>
+					View Uploaded Highlighted File
+				</a>
+			)}
+		</div>
+
+		{/* Disable messages */}
+		{!hasResponseDoc && (
+			<p className="text-xs text-[#00796b] mt-2">
+				Upload your response DOCX to enable the updated PDF build.
+			</p>
+		)}
+
+		{attemptsExhausted && (
+			<p className="text-xs text-red-600 font-semibold mt-2">
+				Uploads disabled because all revision attempts are exhausted.
+			</p>
+		)}
+	</div>
+)}
+
+									{showNotes === manuscript._id && (
+										<div className="mt-4">
+											{renderNotes(manuscript)}
+										</div>
+									)}
 								</div>
-
-								{showNotes === manuscript._id && (
-									<div className="mt-4">
-										{renderNotes(manuscript)}
-									</div>
-								)}
-							</div>
-						))}
+							);
+						})}
 					</div>
 				)}
 			</div>
+			
 
 			{showConfirmation && (
 				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

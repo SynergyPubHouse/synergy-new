@@ -7,9 +7,9 @@ const Header = () => (
       <div className="flex flex-col items-center md:items-start gap-4">
         <div className="relative">
           <img
-            src="/images/SynergyLogo.png"
+            src="/images/SWP-bgremove.png"
             alt="Synergy World Press Logo"
-            className="w-32 h-32 md:w-40 md:h-40 object-contain bg-white rounded-xl shadow-lg"
+            className="w-32 h-33 md:w-40 md:h-40 object-contain"
           />
         </div>
       </div>

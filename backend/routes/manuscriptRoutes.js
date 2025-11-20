@@ -3,7 +3,15 @@ const express = require("express");
 const router = express.Router();
 const manuscriptController = require("../controllers/manuscriptController");
 const auth = require("../middleware/auth");
+const multer = require("multer");
+const os = require("os");
 
+// ---- Multer setup ----
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, os.tmpdir()),
+    filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
+});
+const upload = multer({ storage });
 // Manuscript routes
 router.post("/manuscripts", auth, manuscriptController.createManuscript);
 router.post(
@@ -50,6 +58,28 @@ router.post(
 	"/manuscripts/extract",
 	auth,
 	manuscriptController.extractManuscriptInfo
+);
+router.post(
+  "/manuscripts/:manuscriptId/upload-notes-word",
+  auth,
+  manuscriptController.uploadNotesWord
+);
+router.post(
+	"/manuscripts/:manuscriptId/upload-response",
+	auth,
+	manuscriptController.uploadResponseDoc
+);
+router.post(
+	"/manuscripts/:manuscriptId/build-revision-pdf",
+	auth,
+	manuscriptController.buildRevisionPdf
+);
+
+router.post(
+    "/manuscripts/:id/upload-highlighted",
+    auth,
+    upload.single("highlightedFile"), 
+    manuscriptController.uploadHighlightedFile
 );
 
 module.exports = router;

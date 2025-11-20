@@ -14,10 +14,11 @@ const userSchema = new mongoose.Schema({
 		default: null,
 	},
 	roles: [{
-		type: String,
-		enum: ["author", "corresponding_author"],
-		default: ["author"]
-	}],
+    type: String,
+    enum: ["author", "corresponding_author", "editor", "reviewer"],
+    default: ["author"]
+}],
+
 	googleId: { type: String, unique: true, sparse: true },
 	orcidId: { type: String, unique: true, sparse: true },
 	isVerified: { type: Boolean, default: false }
