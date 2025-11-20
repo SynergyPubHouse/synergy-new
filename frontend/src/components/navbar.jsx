@@ -103,21 +103,23 @@ console.log("user", user)
         <div className="flex items-center gap-4">
           {user ? (
             <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2 focus:outline-none"
-              >
-                {user?.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt="User"
-                    className="w-10 h-10 rounded-full border-2 border-[#00acc1]"
-                  />
-                ) : (
-                  <FaUserCircle className="w-10 h-10 text-[#00acc1]" />
-                )}
-                <span className="text-sm">{user?.name}</span>
-              </button>
+               {location.pathname !== "/" && (
+        <button
+          onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+          className="flex items-center gap-2 focus:outline-none"
+        >
+          {user?.photoURL ? (
+            <img
+              src={user.photoURL}
+              alt="User"
+              className="w-10 h-10 rounded-full border-2 border-[#00acc1]"
+            />
+          ) : (
+            <FaUserCircle className="w-10 h-10 text-[#00acc1]" />
+          )}
+          <span className="text-sm">{user?.name}</span>
+        </button>
+      )}
 
               <AnimatePresence>
                 {userDropdownOpen && (

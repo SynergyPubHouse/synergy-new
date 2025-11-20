@@ -1142,8 +1142,10 @@ exports.sendInvitation = async (req, res) => {
 			email: req.editor?.email,
 		});
 
+		console.log("req.editor:", req);
+
 		const { manuscriptId } = req.params;
-		const { emails, editorNote } = req.body;
+		const { emails, editorNote,id, fullName, editorEmail } = req.body;
 
 		if (!emails || !Array.isArray(emails) || emails.length === 0) {
 			return res.status(400).json({
@@ -1159,22 +1161,19 @@ exports.sendInvitation = async (req, res) => {
 		// Add editor note if provided
 		if (editorNote && editorNote.trim()) {
 			console.log("Adding editor note:", editorNote.trim());
-			console.log("Editor info:", {
-				id: req.editor._id,
-				name: formatFullName(req.editor),
-				email: req.editor.email,
-			});
+			console.log("Editor info:", req.user);
 
 			const note = {
 				text: editorNote.trim(),
 				action: "Reviewer Invitation",
 				visibility: ["editor", "reviewer"],
 				addedBy: {
-					_id: req.editor._id,
-					name: formatFullName(req.editor),
-					email: req.editor.email,
-					role: "editor",
-				},
+   _id: req.user._id,
+   name:  req.user.firstName + " " + (req.user.lastName || ""),
+   email: req.user.email,
+   role: "editor"
+},
+
 				addedAt: new Date(),
 			};
 

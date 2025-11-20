@@ -614,6 +614,9 @@ console.log("EditorDashboard user:", user);
 			// Add editor note if provided
 			if (editorNote.trim()) {
 				requestData.editorNote = editorNote.trim();
+				requestData.id =user._id;
+				requestData.fullName = formatFullName(`${user.firstName} ${user.lastName}`);
+				requestData.edittorEmail = user.email;	
 			}
 
 			await axios.post(
