@@ -1,5 +1,5 @@
-import React from 'react'
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
 
 const BookPublication = () => {
   return (
@@ -40,6 +40,6 @@ const BookPublication = () => {
       </div>
     </div>
   );
-}
+};
 
-export default BookPublication
+export default BookPublication;

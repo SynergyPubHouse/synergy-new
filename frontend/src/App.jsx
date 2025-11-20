@@ -1,11 +1,11 @@
 import React, { useState, createContext, useContext, useEffect } from "react";
 
 import {
-	BrowserRouter as Router,
-	Route,
-	Routes,
-	Navigate,
-	useLocation,
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+  useLocation,
 } from "react-router-dom";
 import Login from "./components/Login";
 import SendLoginDetails from "./pages/SendLoginDetails";
@@ -46,7 +46,8 @@ import FinalEvaluationAndAcceptance from "./pages/peer-review/FinalEvaluationAnd
 import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationIntegrityAndTimeline";
 
 import PageNotAvailable from "./pages/pagenotavailable";
-import BookPublication from "./pages/bookPublication";
+import BookPublication from "./pages/BookPublication";
+
 // Create Authentication Context
 const AuthContext = createContext(null);
 
@@ -55,240 +56,242 @@ const JICS_URL = "/journal/jics";
 // const BASE_URL = '/';
 
 function ScrollToTop() {
-	const { pathname } = useLocation();
+  const { pathname } = useLocation();
 
-	useEffect(() => {
-		window.scrollTo(0, 0);
-	}, [pathname]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
-	return null;
+  return null;
 }
 function AppContent() {
-	const location = useLocation();
-	const hideNavFooter =
-		location.pathname === "/login" || location.pathname === "/register";
-	const [user, setUser] = React.useState(null);
-	const [isLoading, setIsLoading] = React.useState(true);
+  const location = useLocation();
+  const hideNavFooter =
+    location.pathname === "/login" || location.pathname === "/register";
+  const [user, setUser] = React.useState(null);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-	React.useEffect(() => {
-		console.log(
-			"Current Path:",
-			location.pathname,
-			"Hide Navbar:",
-			location.pathname === "/" ||
-				location.pathname.startsWith("/jics") ||
-				location.pathname.startsWith("/peer-review")
-		);
-	}, [location.pathname]);
+  React.useEffect(() => {
+    console.log(
+      "Current Path:",
+      location.pathname,
+      "Hide Navbar:",
+      location.pathname === "/" ||
+        location.pathname.startsWith("/jics") ||
+        location.pathname.startsWith("/peer-review")
+    );
+  }, [location.pathname]);
 
-	React.useEffect(() => {
-		const storedUser = localStorage.getItem("user");
-		if (storedUser) {
-			setUser(JSON.parse(storedUser));
-		}
-		setIsLoading(false);
-	}, []);
+  React.useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setIsLoading(false);
+  }, []);
 
-	const login = (userData) => {
-		setUser(userData);
-		localStorage.setItem("user", JSON.stringify(userData));
-	};
+  const login = (userData) => {
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+  };
 
-	const logout = () => {
-		setUser(null);
-		localStorage.removeItem("user");
-	};
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("user");
+  };
 
-	if (isLoading) {
-		return (
-			<div className="flex h-screen items-center justify-center">
-				Loading...
-			</div>
-		);
-	}
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
 
-	// Hide Navbar on landing and JICS journal pages
-	// const hideNavbar =
-	//     location.pathname === "/" ||
-	//     location.pathname.startsWith("/jics") ||
-	//     location.pathname.startsWith("/peer-review");
+  // Hide Navbar on landing and JICS journal pages
+  // const hideNavbar =
+  //     location.pathname === "/" ||
+  //     location.pathname.startsWith("/jics") ||
+  //     location.pathname.startsWith("/peer-review");
 
-	return (
-		<AuthContext.Provider value={{ user, login, logout }}>
-			{/* {!hideNavbar && <Navbar />} */}
-			{!hideNavFooter && <Navbar />}
-			<Routes>
-				{/* Landing Page */}
-				<Route path="/" element={<LandingPage />} />
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {/* {!hideNavbar && <Navbar />} */}
+      {!hideNavFooter && <Navbar />}
+      <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<LandingPage />} />
 
-				{/* JICS Journal Routes */}
-				<Route path={`${JICS_URL}/*`} element={<JICSJournal />} />
+        {/* JICS Journal Routes */}
+        <Route path={`${JICS_URL}/*`} element={<JICSJournal />} />
 
-				{/* Peer Review Process Routes */}
-				<Route
-					path={`/peer-review/initial-editorial-screening`}
-					element={<InitialEditorialScreening />}
-				/>
-				<Route
-					path={`${JICS_URL}/peer-review/initial-editorial-screening`}
-					element={<InitialEditorialScreening />}
-				/>
-				<Route
-					path={`/peer-review/double-blind-peer-review`}
-					element={<DoubleBlindPeerReview />}
-				/>
-				<Route
-					path={`${JICS_URL}/peer-review/double-blind-peer-review`}
-					element={<DoubleBlindPeerReview />}
-				/>
-				<Route
-					path={`/peer-review/feedback-and-revisions`}
-					element={<FeedbackAndRevisions />}
-				/>
-				<Route
-					path={`${JICS_URL}/peer-review/feedback-and-revisions`}
-					element={<FeedbackAndRevisions />}
-				/>
-				<Route
-					path={`/peer-review/final-evaluation-and-acceptance`}
-					element={<FinalEvaluationAndAcceptance />}
-				/>
-				<Route
-					path={`${JICS_URL}/peer-review/final-evaluation-and-acceptance`}
-					element={<FinalEvaluationAndAcceptance />}
-				/>
-				<Route
-					path={`/peer-review/publication-integrity-and-timeline`}
-					element={<PublicationIntegrityAndTimeline />}
-				/>
-				<Route
-					path={`${JICS_URL}/peer-review/publication-integrity-and-timeline`}
-					element={<PublicationIntegrityAndTimeline />}
-				/>
+        {/* Peer Review Process Routes */}
+        <Route
+          path={`/peer-review/initial-editorial-screening`}
+          element={<InitialEditorialScreening />}
+        />
+        <Route
+          path={`${JICS_URL}/peer-review/initial-editorial-screening`}
+          element={<InitialEditorialScreening />}
+        />
+        <Route
+          path={`/peer-review/double-blind-peer-review`}
+          element={<DoubleBlindPeerReview />}
+        />
+        <Route
+          path={`${JICS_URL}/peer-review/double-blind-peer-review`}
+          element={<DoubleBlindPeerReview />}
+        />
+        <Route
+          path={`/peer-review/feedback-and-revisions`}
+          element={<FeedbackAndRevisions />}
+        />
+        <Route
+          path={`${JICS_URL}/peer-review/feedback-and-revisions`}
+          element={<FeedbackAndRevisions />}
+        />
+        <Route
+          path={`/peer-review/final-evaluation-and-acceptance`}
+          element={<FinalEvaluationAndAcceptance />}
+        />
+        <Route
+          path={`${JICS_URL}/peer-review/final-evaluation-and-acceptance`}
+          element={<FinalEvaluationAndAcceptance />}
+        />
+        <Route
+          path={`/peer-review/publication-integrity-and-timeline`}
+          element={<PublicationIntegrityAndTimeline />}
+        />
+        <Route
+          path={`${JICS_URL}/peer-review/publication-integrity-and-timeline`}
+          element={<PublicationIntegrityAndTimeline />}
+        />
 
-				<Route path="/orcid-callback" element={<OrcidCallback />} />
+        <Route path="/orcid-callback" element={<OrcidCallback />} />
 
-				<Route path="/books" element={<BookPublication />} />
+        <Route path="/books" element={<BookPublication />} />
 
-				{/* Journal Management Routes */}
-				{/* <Route path={BASE_URL} element={<HomePage />} /> */}
-				<Route path={`/publish`} element={<Publish />} />
-				<Route path={`${JICS_URL}/editor`} element={<Editors />} />
-				<Route path={`${JICS_URL}/reviewer`} element={<Reviewers />} />
-				<Route path={`/track`} element={<TrackResearch />} />
-				<Route path={`/contactus`} element={<ContactUs />} />
-				<Route path={`/termsofservice`} element={<TermsOfService />} />
-				<Route path={`/privacy`} element={<PrivacyPolicy />} />
-				<Route path={`/login`} element={<Login />} />
-				<Route path={`/send-login-details`} element={<SendLoginDetails />} />
-				<Route path={`/reset-password/:token`} element={<ResetPassword />} />
-				<Route path={`/register`} element={<Register />} />
-				<Route path={`/account`} element={<MyAccount />} />
-				<Route path={`/subscriptions`} element={<MySubscriptions />} />
-				<Route path={`/team`} element={<TeamDevPage />} />
-				<Route path={`/settings`} element={<Settings />} />
-				<Route path={`/about`} element={<AboutUs />} />
+        {/* Journal Management Routes */}
+        {/* <Route path={BASE_URL} element={<HomePage />} /> */}
+        <Route path={`/publish`} element={<Publish />} />
+        <Route path={`${JICS_URL}/editor`} element={<Editors />} />
+        <Route path={`${JICS_URL}/reviewer`} element={<Reviewers />} />
+        <Route path={`/track`} element={<TrackResearch />} />
+        <Route path={`/contactus`} element={<ContactUs />} />
+        <Route path={`/termsofservice`} element={<TermsOfService />} />
+        <Route path={`/privacy`} element={<PrivacyPolicy />} />
+        <Route path={`/login`} element={<Login />} />
+        <Route path={`/send-login-details`} element={<SendLoginDetails />} />
+        <Route path={`/reset-password/:token`} element={<ResetPassword />} />
+        <Route path={`/register`} element={<Register />} />
+        <Route path={`/account`} element={<MyAccount />} />
+        <Route path={`/subscriptions`} element={<MySubscriptions />} />
+        <Route path={`/team`} element={<TeamDevPage />} />
+        <Route path={`/settings`} element={<Settings />} />
+        <Route path={`/about`} element={<AboutUs />} />
 
-				{/* Editor Routes */}
-				<Route
-					path={`${JICS_URL}/editor/register`}
-					element={<EditorRegister />}
-				/>
-				<Route
-					path={`${JICS_URL}/editor/login`}
-					element={<Navigate to="/login" replace />}
-				/>
-				<Route
-					path={`${JICS_URL}/editor/dashboard`}
-					element={
-						user?.accountType === "editor" || user?.availableRoles?.includes("editor") ? (
-							<EditorDashboard />
-						) : (
-							<Navigate to="/login" replace />
-						)
-					}
-				/>
+        {/* Editor Routes */}
+        <Route
+          path={`${JICS_URL}/editor/register`}
+          element={<EditorRegister />}
+        />
+        <Route
+          path={`${JICS_URL}/editor/login`}
+          element={<Navigate to="/login" replace />}
+        />
+        <Route
+          path={`${JICS_URL}/editor/dashboard`}
+          element={
+            user?.accountType === "editor" ||
+            user?.availableRoles?.includes("editor") ? (
+              <EditorDashboard />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
-				{/* Reviewer Routes */}
-				<Route
-					path={`/reviewer/reset-password/:token`}
-					element={<ReviewerResetPassword />}
-				/>
-				<Route
-					path={`${JICS_URL}/reviewer/register`}
-					element={<ReviewerRegister />}
-				/>
-				<Route
-					path={`${JICS_URL}/reviewer/login`}
-					element={<Navigate to="/login" replace />}
-				/>
-				<Route
-					path={`${JICS_URL}/reviewer/forgot-password`}
-					element={<ReviewerForgotPassword />}
-				/>
-				<Route
-					path={`${JICS_URL}/reviewer/reset-password/:token`}
-					element={<ReviewerResetPassword />}
-				/>
-				<Route
-					path={`${JICS_URL}/reviewer/dashboard`}
-					element={
-						user?.accountType === "reviewer" || user?.availableRoles?.includes("reviewer") ? (
-							<ReviewerDashboard />
-						) : (
-							<Navigate to="/login" replace />
-						)
-					}
-				/>
+        {/* Reviewer Routes */}
+        <Route
+          path={`/reviewer/reset-password/:token`}
+          element={<ReviewerResetPassword />}
+        />
+        <Route
+          path={`${JICS_URL}/reviewer/register`}
+          element={<ReviewerRegister />}
+        />
+        <Route
+          path={`${JICS_URL}/reviewer/login`}
+          element={<Navigate to="/login" replace />}
+        />
+        <Route
+          path={`${JICS_URL}/reviewer/forgot-password`}
+          element={<ReviewerForgotPassword />}
+        />
+        <Route
+          path={`${JICS_URL}/reviewer/reset-password/:token`}
+          element={<ReviewerResetPassword />}
+        />
+        <Route
+          path={`${JICS_URL}/reviewer/dashboard`}
+          element={
+            user?.accountType === "reviewer" ||
+            user?.availableRoles?.includes("reviewer") ? (
+              <ReviewerDashboard />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
-				{/* Protected Routes */}
-				<Route
-					path={`/profile`}
-					element={
-						user ? (
-							<ProfilePage />
-						) : (
-							<Navigate to={`${JICS_URL}/login`} replace />
-						)
-					}
-				/>
+        {/* Protected Routes */}
+        <Route
+          path={`/profile`}
+          element={
+            user ? (
+              <ProfilePage />
+            ) : (
+              <Navigate to={`${JICS_URL}/login`} replace />
+            )
+          }
+        />
 
-				<Route
-					path={`${JICS_URL}/submit`}
-					element={
-						user ? (
-							<ManuscriptPage />
-						) : (
-							<Navigate
-								to="/login"
-								state={{ from: location.pathname }}
-								replace
-							/>
-						)
-					}
-				/>
+        <Route
+          path={`${JICS_URL}/submit`}
+          element={
+            user ? (
+              <ManuscriptPage />
+            ) : (
+              <Navigate
+                to="/login"
+                state={{ from: location.pathname }}
+                replace
+              />
+            )
+          }
+        />
 
-				<Route
-					path={`${JICS_URL}/my-submissions`}
-					element={<MySubmissions />}
-				/>
-				<Route path="*" element={<PageNotAvailable />} />
-			</Routes>
-			{!hideNavFooter && <Footer />}
-		</AuthContext.Provider>
-	);
+        <Route
+          path={`${JICS_URL}/my-submissions`}
+          element={<MySubmissions />}
+        />
+        <Route path="*" element={<PageNotAvailable />} />
+      </Routes>
+      {!hideNavFooter && <Footer />}
+    </AuthContext.Provider>
+  );
 }
 
 // Custom hook to use the AuthContext
 export const useAuth = () => React.useContext(AuthContext);
 
 function App() {
-	return (
-		<Router>
-			<ScrollToTop />
-			<AppContent />
-		</Router>
-	);
+  return (
+    <Router>
+      <ScrollToTop />
+      <AppContent />
+    </Router>
+  );
 }
 
 export default App;
