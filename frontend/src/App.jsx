@@ -46,6 +46,7 @@ import FinalEvaluationAndAcceptance from "./pages/peer-review/FinalEvaluationAnd
 import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationIntegrityAndTimeline";
 
 import PageNotAvailable from "./pages/pagenotavailable";
+import BookPublication from "./pages/bookPublication";
 // Create Authentication Context
 const AuthContext = createContext(null);
 
@@ -167,7 +168,7 @@ function AppContent() {
 
 				<Route path="/orcid-callback" element={<OrcidCallback />} />
 
-				<Route path="/books" element={<PageNotAvailable />} />
+				<Route path="/books" element={<BookPublication />} />
 
 				{/* Journal Management Routes */}
 				{/* <Route path={BASE_URL} element={<HomePage />} /> */}

@@ -91,22 +91,48 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
 </html>`;
         
         // Step 3: Launch Puppeteer and generate PDF
-        // Use chrome-aws-lambda for serverless environments (like Render)
-        // Force serverless mode in production since Render doesn't have Chrome installed
-        const isServerless = true; // Always use chrome-aws-lambda for now
-        
+        // Use chrome-aws-lambda only in explicit serverless environments (e.g. AWS Lambda)
+        const isServerless =
+            !!process.env.AWS_LAMBDA_FUNCTION_NAME ||
+            process.env.IS_SERVERLESS === 'true';
+
         console.log(`[convertDocxToPdfNode] Environment check - NODE_ENV: ${process.env.NODE_ENV}, RENDER: ${process.env.RENDER}, isServerless: ${isServerless}`);
-        
+
         if (isServerless) {
             console.log('[convertDocxToPdfNode] Using chrome-aws-lambda for serverless environment');
-            browser = await puppeteer.launch({
-                headless: true,
-                args: chromium.args,
-                defaultViewport: chromium.defaultViewport,
-                executablePath: await chromium.executablePath
-            });
+            try {
+                const executablePath = await chromium.executablePath;
+                if (!executablePath) {
+                    throw new Error('chrome-aws-lambda executablePath is empty');
+                }
+
+                browser = await puppeteer.launch({
+                    headless: true,
+                    args: chromium.args,
+                    defaultViewport: chromium.defaultViewport,
+                    executablePath
+                });
+            } catch (e) {
+                console.warn('[convertDocxToPdfNode] chrome-aws-lambda failed, falling back to regular Puppeteer:', e);
+                browser = await puppeteer.launch({
+                    headless: true,
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--disable-web-security',
+                        '--disable-features=VizDisplayCompositor',
+                        '--no-first-run',
+                        '--no-zygote',
+                        '--single-process'
+                    ],
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+
+                });
+            }
         } else {
-            console.log('[convertDocxToPdfNode] Using regular Puppeteer for local environment');
+            console.log('[convertDocxToPdfNode] Using regular Puppeteer for non-serverless environment');
             browser = await puppeteer.launch({
                 headless: true,
                 args: [
@@ -120,12 +146,14 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
                     '--no-zygote',
                     '--single-process'
                 ],
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+
             });
         }
         
         const page = await browser.newPage();
-        await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+        await page.setContent(fullHtml, { waitUntil: 'networkidle0', timeout: 0 });
+
         
         // Generate PDF with appropriate settings
         await page.pdf({

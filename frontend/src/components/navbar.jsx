@@ -15,7 +15,7 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
-
+console.log("user", user)
   const logoTarget =
     user?.editor?.role === 'editor'
       ? '/journal/jics/editor/dashboard'
@@ -147,7 +147,7 @@ const Navbar = () => {
                             }}
                             className="border border-[#e0e0e0] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#00acc1]"
                           >
-                            {availableRoles.map((r) => (
+                            {availableRoles?.map((r) => (
                               <option key={r.key} value={r.key}>{r.label}</option>
                             ))}
                           </select>
@@ -190,21 +190,23 @@ const Navbar = () => {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="hidden md:flex gap-4">
-              <Link
-                to="/login" 
-                state={{ from: location.pathname }} 
-                className="text-white font-semibold px-4 py-2 rounded-md border-2 border-[#00acc1] hover:bg-[#00acc1] hover:text-white transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                to={`/register`}
-                className="bg-[#00acc1] text-white font-semibold px-5 py-2 rounded-md shadow transition-colors hover:bg-[#0097a7]"
-              >
-                Register
-              </Link>
-            </div>
+      location.pathname !== '/' && (
+  <div className="hidden md:flex gap-4">
+    <Link
+      to="/login" 
+      state={{ from: location.pathname }} 
+      className="text-white font-semibold px-4 py-2 rounded-md border-2 border-[#00acc1] hover:bg-[#00acc1] hover:text-white transition-colors"
+    >
+      Login
+    </Link>
+    <Link
+      to="/register"
+      className="bg-[#00acc1] text-white font-semibold px-5 py-2 rounded-md shadow transition-colors hover:bg-[#0097a7]"
+    >
+      Register
+    </Link>
+  </div>
+)
           )}
 
           <button

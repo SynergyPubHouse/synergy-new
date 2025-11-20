@@ -210,7 +210,7 @@ const handleAuthorLoginClick = (e) => {
                 isSmall ? "text-sm" : "text-base"
               }`}
             >
-              BOOK PUBLISHED
+             Book Publication
             </Link>
 
             <span
@@ -315,7 +315,7 @@ const handleAuthorLoginClick = (e) => {
             to="/books"
             className="block px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
           >
-            BOOK PUBLISHED
+         Book Publication
           </Link>
 
           <span

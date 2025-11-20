@@ -49,6 +49,16 @@ exports.registerReviewer = async (req, res) => {
 			});
 		}
 
+		// Use the actual Reviewer document _id for assignments
+		const reviewerId = reviewer._id;
+
+		// Add reviewer to assignedReviewers if not already added
+		if (!manuscript.assignedReviewers.includes(reviewerId)) {
+			manuscript.assignedReviewers.push(reviewerId);
+		}
+
+		await manuscript.save();
+
 		// Create new reviewer
 		const reviewer = new Reviewer({
 			title,
@@ -163,78 +173,85 @@ exports.getProfile = async (req, res) => {
 
 // Fetch manuscripts assigned to the reviewer
 exports.getAssignedManuscripts = async (req, res) => {
-	try {
-		console.log("Fetching manuscripts for reviewer:", req.user._id);
-
-		// Find the reviewer and populate their assigned manuscripts with corresponding author information
-		const reviewer = await Reviewer.findById(req.user._id).populate({
-			path: "assignedManuscripts",
-			select: "customId title correspondingAuthor submissionDate status mergedFileUrl reviewerNotes editorNotes",
-			populate: {
-				path: "correspondingAuthor",
-				select: "firstName middleName lastName email",
-			},
-		});
-
-		if (!reviewer) {
-			return res.status(404).json({ message: "Reviewer not found" });
-		}
-
-		// Format the manuscripts data
-		const formattedManuscripts = reviewer.assignedManuscripts.map(
-			(manuscript) => {
-				console.log(
-					"Populated manuscript correspondingAuthor:",
-					manuscript.correspondingAuthor
-				);
-				// Use correspondingAuthor for author data
-				let authorData = {
-					_id: manuscript.correspondingAuthor?._id || null,
-					firstName: manuscript.correspondingAuthor?.firstName || "",
-					lastName: manuscript.correspondingAuthor?.lastName || "",
-					email: manuscript.correspondingAuthor?.email || "",
-					fullName: manuscript.correspondingAuthor
-						? formatFullName(manuscript.correspondingAuthor)
-						: "Unknown Author",
-				};
-
-				// Ensure mergedFileUrl is properly formatted
-				let pdfUrl = manuscript.mergedFileUrl || "";
-				if (pdfUrl && !pdfUrl.startsWith("http")) {
-					pdfUrl = `https://paper-sphere.vercel.app${pdfUrl}`;
-				}
-
-				// Filter reviewerNotes to only show notes from the current reviewer
-				const filteredReviewerNotes = manuscript.reviewerNotes.filter(
-					(note) =>
-						note.addedBy._id.toString() === req.user._id.toString()
-				);
-
-				// Filter editorNotes to only show notes visible to reviewers
-				const visibleEditorNotes = manuscript.editorNotes.filter(
-					(note) =>
-						note.visibility && note.visibility.includes("reviewer")
-				);
-
-				return {
-					...manuscript.toObject(),
-					author: authorData, // Continue to use 'author' in frontend for now for consistency
-					mergedFileUrl: pdfUrl,
-					reviewerNotes: filteredReviewerNotes, // Override with filtered notes
-					editorNotes: visibleEditorNotes, // Include editor notes visible to reviewers
-				};
-			}
-		);
-
-		console.log("Found manuscripts:", formattedManuscripts.length);
-		res.json(formattedManuscripts);
-	} catch (error) {
-		console.error("Error fetching manuscripts:", error);
-		res.status(500).json({
-			message: "Error fetching manuscripts",
-			error: error.message,
-		});
-	}
+    try {
+        console.log("Fetching manuscripts for reviewer (assigned only):", {
+            id: req.user._id,
+            email: req.user.email,
+        });
+        // Resolve the Reviewer document using unified login: try id first, then email
+        let reviewer = await Reviewer.findById(req.user._id);
+        if (!reviewer && req.user?.email) {
+            reviewer = await Reviewer.findOne({ email: req.user.email });
+        }
+        if (!reviewer) {
+            return res.status(404).json({ message: "Reviewer not found" });
+        }
+        // Fetch manuscripts where this reviewer is actually assigned
+        const manuscripts = await Manuscript.find({
+            assignedReviewers: reviewer._id,
+        })
+            .select(
+                "customId title correspondingAuthor submissionDate status mergedFileUrl reviewerNotes editorNotes invitations revisionCombinedPdfUrl highlightedRevisionFileUrl"
+            )
+            .populate({
+                path: "correspondingAuthor",
+                select: "firstName middleName lastName email",
+            });
+        // Format the manuscripts data
+        const formattedManuscripts = manuscripts.map(
+            (manuscript) => {
+                console.log(
+                    "Populated manuscript correspondingAuthor:",
+                    manuscript.correspondingAuthor
+                );
+                // Use correspondingAuthor for author data
+                let authorData = {
+                    _id: manuscript.correspondingAuthor?._id || null,
+                    firstName: manuscript.correspondingAuthor?.firstName || "",
+                    lastName: manuscript.correspondingAuthor?.lastName || "",
+                    email: manuscript.correspondingAuthor?.email || "",
+                    fullName: manuscript.correspondingAuthor
+                        ? formatFullName(manuscript.correspondingAuthor)
+                        : "Unknown Author",
+                };
+                // Ensure mergedFileUrl is properly formatted
+                let pdfUrl = manuscript.mergedFileUrl || "";
+                if (pdfUrl && !pdfUrl.startsWith("http")) {
+                    pdfUrl = `https://paper-sphere.vercel.app${pdfUrl}`;
+                }
+                // Filter reviewerNotes to only show notes from the current reviewer
+                const filteredReviewerNotes = manuscript.reviewerNotes.filter(
+                (note) => {
+                    if (!note.addedBy?._id) return false;
+                    return (
+                        note.addedBy._id.toString() ===
+                        reviewer._id.toString()
+                    );
+                }
+            );
+                // Filter editorNotes to only show notes visible to reviewers
+                const visibleEditorNotes = manuscript.editorNotes.filter(
+                    (note) =>
+                        note.visibility && note.visibility.includes("reviewer")
+                );
+                return {
+                    ...manuscript.toObject(),
+                    author: authorData, // Continue to use 'author' in frontend for now for consistency
+                    mergedFileUrl: pdfUrl,
+                    reviewerNotes: filteredReviewerNotes, // Override with filtered notes
+                    editorNotes: visibleEditorNotes, // Include editor notes visible to reviewers
+                };
+            }
+        );
+        console.log("Found manuscripts:", formattedManuscripts.length);
+        res.json(formattedManuscripts);
+    } catch (error) {
+        console.error("Error fetching manuscripts:", error);
+        res.status(500).json({
+            message: "Error fetching manuscripts",
+            error: error.message,
+        });
+    }
 };
 
 // Submit a review for a manuscript
@@ -254,7 +271,10 @@ exports.submitReview = async (req, res) => {
 		}
 
 		// Get the reviewer's information
-		const reviewer = await Reviewer.findById(req.user._id);
+		let reviewer = await Reviewer.findById(req.user._id);
+		if (!reviewer && req.user?.email) {
+			reviewer = await Reviewer.findOne({ email: req.user.email });
+		}
 		if (!reviewer) {
 			return res.status(404).json({ message: "Reviewer not found" });
 		}
@@ -449,54 +469,56 @@ exports.resetPassword = async (req, res) => {
 
 // Get pending invitations for logged-in reviewer
 exports.getPendingInvitations = async (req, res) => {
-	try {
-		const reviewerEmail = req.user.email;
-
-		// Find manuscripts with pending invitations for this reviewer
-		const manuscriptsWithInvitations = await Manuscript.find({
-			"invitations.email": reviewerEmail,
-			"invitations.status": "pending",
-		})
-			.select(
-				"customId title type abstract keywords submissionDate invitations editorNotes"
-			)
-			.lean();
-
-		// Filter invitations for this specific reviewer
-		const invitations = manuscriptsWithInvitations.map((manuscript) => {
-			const relevantInvitation = manuscript.invitations.find(
-				(inv) => inv.email === reviewerEmail && inv.status === "pending"
-			);
-
-			// Filter editor notes visible to reviewers
-			const visibleEditorNotes = manuscript.editorNotes
-				? manuscript.editorNotes.filter(
-						(note) =>
-							note.visibility &&
-							note.visibility.includes("reviewer")
-				  )
-				: [];
-
-			return {
-				_id: manuscript._id,
-				title: manuscript.title,
-				type: manuscript.type,
-				abstract: manuscript.abstract,
-				keywords: manuscript.keywords,
-				submissionDate: manuscript.submissionDate,
-				invitedAt: relevantInvitation.invitedAt,
-				editorNotes: visibleEditorNotes,
-			};
-		});
-
-		res.json(invitations);
-	} catch (error) {
-		console.error("Error getting pending invitations:", error);
-		res.status(500).json({
-			message: "Error fetching pending invitations",
-			error: error.message,
-		});
-	}
+    try {
+        const reviewerEmail = req.user.email;
+        // Correct query using elemMatch
+        const manuscriptsWithInvitations = await Manuscript.find({
+            invitations: {
+                $elemMatch: {
+                    email: reviewerEmail,
+                    status: "pending"
+                }
+            }
+        })
+        .select(
+            "customId title type abstract keywords submissionDate invitations editorNotes"
+        )
+        .lean();
+        // Build response
+        const invitations = manuscriptsWithInvitations.map((manuscript) => {
+            // Find the exact pending invitation for this reviewer
+            const relevantInvitation = manuscript.invitations.find(
+                (inv) =>
+                    inv.email === reviewerEmail &&
+                    inv.status === "pending"
+            );
+            // Filter editor notes visible to reviewers
+            const visibleEditorNotes = manuscript.editorNotes
+                ? manuscript.editorNotes.filter(
+                      (note) =>
+                          note.visibility &&
+                          note.visibility.includes("reviewer")
+                  )
+                : [];
+            return {
+                _id: manuscript._id,
+                title: manuscript.title,
+                type: manuscript.type,
+                abstract: manuscript.abstract,
+                keywords: manuscript.keywords,
+                submissionDate: manuscript.submissionDate,
+                invitedAt: relevantInvitation?.invitedAt,
+                editorNotes: visibleEditorNotes,
+            };
+        });
+        res.json(invitations);
+    } catch (error) {
+        console.error("Error getting pending invitations:", error);
+        res.status(500).json({
+            message: "Error fetching pending invitations",
+            error: error.message,
+        });
+    }
 };
 
 // Accept invitation
@@ -504,7 +526,6 @@ exports.acceptInvitation = async (req, res) => {
 	try {
 		const { manuscriptId } = req.params;
 		const reviewerEmail = req.user.email;
-		const reviewerId = req.user._id;
 
 		// Update manuscript invitation status
 		const manuscript = await Manuscript.findById(manuscriptId);
@@ -527,15 +548,26 @@ exports.acceptInvitation = async (req, res) => {
 		invitation.status = "accepted";
 		invitation.acceptedAt = new Date();
 
-		// Add reviewer to assignedReviewers if not already added
-		if (!manuscript.assignedReviewers.includes(reviewerId)) {
-			manuscript.assignedReviewers.push(reviewerId);
+		// Add manuscript to reviewer's assignedManuscripts
+		// Look up reviewer by ID first; if not found, fall back to email
+		let reviewer = await Reviewer.findById(req.user._id);
+		if (!reviewer) {
+			reviewer = await Reviewer.findOne({ email: reviewerEmail });
 		}
 
-		await manuscript.save();
+		if (!reviewer) {
+			return res.status(404).json({
+				message:
+					"Reviewer account not found. Please ensure you are logged in as a reviewer.",
+			});
+		}
 
-		// Add manuscript to reviewer's assignedManuscripts
-		const reviewer = await Reviewer.findById(reviewerId);
+		// Add reviewer to manuscript's assignedReviewers if not already added
+		if (!manuscript.assignedReviewers.includes(reviewer._id)) {
+			manuscript.assignedReviewers.push(reviewer._id);
+		}
+
+		// Add manuscript to reviewer's assignedManuscripts if not already added
 		if (!reviewer.assignedManuscripts.includes(manuscriptId)) {
 			reviewer.assignedManuscripts.push(manuscriptId);
 		}
@@ -545,7 +577,19 @@ exports.acceptInvitation = async (req, res) => {
 			(inv) => inv.manuscriptId.toString() !== manuscriptId
 		);
 
-		await reviewer.save();
+		// Save both the manuscript and reviewer updates in a transaction
+		const session = await mongoose.startSession();
+		session.startTransaction();
+		try {
+			await manuscript.save({ session });
+			await reviewer.save({ session });
+			await session.commitTransaction();
+		} catch (error) {
+			await session.abortTransaction();
+			throw error;
+		} finally {
+			session.endSession();
+		}
 
 		res.json({
 			message: "Invitation accepted successfully",
@@ -599,8 +643,22 @@ exports.rejectInvitation = async (req, res) => {
 		await manuscript.save();
 
 		// Remove from reviewer's pending invitations if exists
-		const reviewer = await Reviewer.findById(req.user._id);
-		reviewer.pendingInvitations = reviewer.pendingInvitations.filter(
+		let reviewer = await Reviewer.findById(req.user._id);
+		if (!reviewer && req.user?.email) {
+			reviewer = await Reviewer.findOne({ email: reviewerEmail });
+		}
+
+		if (!reviewer) {
+			console.warn(
+				`Reviewer account not found when rejecting invitation for ${reviewerEmail}`
+			);
+			return res.status(404).json({
+				message:
+					"Reviewer account not found. Please ensure you are logged in as a reviewer.",
+			});
+		}
+
+		reviewer.pendingInvitations = (reviewer.pendingInvitations || []).filter(
 			(inv) => inv.manuscriptId.toString() !== manuscriptId
 		);
 		await reviewer.save();

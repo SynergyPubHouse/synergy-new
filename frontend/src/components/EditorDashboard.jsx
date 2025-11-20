@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../App";
 import axios from "axios";
 
+import { exportNotesToWord  } from '../components/exportNotesToWord.jsx';
+
 function EditorDashboard() {
 	const { user } = useAuth();
-
+console.log("EditorDashboard user:", user);
 	// Helper function to format full name including middle name if it exists
 	const formatFullName = (user) => {
 		if (!user) return "Unknown";
@@ -44,79 +46,96 @@ function EditorDashboard() {
 	const [filterType, setFilterType] = useState("all"); // "all", "status", "activity"
 	const [filterValue, setFilterValue] = useState(""); // The specific status or activity to filter by
 
+	// Simple toast system to replace browser alerts
+	const [toasts, setToasts] = useState([]);
+
+	const addToast = (message, type = "info", duration = 6000) => {
+		const id = Date.now() + Math.random();
+		setToasts((prev) => [...prev, { id, message, type }]);
+		setTimeout(() => {
+			setToasts((prev) => prev.filter((t) => t.id !== id));
+		}, duration);
+	};
+
+	const removeToast = (id) => {
+		setToasts((prev) => prev.filter((t) => t.id !== id));
+	};
+
+	// Fetch users with manuscripts
+	const fetchUsers = useCallback(async () => {
+		try {
+			if (!user?.token) {
+				console.error("No user token found");
+				return;
+			}
+
+			console.log("Fetching users with token:", user.token); // Debug log
+			const response = await axios.get(
+				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/users-with-manuscripts`,
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			const processedUsers = (response.data || []).map((userRecord) => {
+				const authorName = formatFullName(userRecord);
+				return {
+					...userRecord,
+					authorName,
+					manuscripts: (userRecord.manuscripts || []).map((manuscript) => ({
+						...manuscript,
+						authorName: manuscript.authorName || authorName,
+					})),
+				};
+			});
+
+			setUsers(processedUsers);
+			const allManuscripts = processedUsers.flatMap((user) => user.manuscripts || []);
+			setManuscripts(allManuscripts);
+		} catch (error) {
+			console.error("Error fetching users:", error);
+			if (error.response?.status === 401) {
+				addToast("Session expired. Please login again.", "error");
+				localStorage.removeItem("user");
+				window.location.href = "/login";
+			}
+		}
+	}, [user]);
+
+	// Fetch reviewers
+	const fetchReviewers = useCallback(async () => {
+		try {
+			if (!user?.token) {
+				console.error("No user token found");
+				return;
+			}
+
+			console.log("Fetching reviewers with token:", user.token); // Debug log
+			const response = await axios.get(
+				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/reviewers`,
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			console.log("Reviewers fetched successfully:", response.data);
+			setReviewers(response.data);
+		} catch (error) {
+			console.error("Error fetching reviewers:", error.response?.data || error.message);
+			if (error.response?.status === 401) {
+				addToast("Session expired. Please login again.", "error");
+				localStorage.removeItem("user");
+				window.location.href = "/login";
+			}
+		}
+	}, [user]);
+
 	useEffect(() => {
-		const fetchUsers = async () => {
-			try {
-				if (!user?.token) {
-					console.error("No user token found");
-					return;
-				}
-
-				console.log("Fetching users with token:", user.token); // Debug log
-				const response = await axios.get(
-					`${
-						import.meta.env.VITE_BACKEND_URL
-					}/api/auth/editor/users-with-manuscripts`,
-					{
-						headers: {
-							Authorization: `Bearer ${user.token}`,
-						},
-					}
-				);
-				setUsers(response.data);
-				
-				// Initialize with all manuscripts visible by default
-				// This ensures the filter shows data immediately without needing to select a user first
-				const allManuscripts = response.data.flatMap(user => user.manuscripts || []);
-				setManuscripts(allManuscripts);
-			} catch (error) {
-				console.error("Error fetching users:", error);
-				if (error.response?.status === 401) {
-					alert("Session expired. Please login again.");
-					// Clear user data and redirect to login
-					localStorage.removeItem("user");
-					window.location.href = "/login";
-				}
-			}
-		};
-
-		const fetchReviewers = async () => {
-			try {
-				if (!user?.token) {
-					console.error("No user token found");
-					return;
-				}
-
-				console.log("Fetching reviewers with token:", user.token); // Debug log
-				const response = await axios.get(
-					`${
-						import.meta.env.VITE_BACKEND_URL
-					}/api/auth/editor/reviewers`,
-					{
-						headers: {
-							Authorization: `Bearer ${user.token}`,
-						},
-					}
-				);
-				console.log("Reviewers fetched successfully:", response.data);
-				setReviewers(response.data);
-			} catch (error) {
-				console.error(
-					"Error fetching reviewers:",
-					error.response?.data || error.message
-				);
-				if (error.response?.status === 401) {
-					alert("Session expired. Please login again.");
-					// Clear user data and redirect to login
-					localStorage.removeItem("user");
-					window.location.href = "/login";
-				}
-			}
-		};
-
 		fetchUsers();
 		fetchReviewers();
-	}, [user]);
+	}, [user, fetchUsers, fetchReviewers]);
 
 	// Handle user click to fetch manuscripts
 	const handleUserClick = (user) => {
@@ -149,7 +168,7 @@ function EditorDashboard() {
 
 		if (!manuscript?.mergedFileUrl) {
 			console.error("No mergedFileUrl found in manuscript:", manuscript);
-			alert("PDF URL not available");
+			addToast("PDF URL not available", "error");
 			return;
 		}
 
@@ -187,7 +206,7 @@ function EditorDashboard() {
 			}
 
 			// Update the status
-			await axios.patch(
+			const response = await axios.patch(
 				`${
 					import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${manuscriptId}/status`,
@@ -199,9 +218,24 @@ function EditorDashboard() {
 				}
 			);
 
+			const updatedData = response.data?.manuscript;
+
 			// Update manuscripts list with new status
 			const updatedManuscripts = manuscripts.map((m) =>
-				m._id === manuscriptId ? { ...m, status: newStatus } : m
+				m._id === manuscriptId
+					? {
+						...m,
+						status: updatedData?.status || newStatus,
+						revisionLocked:
+							typeof updatedData?.revisionLocked === "boolean"
+								? updatedData.revisionLocked
+								: m.revisionLocked,
+						revisionAttempts:
+							updatedData?.revisionAttempts ?? m.revisionAttempts,
+						maxRevisionAttempts:
+							updatedData?.maxRevisionAttempts ?? m.maxRevisionAttempts,
+					}
+					: m
 			);
 			setManuscripts(updatedManuscripts);
 
@@ -210,25 +244,34 @@ function EditorDashboard() {
 			setShowNoteInput(null);
 			setSelectedManuscript(null);
 
-			alert(
+			addToast(
 				newStatus === "Rejected"
 					? "Manuscript rejected successfully"
-					: `Manuscript status updated to "${newStatus}" successfully`
+					: `Manuscript status updated to "${newStatus}" successfully`,
+				"success"
 			);
+
+			// Refresh data from server to ensure UI matches backend
+			try {
+				await fetchUsers();
+			} catch (e) {
+				console.warn("Failed to refresh manuscripts after status update:", e);
+			}
 		} catch (error) {
 			console.error("Error updating manuscript:", error);
 
 			// Check for specific error about rejected manuscripts
-			if (
-				error.response?.status === 403 &&
-				error.response?.data?.message?.includes("rejected")
-			) {
-				alert(
-					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable."
-				);
-			} else {
-				alert("Failed to update manuscript");
-			}
+				if (
+					error.response?.status === 403 &&
+					error.response?.data?.message?.includes("rejected")
+				) {
+					addToast(
+						"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
+						"error"
+					);
+				} else {
+					addToast("Failed to update manuscript", "error");
+				}
 		}
 	};
 
@@ -269,7 +312,7 @@ function EditorDashboard() {
 				`Updating manuscript ${manuscriptId} to status: ${newStatus}`
 			);
 
-			await axios.patch(
+			const response = await axios.patch(
 				`${
 					import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${manuscriptId}/status`,
@@ -281,27 +324,56 @@ function EditorDashboard() {
 				}
 			);
 
+			const updatedData = response.data?.manuscript;
+
 			// Update local state
 			const updatedManuscripts = manuscripts.map((m) =>
-				m._id === manuscriptId ? { ...m, status: newStatus } : m
+				m._id === manuscriptId
+					? {
+							...m,
+							status: updatedData?.status || newStatus,
+							revisionLocked:
+								typeof updatedData?.revisionLocked === "boolean"
+									? updatedData.revisionLocked
+									: m.revisionLocked,
+							revisionAttempts:
+								updatedData?.revisionAttempts ??
+								m.revisionAttempts,
+							maxRevisionAttempts:
+								updatedData?.maxRevisionAttempts ??
+								m.maxRevisionAttempts,
+						}
+					: m
 			);
 			setManuscripts(updatedManuscripts);
 
-			alert(`Manuscript status updated to "${newStatus}" successfully!`);
+			addToast(
+				response.data?.message ||
+					`Manuscript status updated to "${newStatus}" successfully!`,
+				"success"
+			);
+
+			// Refresh manuscript list
+			try {
+				await fetchUsers();
+			} catch (e) {
+				console.warn("Failed to refresh manuscripts after direct status update:", e);
+			}
 		} catch (error) {
 			console.error("Error updating manuscript status:", error);
 
 			// Check for specific error about rejected manuscripts
-			if (
-				error.response?.status === 403 &&
-				error.response?.data?.message?.includes("rejected")
-			) {
-				alert(
-					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable."
-				);
-			} else {
-				alert(`Failed to update manuscript status to "${newStatus}"`);
-			}
+				if (
+					error.response?.status === 403 &&
+					error.response?.data?.message?.includes("rejected")
+				) {
+					addToast(
+						"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
+						"error"
+					);
+				} else {
+					addToast(`Failed to update manuscript status to "${newStatus}"`, "error");
+				}
 		}
 	};
 
@@ -342,23 +414,29 @@ function EditorDashboard() {
 			setSelectedManuscriptIds([]);
 			setShowBulkActions(false);
 
-			alert(
-				`${manuscriptIds.length} manuscripts updated to "${newStatus}" successfully!`
-			);
+			addToast(`${manuscriptIds.length} manuscripts updated to "${newStatus}" successfully!`, "success");
+
+			// Refresh manuscript list
+			try {
+				await fetchUsers();
+			} catch (e) {
+				console.warn("Failed to refresh manuscripts after bulk update:", e);
+			}
 		} catch (error) {
 			console.error("Error bulk updating manuscript status:", error);
 
 			// Check for specific error about rejected manuscripts
-			if (
-				error.response?.status === 403 ||
-				error.response?.data?.message?.includes("rejected")
-			) {
-				alert(
-					"Some manuscripts could not be updated because they are rejected. Rejected manuscripts cannot be modified."
-				);
-			} else {
-				alert(`Failed to bulk update manuscripts to "${newStatus}"`);
-			}
+				if (
+					error.response?.status === 403 ||
+					error.response?.data?.message?.includes("rejected")
+				) {
+					addToast(
+						"Some manuscripts could not be updated because they are rejected. Rejected manuscripts cannot be modified.",
+						"error"
+					);
+				} else {
+					addToast(`Failed to bulk update manuscripts to "${newStatus}"`, "error");
+				}
 		}
 	};
 
@@ -375,11 +453,11 @@ function EditorDashboard() {
 	const handleRevisionRequired = async (manuscriptId) => {
 		try {
 			if (!revisionNoteText.trim()) {
-				alert("Please enter a revision note");
+				addToast("Please enter a revision note", "error");
 				return;
 			}
 
-			await axios.post(
+			const response = await axios.post(
 				`${
 					import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${manuscriptId}/revision-required`,
@@ -391,10 +469,25 @@ function EditorDashboard() {
 				}
 			);
 
-			// Update manuscripts list with new status
+			const updatedData = response.data?.manuscript;
+
+			// Update manuscripts list with new status/info
 			const updatedManuscripts = manuscripts.map((m) =>
 				m._id === manuscriptId
-					? { ...m, status: "Revision Required" }
+					? {
+							...m,
+							status: updatedData?.status || "Revision Required",
+							revisionAttempts:
+								updatedData?.revisionAttempts ??
+								m.revisionAttempts,
+							maxRevisionAttempts:
+								updatedData?.maxRevisionAttempts ??
+								m.maxRevisionAttempts,
+							revisionLocked:
+								typeof updatedData?.revisionLocked === "boolean"
+									? updatedData.revisionLocked
+									: m.revisionLocked,
+						}
 					: m
 			);
 			setManuscripts(updatedManuscripts);
@@ -404,21 +497,22 @@ function EditorDashboard() {
 			setShowNoteInput(null);
 			setSelectedManuscript(null);
 
-			alert("Revision required note added successfully");
+			addToast(response.data?.message || "Revision required note added successfully", "success");
+
+			// Refresh manuscript list
+			try {
+				await fetchUsers();
+			} catch (e) {
+				console.warn("Failed to refresh manuscripts after revision required:", e);
+			}
 		} catch (error) {
 			console.error("Error adding revision required note:", error);
 
 			// Check for specific error about rejected manuscripts
-			if (
-				error.response?.status === 403 &&
-				error.response?.data?.message?.includes("rejected")
-			) {
-				alert(
-					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable."
-				);
-			} else {
-				alert("Failed to add revision required note");
-			}
+			const errorMessage =
+				error.response?.data?.message ||
+				"Failed to add revision required note";
+			addToast(errorMessage, "error");
 		}
 	};
 
@@ -464,10 +558,17 @@ function EditorDashboard() {
 			setShowAcceptDialog(false);
 			setSelectedManuscript(null);
 			setAcceptanceNote("");
-			alert("Manuscript accepted successfully!");
+			addToast("Manuscript accepted successfully!", "success");
+
+			// Refresh manuscript list
+			try {
+				await fetchUsers();
+			} catch (e) {
+				console.warn("Failed to refresh manuscripts after accept:", e);
+			}
 		} catch (error) {
 			console.error("Error accepting manuscript:", error);
-			alert("Failed to accept manuscript");
+			addToast("Failed to accept manuscript", "error");
 		}
 	};
 
@@ -489,7 +590,7 @@ function EditorDashboard() {
 				.filter((email) => email.length > 0);
 
 			if (emailArray.length === 0) {
-				alert("Please enter at least one email address");
+				addToast("Please enter at least one email address", "error");
 				setIsSendingInvitations(false);
 				return;
 			}
@@ -501,7 +602,7 @@ function EditorDashboard() {
 			);
 
 			if (invalidEmails.length > 0) {
-				alert(`Invalid email addresses: ${invalidEmails.join(", ")}`);
+				addToast(`Invalid email addresses: ${invalidEmails.join(", ")}`, "error");
 				setIsSendingInvitations(false);
 				return;
 			}
@@ -529,16 +630,14 @@ function EditorDashboard() {
 				}
 			);
 
-			alert(
-				`Invitations sent successfully to ${emailArray.length} reviewers!`
-			);
+			addToast(`Invitations sent successfully to ${emailArray.length} reviewers!`, "success");
 			setShowInviteDialog(false);
 			setInviteEmails([""]);
 			setEditorNote("");
 			setInviteManuscript(null);
 		} catch (error) {
 			console.error("Error sending invitations:", error);
-			alert("Failed to send invitations");
+			addToast("Failed to send invitations", "error");
 		} finally {
 			setIsSendingInvitations(false); // Stop loading
 		}
@@ -663,6 +762,24 @@ function EditorDashboard() {
 
 	return (
 		<div className="min-h-screen bg-[#f8fafc] p-6">
+			{/* Toast container */}
+			<div className="fixed top-4 right-4 z-50 flex flex-col space-y-2">
+				{toasts.map((t) => (
+					<div
+						key={t.id}
+						onClick={() => removeToast(t.id)}
+						className={`max-w-sm px-4 py-2 rounded shadow cursor-pointer transform transition-all duration-150 hover:scale-105 break-words ${
+							t.type === "success"
+								? "bg-green-500 text-white"
+							: t.type === "error"
+							? "bg-red-500 text-white"
+							: "bg-gray-800 text-white"
+						}`}
+					>
+						{t.message}
+					</div>
+				))}
+			</div>
 			<div className="max-w-6xl mx-auto">
 				<h1 className="text-4xl font-bold text-[#496580] mb-8 text-center">
 					Editor Dashboard
@@ -1176,7 +1293,21 @@ function EditorDashboard() {
 													>
 														{manuscript.status}
 													</span>
+													{typeof manuscript.revisionAttempts ===
+														"number" && (
+														<span className="text-xs text-[#496580]">
+															Attempts:{" "}
+															{manuscript.revisionAttempts}/
+															{manuscript.maxRevisionAttempts ||
+																3}
+														</span>
+													)}
 												</div>
+												{manuscript.revisionLocked && (
+													<p className="text-xs text-red-600 font-semibold mb-2">
+														⚠ All revision attempts exhausted. Manuscript automatically rejected.
+													</p>
+												)}
 												{/* Time Information */}
 												<div className="text-xs text-gray-600 space-y-1">
 													{manuscript.submissionDate && (
@@ -1357,16 +1488,38 @@ function EditorDashboard() {
 										{/* Action Buttons */}
 										<div className="flex flex-col space-y-2">
 											{/* View PDF Button - Always Available */}
-											<button
-												onClick={() =>
-													handleManuscriptClick(
-														manuscript
-													)
-												}
-												className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-											>
-												📄 View PDF
-											</button>
+											  {manuscript.mergedFileUrl && (
+    <button
+      onClick={() => window.open(manuscript.mergedFileUrl, "_blank")}
+      className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+    >
+      📄 View Original PDF
+    </button>
+  )}
+
+  {/* Highlighted Revision (Word Doc) */}
+  {manuscript.highlightedRevisionFileUrl && (
+    <button
+      onClick={() => {
+        const url = manuscript.highlightedRevisionFileUrl;
+        const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+        window.open(viewerUrl, "_blank");
+      }}
+      className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+    >
+      ✏️ View Highlighted Revision
+    </button>
+  )}
+
+  {/* Combined Revision PDF */}
+  {manuscript.revisionCombinedPdfUrl && (
+    <button
+      onClick={() => window.open(manuscript.revisionCombinedPdfUrl, "_blank")}
+      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+    >
+      📑 View Combined Revision PDF
+    </button>
+  )}
 
 											{/* Invite Reviewers Button */}
 											<button
@@ -1563,6 +1716,12 @@ function EditorDashboard() {
 
 											{/* Quick Actions Section */}
 											<div className="bg-yellow-50 p-3 rounded border">
+												<button
+  className="px-4 py-2 bg-blue-600 text-white rounded"
+  onClick={() => exportNotesToWord(manuscript, user)}
+>
+  📄 Export Notes to Word
+</button>
 												<h4 className="text-sm font-semibold text-yellow-700 mb-2">
 													⚡ Quick Actions
 												</h4>

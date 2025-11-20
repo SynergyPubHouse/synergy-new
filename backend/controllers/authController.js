@@ -4,6 +4,8 @@ const axios = require("axios");
 const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
 const { OAuth2Client } = require('google-auth-library');
+const Editor = require("../models/Editor");
+const Reviewer = require("../models/Reviewer");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT
@@ -107,130 +109,151 @@ exports.sendLoginDetails = async (req, res) => {
 // @route   POST /api/auth/register
 // @access  Public
 exports.registerUser = async (req, res) => {
-	const {
-		title,
-		firstName,
-		middleName,
-		lastName,
-		email,
-		username,
-		password,
-	} = req.body;
+  const {
+    title,
+    firstName,
+    middleName,
+    lastName,
+    email,
+    username,
+    password,
+    role,
+    specialization,
+    experience,
+    specialKey,
+  } = req.body;
 
-	try {
-		const existingUser = await User.findOne({
-			$or: [{ email }, { username }],
-		});
+  try {
+    // Check email/username in User collection
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser) return res.status(400).json({ message: "Email or Username already exists" });
 
-		if (existingUser) {
-			return res
-				.status(400)
-				.json({ message: "Username or Email already exists" });
-		}
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const normalizedRole = role ? role.toLowerCase().replace(" ", "_") : "author";
 
-		const hashedPassword = await bcrypt.hash(password, 10);
+    // Create User entry
+    const userData = {
+      title,
+      firstName,
+      middleName,
+      lastName,
+      email,
+      username,
+      password: hashedPassword,
+      roles: [normalizedRole],
+    };
 
-		const newUser = await User.create({
-			title,
-			firstName,
-			middleName,
-			lastName,
-			email,
-			username,
-			password: hashedPassword,
-		});
+    // Extra fields for Editor/Reviewer
+    if (normalizedRole === "editor") {
+      const HARDCODED_EDITOR_KEY = "myTestEditorKey123";
+      if (!specialKey) return res.status(400).json({ message: "Editor key required" });
+      if (specialKey !== HARDCODED_EDITOR_KEY) return res.status(401).json({ message: "Invalid editor key" });
+      if (!specialization || !experience) return res.status(400).json({ message: "Specialization and experience required" });
+      
+      userData.specialization = specialization;
+      userData.experience = experience;
+      userData.specialKey = specialKey;
 
-		if (newUser) {
-			res.status(201).json({
-				_id: newUser._id,
-				title: newUser.title,
-				firstName: newUser.firstName,
-				lastName: newUser.lastName,
-				email: newUser.email,
-				username: newUser.username,
-				token: generateToken(newUser._id),
-			});
-		}
-	} catch (error) {
-		res.status(500).json({ message: "Server Error", error });
-	}
+      // Optional: save extra info in Editor collection
+      await Editor.create({ ...userData });
+    }
+
+    if (normalizedRole === "reviewer") {
+      if (!specialization || !experience) return res.status(400).json({ message: "Specialization and experience required" });
+
+      userData.specialization = specialization;
+      userData.experience = experience;
+
+      // Optional: save extra info in Reviewer collection
+      await Reviewer.create({ ...userData });
+    }
+
+    const newUser = await User.create(userData);
+
+    res.status(201).json({
+      _id: newUser._id,
+      title: newUser.title,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      email: newUser.email,
+      username: newUser.username,
+      roles: newUser.roles,
+      token: generateToken(newUser._id),
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error", error });
+  }
 };
+
+
 
 // @desc    Authenticate user & get token (unified login for all roles)
 // @route   POST /api/auth/login
 // @access  Public
+const HARDCODED_EDITOR_KEY = "myTestEditorKey123";
+
+
+
 exports.loginUser = async (req, res) => {
-	const { email, password } = req.body;
+    const { email, password, passKey } = req.body;
 
-	try {
-		// Import models here to avoid circular dependencies
-		const Editor = require("../models/Editor");
-		const Reviewer = require("../models/Reviewer");
-		
-		// Check all three models for the email
-		const [user, editor, reviewer] = await Promise.all([
-			User.findOne({ email }),
-			Editor.findOne({ email }),
-			Reviewer.findOne({ email })
-		]);
+    try {
+        // Import optional models
+        const Reviewer = require("../models/Reviewer");
 
-		let authenticatedAccount = null;
-		let accountType = null;
-		let availableRoles = [];
+        // Find the user by email in User collection
+        const user = await User.findOne({ email });
 
-		// Check User account
-		if (user && (await bcrypt.compare(password, user.password))) {
-			authenticatedAccount = user;
-			accountType = 'user';
-			availableRoles.push('author');
-		}
+        if (!user) {
+            return res.status(401).json({ message: "Invalid email or password" });
+        }
 
-		// Check Editor account
-		if (editor && (await editor.comparePassword(password))) {
-			authenticatedAccount = editor;
-			accountType = 'editor';
-			availableRoles.push('editor');
-		}
+        // Compare password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: "Invalid email or password" });
+        }
 
-		// Check Reviewer account  
-		if (reviewer && (await reviewer.comparePassword(password))) {
-			authenticatedAccount = reviewer;
-			accountType = 'reviewer';
-			availableRoles.push('reviewer');
-		}
+        // Determine current role
+        let currentRole = null;
 
-		if (authenticatedAccount) {
-			// If multiple accounts exist with same email/password, collect all roles
-			const allRoles = [];
-			if (user && (await bcrypt.compare(password, user.password))) {
-				allRoles.push('author');
-			}
-			if (editor && (await editor.comparePassword(password))) {
-				allRoles.push('editor');
-			}
-			if (reviewer && (await reviewer.comparePassword(password))) {
-				allRoles.push('reviewer');
-			}
+        // If user has editor role, check passKey
+        if (user.roles.includes("editor")) {
+            if (passKey !== HARDCODED_EDITOR_KEY) {
+                return res.status(401).json({ message: "Editor key required" });
+            }
+            currentRole = "editor";
+        } else if (user.roles.includes("reviewer")) {
+            currentRole = "reviewer";
+        } else {
+            currentRole = "author"; // default role for normal user
+        }
 
-			res.json({
-				_id: authenticatedAccount._id,
-				firstName: authenticatedAccount.firstName,
-				lastName: authenticatedAccount.lastName,
-				email: authenticatedAccount.email,
-				username: authenticatedAccount.username,
-				token: generateToken(authenticatedAccount._id),
-				accountType: accountType,
-				availableRoles: allRoles, // All roles this email can access
-				currentRole: accountType, // Currently logged in as
-			});
-		} else {
-			res.status(401).json({ message: "Invalid email or password" });
-		}
-	} catch (error) {
-		console.error("Login error:", error);
-		res.status(500).json({ message: "Server Error", error });
-	}
+        // Collect all roles from user.roles
+        const availableRoles = [...user.roles];
+
+        // Respond with user info
+        return res.json({
+            _id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            username: user.username,
+            token: generateToken(user._id),
+            accountType: currentRole,
+            availableRoles: availableRoles,
+            currentRole: currentRole
+        });
+
+    } catch (error) {
+        console.error("Login error:", error);
+        return res.status(500).json({ message: "Server Error", error });
+    }
 };
+
+
 
 // @desc    Switch user role (for users with multiple roles)
 // @route   POST /api/auth/switch-role

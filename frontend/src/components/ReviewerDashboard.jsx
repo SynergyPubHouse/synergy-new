@@ -3,6 +3,18 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../App";
 import { getUserFullName } from "../utils/roleUtils";
+import { CLOSING } from "ws";
+
+// Helper function to format recommendation text
+const formatRecommendation = (rec) => {
+	const recMap = {
+		'accept': 'Accept',
+		'minor-revision': 'Minor Revision',
+		'major-revision': 'Major Revision',
+		'reject': 'Reject'
+	};
+	return recMap[rec] || rec;
+};
 
 function ReviewerDashboard() {
 	const { user } = useAuth();
@@ -16,7 +28,9 @@ function ReviewerDashboard() {
 	const [pendingInvitations, setPendingInvitations] = useState([]);
 	const [showRejectForm, setShowRejectForm] = useState(null); // Store manuscript ID when showing reject form
 	const [rejectionReason, setRejectionReason] = useState(""); // For storing rejection reason
-
+	console.log("showReviewForm", showReviewForm);
+	console.log("reviewText", reviewText);
+	console.log("recommendation", recommendation);
 	useEffect(() => {
 		const fetchManuscripts = async () => {
 			try {
@@ -28,8 +42,7 @@ function ReviewerDashboard() {
 
 				console.log("Fetching manuscripts with token:", user.token);
 				const response = await axios.get(
-					`${
-						import.meta.env.VITE_BACKEND_URL
+					`${import.meta.env.VITE_BACKEND_URL
 					}/api/auth/reviewer/assigned-manuscripts`,
 					{
 						headers: {
@@ -119,8 +132,7 @@ function ReviewerDashboard() {
 				}
 
 				const response = await axios.get(
-					`${
-						import.meta.env.VITE_BACKEND_URL
+					`${import.meta.env.VITE_BACKEND_URL
 					}/api/auth/reviewer/pending-invitations`,
 					{
 						headers: {
@@ -186,8 +198,7 @@ function ReviewerDashboard() {
 
 			// Submit the review with the structured note
 			const response = await axios.post(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/reviewer/manuscripts/${manuscriptId}/review`,
 				{
 					comments: reviewText,
@@ -205,8 +216,7 @@ function ReviewerDashboard() {
 
 			// Update the manuscript status directly first
 			const statusResponse = await axios.put(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/manuscripts/${manuscriptId}/status`,
 				{ status: "Reviewed" },
 				{
@@ -220,87 +230,14 @@ function ReviewerDashboard() {
 
 			// Fetch updated manuscript data
 			const updatedResponse = await axios.get(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/reviewer/assigned-manuscripts`,
 				{
 					headers: {
 						Authorization: `Bearer ${user.token}`,
-					},
-				}
-			);
-
-			console.log("Updated manuscripts data:", updatedResponse.data);
-
-            // Update manuscripts state with fresh data (use server data as-is to avoid duplicates)
-            const userManuscripts = {};
-            updatedResponse.data.forEach((manuscript) => {
-                const authorFullName =
-                    typeof manuscript.author === "string"
-                        ? manuscript.author
-                        : manuscript.author.fullName ||
-                          `${manuscript.author.firstName} ${manuscript.author.lastName}`;
-
-                if (!userManuscripts[authorFullName]) {
-                    userManuscripts[authorFullName] = {
-                        _id: manuscript._id,
-                        firstName:
-                            typeof manuscript.author === "string"
-                                ? manuscript.author.split(" ")[0]
-                                : manuscript.author.firstName,
-                        lastName:
-                            typeof manuscript.author === "string"
-                                ? manuscript.author.split(" ")[1] || ""
-                                : manuscript.author.lastName,
-                        fullName: authorFullName,
-                        manuscripts: [],
-                    };
-                }
-                // Push manuscript as returned from server to prevent double-adding the just-submitted note
-                userManuscripts[authorFullName].manuscripts.push(manuscript);
-            });
-
-			console.log("Processed user manuscripts:", userManuscripts);
-
-			const usersList = Object.values(userManuscripts);
-			setUsers(usersList);
-			if (selectedUser) {
-				const updatedSelectedUser = usersList.find(
-					(u) => u.fullName === selectedUser.fullName
-				);
-				if (updatedSelectedUser) {
-					console.log(
-						"Setting updated manuscripts:",
-						updatedSelectedUser.manuscripts
-					);
-					setSelectedUser(updatedSelectedUser);
-					setManuscripts(updatedSelectedUser.manuscripts);
-				}
-			}
-
-			// Reset form
-			setReviewText("");
-			setRecommendation("");
-			setShowReviewForm(null);
-			alert("Review submitted successfully!");
-		} catch (error) {
-			console.error("Error submitting review:", error);
-			alert("Failed to submit review");
-		}
-	};
-
-	// Handle accepting invitation
-	const handleAcceptInvitation = async (manuscriptId) => {
-		try {
-			if (!user || !user.token) {
-				alert("You must be logged in to accept invitations");
-				navigate("/login");
-				return;
-			}
-
-			await axios.post(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+					}
+				},
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/reviewer/manuscripts/${manuscriptId}/accept-invitation`,
 				{},
 				{
@@ -339,8 +276,7 @@ function ReviewerDashboard() {
 			}
 
 			await axios.post(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/reviewer/manuscripts/${manuscriptId}/reject-invitation`,
 				{
 					rejectionReason: rejectionReason.trim(),
@@ -366,7 +302,35 @@ function ReviewerDashboard() {
 			);
 		}
 	};
-
+	const handleAcceptInvitation = async (manuscriptId) => {
+		try {
+			if (!user || !user.token) {
+				alert("You must be logged in to accept invitations");
+				navigate("/login");
+				return;
+			}
+			await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL
+				}/api/auth/reviewer/manuscripts/${manuscriptId}/accept-invitation`,
+				{},
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			// Remove from pending invitations
+			setPendingInvitations((prev) =>
+				prev.filter((inv) => inv._id !== manuscriptId)
+			);
+			alert("Invitation accepted successfully!");
+			// Refresh manuscripts to show the newly accepted one
+			window.location.reload();
+		} catch (error) {
+			console.error("Error accepting invitation:", error);
+			alert("Failed to accept invitation");
+		}
+	};
 	return (
 		<div className="min-h-screen bg-[#f8fafc] p-6">
 			<div className="max-w-6xl mx-auto">
@@ -407,9 +371,9 @@ function ReviewerDashboard() {
 										<p className="mt-1 text-gray-600">
 											{invitation.abstract.length > 150
 												? `${invitation.abstract.substring(
-														0,
-														150
-												  )}...`
+													0,
+													150
+												)}...`
 												: invitation.abstract}
 										</p>
 									</div>
@@ -497,11 +461,10 @@ function ReviewerDashboard() {
 								<button
 									key={user._id}
 									onClick={() => handleUserClick(user)}
-									className={`w-full text-left p-3 rounded-lg transition-all ${
-										selectedUser === user
-											? "bg-[#496580] text-white"
-											: "bg-[#f8fafc] text-[#1a365d] hover:bg-[#e2e8f0]"
-									}`}
+									className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser === user
+										? "bg-[#496580] text-white"
+										: "bg-[#f8fafc] text-[#1a365d] hover:bg-[#e2e8f0]"
+										}`}
 								>
 									{user.fullName}
 								</button>
@@ -548,6 +511,35 @@ function ReviewerDashboard() {
 											>
 												View PDF
 											</button>
+
+
+												{manuscript.highlightedRevisionFileUrl && (
+	<button
+	onClick={() => {
+		const url = manuscript.highlightedRevisionFileUrl;
+		if (url) {
+			const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+			window.open(viewerUrl, "_blank");
+		} else {
+			alert("File not available");
+		}
+	}}
+	className="px-4 py-2 bg-[#f59e0b] text-white rounded hover:bg-[#d97706]"
+>
+	View Highlighted Revision
+</button>
+
+	)}
+
+	{/* Combined Revision PDF */}
+	{manuscript.revisionCombinedPdfUrl && (
+		<button
+			onClick={() => handleViewPDF(manuscript.revisionCombinedPdfUrl)}
+			className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669]"
+		>
+			View Combined Revision PDF
+		</button>
+	)}
 										</div>
 									</div>
 
@@ -574,18 +566,17 @@ function ReviewerDashboard() {
 															</p>
 															{note.action && (
 																<span
-																	className={`inline-block mt-2 px-2 py-1 text-xs rounded ${
-																		note.action ===
+																	className={`inline-block mt-2 px-2 py-1 text-xs rounded ${note.action ===
 																		"Under Review"
-																			? "bg-[#f59e0b]"
-																			: note.action ===
-																			  "Reviewed"
+																		? "bg-[#f59e0b]"
+																		: note.action ===
+																			"Reviewed"
 																			? "bg-[#3b82f6]"
 																			: note.action ===
-																			  "Accepted"
-																			? "bg-[#10b981]"
-																			: "bg-[#ef4444]"
-																	} text-white`}
+																				"Accepted"
+																				? "bg-[#10b981]"
+																				: "bg-[#ef4444]"
+																		} text-white`}
 																>
 																	{
 																		note.action
@@ -609,23 +600,43 @@ function ReviewerDashboard() {
 										</div>
 									)}
 
-									{/* Review Form */}
-									<div className="mt-4 flex justify-end">
-										{showReviewForm !== manuscript._id ? (
-											<button
-												onClick={() =>
-													setShowReviewForm(
-														manuscript._id
-													)
-												}
-												className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669]"
-											>
-												Add Review
-											</button>
-										) : (
+									{/* Review Section */}
+									<div className="mt-4">
+										{manuscript.reviewerNotes && manuscript.reviewerNotes.length > 0 ? (
+											<div className="border-t border-[#e2e8f0] pt-4">
+												<div className="flex justify-between items-center mb-4">
+													<h4 className="text-[#10b981] text-lg font-semibold">
+														Your Review
+													</h4>
+													<button
+														onClick={() => {
+															setShowReviewForm(manuscript._id);
+															setReviewText(manuscript.reviewerNotes[0].text);
+															setRecommendation(manuscript.reviewerNotes[0].action);
+														}}
+														className="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600"
+													>
+														Edit Review
+													</button>
+												</div>
+												<div className="bg-white p-4 rounded-lg border border-[#e2e8f0] mb-4">
+													<p className="whitespace-pre-line text-[#1a365d] mb-3">
+														{manuscript.reviewerNotes[0].text}
+													</p>
+													<div className="flex justify-between items-center text-sm">
+														<span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
+															{manuscript.reviewerNotes[0].action}
+														</span>
+														<span className="text-gray-500">
+															Submitted on: {new Date(manuscript.reviewerNotes[0].addedAt).toLocaleString()}
+														</span>
+													</div>
+												</div>
+											</div>
+										) : showReviewForm === manuscript._id ? (
 											<div className="w-full border-t border-[#e2e8f0] pt-4">
 												<h4 className="text-[#10b981] text-lg font-semibold mb-4">
-													Add Your Review
+													{manuscript.reviewerNotes?.length > 0 ? 'Edit Your Review' : 'Add Your Review'}
 												</h4>
 												<div className="space-y-4">
 													<div>
@@ -636,8 +647,7 @@ function ReviewerDashboard() {
 															value={reviewText}
 															onChange={(e) =>
 																setReviewText(
-																	e.target
-																		.value
+																	e.target.value
 																)
 															}
 															className="w-full h-32 bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
@@ -649,20 +659,16 @@ function ReviewerDashboard() {
 															Recommendation:
 														</label>
 														<select
-															value={
-																recommendation
-															}
+															value={recommendation}
 															onChange={(e) =>
 																setRecommendation(
-																	e.target
-																		.value
+																	e.target.value
 																)
 															}
 															className="w-full bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
 														>
 															<option value="">
-																Select a
-																recommendation
+																Select a recommendation
 															</option>
 															<option value="Accept">
 																Accept
@@ -681,15 +687,9 @@ function ReviewerDashboard() {
 													<div className="flex justify-end space-x-2">
 														<button
 															onClick={() => {
-																setShowReviewForm(
-																	null
-																);
-																setReviewText(
-																	""
-																);
-																setRecommendation(
-																	""
-																);
+																setShowReviewForm(null);
+																setReviewText("");
+																setRecommendation("");
 															}}
 															className="px-4 py-2 bg-[#64748b] text-white rounded hover:bg-[#475569]"
 														>
@@ -707,10 +707,23 @@ function ReviewerDashboard() {
 															}
 															className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed"
 														>
-															Submit Review
+															{manuscript.reviewerNotes?.length > 0 ? 'Update Review' : 'Submit Review'}
 														</button>
 													</div>
 												</div>
+											</div>
+										) : (
+											<div className="flex justify-end">
+												<button
+													onClick={() =>
+														setShowReviewForm(
+															manuscript._id
+														)
+													}
+													className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669]"
+												>
+													Add Review
+												</button>
 											</div>
 										)}
 									</div>

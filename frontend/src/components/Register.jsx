@@ -17,6 +17,7 @@ function Register() {
     confirmPassword: "",
     specialization: "",
     experience: "",
+    specialKey: "",
   });
   const [role, setRole] = useState("Author");
   const [errorMessage, setErrorMessage] = useState("");
@@ -24,7 +25,7 @@ function Register() {
   const navigate = useNavigate();
   const location = useLocation(); // 2. Initialize useLocation
   const { login } = useAuth(); // 3. Get the login function from your Auth context
-  
+
   // 4. Define the 'from' variable, defaulting to the homepage
   const from = location.state?.from || '/';
 
@@ -33,51 +34,47 @@ function Register() {
     setErrorMessage("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setErrorMessage(""); // Clear previous errors
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsLoading(true);
+  setErrorMessage("");
 
-    if (formData.password !== formData.confirmPassword) {
-      setErrorMessage("Passwords do not match!");
-      setIsLoading(false);
-      return;
+  if (formData.password !== formData.confirmPassword) {
+    setErrorMessage("Passwords do not match!");
+    setIsLoading(false);
+    return;
+  }
+
+  if ((role === "Editor" || role === "Reviewer") && (!formData.specialization || !formData.experience)) {
+    setErrorMessage("Please provide specialization and experience for this role.");
+    setIsLoading(false);
+    return;
+  }
+
+  try {
+    const endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`;
+
+    const payload = { ...formData, role };
+    if (role === "Editor") payload.specialKey = formData.specialKey || "";
+
+    const response = await axios.post(endpoint, payload);
+
+    if (response.data.role === "Author") {
+      login(response.data);
+      localStorage.setItem("user", JSON.stringify(response.data));
+      navigate(from, { replace: true });
+    } else {
+      alert(`${response.data.role} registration successful. Please log in.`);
+      navigate("/login");
     }
 
-    if ((role === "Editor" || role === "Reviewer") && (!formData.specialization || !formData.experience)) {
-      setErrorMessage("Please provide specialization and experience for this role.");
-      setIsLoading(false);
-      return;
-    }
+  } catch (error) {
+    setErrorMessage(error.response?.data?.message || "Registration Failed. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-    try {
-      let endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`;
-      if (role === "Editor") endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/register`;
-      if (role === "Reviewer") endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/register`;
-
-      const response = await axios.post(endpoint, formData);
-
-      if (role === "Author") {
-        if (response.data) {
-          login(response.data); // Update the application's auth state
-          localStorage.setItem("user", JSON.stringify(response.data)); // Persist session
-          navigate(from, { replace: true }); // Redirect to the previous page or homepage
-        } else {
-          setErrorMessage("Registration successful, but auto-login failed. Please sign in.");
-        }
-      } else {
-        alert(`${role} registration successful. Please log in.`);
-        navigate(`/login`);
-      }
-      
-    } catch (error) {
-      // 7. Provide a more robust error message
-      setErrorMessage(error.response?.data?.message || "Registration Failed. Please try again.");
-      
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -87,12 +84,12 @@ function Register() {
           <div className="md:w-2/5 bg-gradient-to-br from-teal-600 to-cyan-500 p-8 flex flex-col items-center justify-center text-white">
             <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl mb-6">
               <img
-                src="/images/SynergyLogo.png"
+                src="/images/JICSLogo.png"
                 alt="Logo"
                 className="w-16 h-16 object-contain"
               />
             </div>
-            <h1 className="text-2xl font-bold mb-2 text-center">Synergy World Press</h1>
+            <h1 className="text-2xl font-bold mb-2 text-center">Journal of Intelligent Computing System</h1>
             <p className="text-sm text-cyan-100 text-center opacity-90">
               Join our community of scholars and researchers
             </p>
@@ -274,6 +271,21 @@ function Register() {
                   />
                 </div>
               </div>
+{role === "Editor" && (
+  <div className="grid grid-cols-1 gap-3">
+    <label className="block text-xs font-medium text-gray-600 mb-1">
+      Editor Key
+    </label>
+    <input
+      type="password"
+      name="specialKey"
+      value={formData.specialKey}
+      onChange={handleChange}
+      required
+      className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+    />
+  </div>
+)}
 
               <button
                 type="submit"
