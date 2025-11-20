@@ -46,6 +46,7 @@ import FinalEvaluationAndAcceptance from "./pages/peer-review/FinalEvaluationAnd
 import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationIntegrityAndTimeline";
 
 import PageNotAvailable from "./pages/pagenotavailable";
+// import BookPublication from "./pages/BookPublication";
 import BookPublication from "./pages/BookPublication";
 
 // Create Authentication Context
