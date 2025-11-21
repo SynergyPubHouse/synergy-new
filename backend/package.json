@@ -5,6 +5,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node server.js",
+     "postinstall": "node node_modules/puppeteer/install.mjs",
     "start": "node server.js",
     "build": "echo \"Installing Python dependencies...\" && python3 -m pip install docx2txt && echo \"Backend build completed\""
   },
