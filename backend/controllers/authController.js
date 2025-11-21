@@ -579,6 +579,51 @@ exports.orcidCallback = async (req, res) => {
           Authorization: `Bearer ${access_token}`,
           Accept: "application/vnd.orcid+json",
         },
+      }
+    );
+
+    const orcidData = userResponse.data;
+
+    // Extract name with robust fallbacks
+    let givenName = "ORCID";
+    let familyName = "ORCID";
+    
+    if (orcidData.name) {
+      if (orcidData.name["given-names"]?.value) {
+        givenName = orcidData.name["given-names"].value;
+      } else if (orcidData.name.givenNames?.value) {
+        givenName = orcidData.name.givenNames.value;
+      } else if (orcidData.name["given-names"]) {
+        givenName = orcidData.name["given-names"];
+      } else if (orcidData.name.givenNames) {
+        givenName = orcidData.name.givenNames;
+      }
+      
+      if (orcidData.name["family-name"]?.value) {
+        familyName = orcidData.name["family-name"].value;
+      } else if (orcidData.name.familyName?.value) {
+        familyName = orcidData.name.familyName.value;
+      } else if (orcidData.name["family-name"]) {
+        familyName = orcidData.name["family-name"];
+      } else if (orcidData.name.familyName) {
+        familyName = orcidData.name.familyName;
+      }
+    }
+
+    // Ensure we have non-empty strings for required fields
+    givenName = givenName && givenName.trim() ? givenName.trim() : "ORCID";
+    familyName = familyName && familyName.trim() ? familyName.trim() : "ORCID";
+
+    // Generate fallback email if ORCID email is not available
+    let primaryEmail = `orcid_${orcid.slice(-6)}@example.com`;
+    
+    try {
+      // Try to fetch email separately (may be private)
+      const emailResponse = await axios.get(`https://pub.orcid.org/v3.0/${encodeURIComponent(orcid)}/email`, {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          Accept: "application/vnd.orcid+json",
+        },
       });
 
       const emails = emailResponse.data?.email || emailResponse.data?.emails || [];
