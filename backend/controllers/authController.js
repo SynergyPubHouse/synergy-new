@@ -550,7 +550,8 @@ exports.orcidCallback = async (req, res) => {
         },
       }
     );
-
+    console.log("userResponse", userResponse);
+console.log("userResponse.data",userResponse.data);
     const orcidData = userResponse.data;
     const email = orcidData.emails?.[0]?.email;
     const name = orcidData.name;
