@@ -516,15 +516,15 @@ exports.getGoogleClientId = async (req, res) => {
 // @access  Public
 exports.orcidCallback = async (req, res) => {
   try {
-    const code = req.query.code; // GET request parameter
+    const code = req.query.code;
 
     if (!code) {
       return res.status(400).json({ message: "No code provided" });
     }
 
-    // Determine redirect URI
     const ORCID_REDIRECT_URI =
       "https://synergy-world-press-pq5k.onrender.com/api/auth/orcid/callback";
+
     // Exchange code for access token
     const tokenResponse = await axios.post(
       "https://orcid.org/oauth/token",
@@ -540,9 +540,9 @@ exports.orcidCallback = async (req, res) => {
 
     const { access_token, orcid } = tokenResponse.data;
 
-    // Get user info from ORCID
+    // 🔥 IMPORTANT: Public API uses pub.orcid.org
     const userResponse = await axios.get(
-      `https://api.orcid.org/v3.0/${orcid}/person`,
+      `https://pub.orcid.org/v3.0/${orcid}/person`,
       {
         headers: {
           Authorization: `Bearer ${access_token}`,
@@ -550,50 +550,50 @@ exports.orcidCallback = async (req, res) => {
         },
       }
     );
-    console.log("userResponse", userResponse);
-console.log("userResponse.data", JSON.stringify(userResponse.data, null, 2));
+console.log("userResponse data:", userResponse.data);
+console.log("userResponse ", userResponse);
+    const orcidData = userResponse.data;
+    const name = orcidData.name;
 
-const orcidData = userResponse.data;
-const name = orcidData.name;
+    let user = await User.findOne({ orcidId: orcid });
 
-let user = await User.findOne({ orcidId: orcid });
+    if (!user) {
+      user = await User.create({
+        firstName: name["given-names"]?.value || "",
+        lastName: name["family-name"]?.value || "",
+        orcidId: orcid,
+        username: `orcid_${orcid.slice(-4)}`,
+        password: await bcrypt.hash(orcid + process.env.JWT_SECRET, 10),
+        roles: ["author"],
+        isVerified: true,
+      });
+    }
 
-if (!user) {
-  user = await User.create({
-    firstName: name["given-names"]?.value || name.givenNames || "",
-    lastName: name["family-name"]?.value || name.familyName || "",
-    orcidId: orcid,
-    username: `orcid_${orcid.slice(-4)}`,
-    password: await bcrypt.hash(orcid + process.env.JWT_SECRET, 10),
-    roles: ["author"],
-    isVerified: true,
-  });
-} else if (!user.orcidId) {
-  user.orcidId = orcid;
-  await user.save();
-}
+    const token = generateToken(user._id);
 
-const token = generateToken(user._id);
+    return res.json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email || null,
+      username: user.username,
+      roles: user.roles,
+      token,
+      accountType: "author",
+      currentRole: "author",
+      availableRoles: user.roles,
+    });
 
-res.json({
-  _id: user._id,
-  firstName: user.firstName,
-  lastName: user.lastName,
-  email: user.email || null,
-  username: user.username,
-  roles: user.roles,
-  token,
-  accountType: "author",
-  currentRole: "author",
-  availableRoles: user.roles,
-});
   } catch (error) {
     console.error(
       "ORCID callback error:",
       error.response?.data || error.message
     );
-    res
-      .status(500)
-      .json({ message: "ORCID authentication failed", error: error.message });
+
+    return res.status(500).json({
+      message: "ORCID authentication failed",
+      error: error.response?.data || error.message,
+    });
   }
 };
+
