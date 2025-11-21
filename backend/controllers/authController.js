@@ -3,16 +3,16 @@ const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
-const { OAuth2Client } = require('google-auth-library');
+const { OAuth2Client } = require("google-auth-library");
 const Editor = require("../models/Editor");
 const Reviewer = require("../models/Reviewer");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT
 const generateToken = (id) => {
-	return jwt.sign({ id }, process.env.JWT_SECRET, {
-		expiresIn: "30d",
-	});
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
 };
 
 // @desc    Reset password using token
@@ -22,7 +22,9 @@ exports.resetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) {
-      return res.status(400).json({ message: "Token and new password are required" });
+      return res
+        .status(400)
+        .json({ message: "Token and new password are required" });
     }
 
     let decoded;
@@ -60,11 +62,19 @@ exports.sendLoginDetails = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: "No account found with this email" });
+      return res
+        .status(404)
+        .json({ message: "No account found with this email" });
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
-    const fullName = [user.title, user.firstName, user.middleName, user.lastName]
+    const frontendUrl =
+      process.env.FRONTEND_URL || "https://synergyworldpress.com";
+    const fullName = [
+      user.title,
+      user.firstName,
+      user.middleName,
+      user.lastName,
+    ]
       .filter(Boolean)
       .join(" ");
 
@@ -126,10 +136,15 @@ exports.registerUser = async (req, res) => {
   try {
     // Check email/username in User collection
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) return res.status(400).json({ message: "Email or Username already exists" });
+    if (existingUser)
+      return res
+        .status(400)
+        .json({ message: "Email or Username already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const normalizedRole = role ? role.toLowerCase().replace(" ", "_") : "author";
+    const normalizedRole = role
+      ? role.toLowerCase().replace(" ", "_")
+      : "author";
 
     // Create User entry
     const userData = {
@@ -146,10 +161,15 @@ exports.registerUser = async (req, res) => {
     // Extra fields for Editor/Reviewer
     if (normalizedRole === "editor") {
       const HARDCODED_EDITOR_KEY = "myTestEditorKey123";
-      if (!specialKey) return res.status(400).json({ message: "Editor key required" });
-      if (specialKey !== HARDCODED_EDITOR_KEY) return res.status(401).json({ message: "Invalid editor key" });
-      if (!specialization || !experience) return res.status(400).json({ message: "Specialization and experience required" });
-      
+      if (!specialKey)
+        return res.status(400).json({ message: "Editor key required" });
+      if (specialKey !== HARDCODED_EDITOR_KEY)
+        return res.status(401).json({ message: "Invalid editor key" });
+      if (!specialization || !experience)
+        return res
+          .status(400)
+          .json({ message: "Specialization and experience required" });
+
       userData.specialization = specialization;
       userData.experience = experience;
       userData.specialKey = specialKey;
@@ -159,7 +179,10 @@ exports.registerUser = async (req, res) => {
     }
 
     if (normalizedRole === "reviewer") {
-      if (!specialization || !experience) return res.status(400).json({ message: "Specialization and experience required" });
+      if (!specialization || !experience)
+        return res
+          .status(400)
+          .json({ message: "Specialization and experience required" });
 
       userData.specialization = specialization;
       userData.experience = experience;
@@ -180,281 +203,269 @@ exports.registerUser = async (req, res) => {
       roles: newUser.roles,
       token: generateToken(newUser._id),
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server Error", error });
   }
 };
 
-
-
 // @desc    Authenticate user & get token (unified login for all roles)
 // @route   POST /api/auth/login
 // @access  Public
 const HARDCODED_EDITOR_KEY = "myTestEditorKey123";
 
-
-
 exports.loginUser = async (req, res) => {
-    const { email, password, passKey } = req.body;
+  const { email, password, passKey } = req.body;
 
-    try {
-        // Import optional models
-        const Reviewer = require("../models/Reviewer");
+  try {
+    // Import optional models
+    const Reviewer = require("../models/Reviewer");
 
-        // Find the user by email in User collection
-        const user = await User.findOne({ email });
+    // Find the user by email in User collection
+    const user = await User.findOne({ email });
 
-        if (!user) {
-            return res.status(401).json({ message: "Invalid email or password" });
-        }
-
-        // Compare password
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            return res.status(401).json({ message: "Invalid email or password" });
-        }
-
-        // Determine current role
-        let currentRole = null;
-
-        // If user has editor role, check passKey
-        if (user.roles.includes("editor")) {
-            if (passKey !== HARDCODED_EDITOR_KEY) {
-                return res.status(401).json({ message: "Editor key required" });
-            }
-            currentRole = "editor";
-        } else if (user.roles.includes("reviewer")) {
-            currentRole = "reviewer";
-        } else {
-            currentRole = "author"; // default role for normal user
-        }
-
-        // Collect all roles from user.roles
-        const availableRoles = [...user.roles];
-
-        // Respond with user info
-        return res.json({
-            _id: user._id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            username: user.username,
-            token: generateToken(user._id),
-            accountType: currentRole,
-            availableRoles: availableRoles,
-            currentRole: currentRole
-        });
-
-    } catch (error) {
-        console.error("Login error:", error);
-        return res.status(500).json({ message: "Server Error", error });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
     }
+
+    // Compare password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Determine current role
+    let currentRole = null;
+
+    // If user has editor role, check passKey
+    if (user.roles.includes("editor")) {
+      if (passKey !== HARDCODED_EDITOR_KEY) {
+        return res.status(401).json({ message: "Editor key required" });
+      }
+      currentRole = "editor";
+    } else if (user.roles.includes("reviewer")) {
+      currentRole = "reviewer";
+    } else {
+      currentRole = "author"; // default role for normal user
+    }
+
+    // Collect all roles from user.roles
+    const availableRoles = [...user.roles];
+
+    // Respond with user info
+    return res.json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      username: user.username,
+      token: generateToken(user._id),
+      accountType: currentRole,
+      availableRoles: availableRoles,
+      currentRole: currentRole,
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({ message: "Server Error", error });
+  }
 };
-
-
 
 // @desc    Switch user role (for users with multiple roles)
 // @route   POST /api/auth/switch-role
 // @access  Private
 exports.switchRole = async (req, res) => {
-	const { email, targetRole } = req.body;
+  const { email, targetRole } = req.body;
 
-	try {
-		// Import models
-		const Editor = require("../models/Editor");
-		const Reviewer = require("../models/Reviewer");
+  try {
+    // Import models
+    const Editor = require("../models/Editor");
+    const Reviewer = require("../models/Reviewer");
 
-		let targetAccount = null;
-		let newToken = null;
+    let targetAccount = null;
+    let newToken = null;
 
-		// Find the account for the target role
-		switch (targetRole) {
-			case 'author':
-				targetAccount = await User.findOne({ email });
-				break;
-			case 'editor':
-				targetAccount = await Editor.findOne({ email });
-				break;
-			case 'reviewer':
-				targetAccount = await Reviewer.findOne({ email });
-				break;
-			default:
-				return res.status(400).json({ message: "Invalid role specified" });
-		}
+    // Find the account for the target role
+    switch (targetRole) {
+      case "author":
+        targetAccount = await User.findOne({ email });
+        break;
+      case "editor":
+        targetAccount = await Editor.findOne({ email });
+        break;
+      case "reviewer":
+        targetAccount = await Reviewer.findOne({ email });
+        break;
+      default:
+        return res.status(400).json({ message: "Invalid role specified" });
+    }
 
-		if (!targetAccount) {
-			return res.status(404).json({ 
-				message: `No ${targetRole} account found for this email` 
-			});
-		}
+    if (!targetAccount) {
+      return res.status(404).json({
+        message: `No ${targetRole} account found for this email`,
+      });
+    }
 
-		// Generate new token for the target account
-		newToken = generateToken(targetAccount._id);
+    // Generate new token for the target account
+    newToken = generateToken(targetAccount._id);
 
-		res.json({
-			_id: targetAccount._id,
-			firstName: targetAccount.firstName,
-			lastName: targetAccount.lastName,
-			email: targetAccount.email,
-			username: targetAccount.username,
-			token: newToken,
-			accountType: targetRole,
-			currentRole: targetRole,
-			message: `Successfully switched to ${targetRole} role`
-		});
-
-	} catch (error) {
-		console.error("Role switch error:", error);
-		res.status(500).json({ message: "Server Error", error });
-	}
+    res.json({
+      _id: targetAccount._id,
+      firstName: targetAccount.firstName,
+      lastName: targetAccount.lastName,
+      email: targetAccount.email,
+      username: targetAccount.username,
+      token: newToken,
+      accountType: targetRole,
+      currentRole: targetRole,
+      message: `Successfully switched to ${targetRole} role`,
+    });
+  } catch (error) {
+    console.error("Role switch error:", error);
+    res.status(500).json({ message: "Server Error", error });
+  }
 };
 
 // @desc    Get user profile
 // @route   GET /api/auth/profile
 // @access  Private
 exports.getUserProfile = async (req, res) => {
-	try {
-		const user = await User.findById(req.user._id).select("-password");
+  try {
+    const user = await User.findById(req.user._id).select("-password");
 
-		if (user) {
-			res.json(user);
-		} else {
-			res.status(404).json({ message: "User not found" });
-		}
-	} catch (error) {
-		res.status(500).json({ message: "Server Error", error });
-	}
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
 };
 
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
 // @access  Private
 exports.updateUserProfile = async (req, res) => {
-	try {
-		const user = await User.findById(req.user._id);
+  try {
+    const user = await User.findById(req.user._id);
 
-		if (user) {
-			user.firstName = req.body.firstName || user.firstName;
-			user.middleName = req.body.middleName || user.middleName;
-			user.lastName = req.body.lastName || user.lastName;
-			user.email = req.body.email || user.email;
-			user.username = req.body.username || user.username;
+    if (user) {
+      user.firstName = req.body.firstName || user.firstName;
+      user.middleName = req.body.middleName || user.middleName;
+      user.lastName = req.body.lastName || user.lastName;
+      user.email = req.body.email || user.email;
+      user.username = req.body.username || user.username;
 
-			if (req.body.password) {
-				user.password = await bcrypt.hash(req.body.password, 10);
-			}
+      if (req.body.password) {
+        user.password = await bcrypt.hash(req.body.password, 10);
+      }
 
-			const updatedUser = await user.save();
+      const updatedUser = await user.save();
 
-			res.json({
-				_id: updatedUser._id,
-				firstName: updatedUser.firstName,
-				lastName: updatedUser.lastName,
-				email: updatedUser.email,
-				username: updatedUser.username,
-				token: generateToken(updatedUser._id),
-			});
-		} else {
-			res.status(404).json({ message: "User not found" });
-		}
-	} catch (error) {
-		res.status(500).json({ message: "Server Error", error });
-	}
+      res.json({
+        _id: updatedUser._id,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        email: updatedUser.email,
+        username: updatedUser.username,
+        token: generateToken(updatedUser._id),
+      });
+    } else {
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
 };
 
 // @desc    Get all users
 // @route   GET /api/auth/users
 // @access  Private/Admin
 exports.getAllUsers = async (req, res) => {
-	try {
-		const users = await User.find({}).select("-password");
-		res.json(users);
-	} catch (error) {
-		res.status(500).json({ message: "Server Error", error });
-	}
+  try {
+    const users = await User.find({}).select("-password");
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
 };
 
 // @desc    Delete user
 // @route   DELETE /api/auth/user/:id
 // @access  Private/Admin
 exports.deleteUser = async (req, res) => {
-	try {
-		const user = await User.findById(req.params.id);
+  try {
+    const user = await User.findById(req.params.id);
 
-		if (user) {
-			await user.remove();
-			res.json({ message: "User removed" });
-		} else {
-			res.status(404).json({ message: "User not found" });
-		}
-	} catch (error) {
-		res.status(500).json({ message: "Server Error", error });
-	}
+    if (user) {
+      await user.remove();
+      res.json({ message: "User removed" });
+    } else {
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error });
+  }
 };
 
 // @desc    Verify if email exists in database
 // @route   POST /api/auth/verify-email
 // @access  Private
 exports.verifyEmail = async (req, res) => {
-	try {
-		const { email } = req.body;
+  try {
+    const { email } = req.body;
 
-		if (!email) {
-			return res.status(400).json({ message: "Email is required" });
-		}
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
 
-		const user = await User.findOne({ email });
+    const user = await User.findOne({ email });
 
-		if (user) {
-			res.json({ 
-				exists: true,
-				message: "Email exists in database",
-				user: {
-					_id: user._id,
-					title: user.title,
-					firstName: user.firstName,
-					middleName: user.middleName,
-					lastName: user.lastName,
-					email: user.email,
-					institution: user.institution,
-					country: user.country,
-					academicDegree: user.academicDegree
-				}
-			});
-		} else {
-			res.json({ 
-				exists: false,
-				message: "Email does not exist in database" 
-			});
-		}
-	} catch (error) {
-		res.status(500).json({ message: "Server Error", error: error.message });
-	}
+    if (user) {
+      res.json({
+        exists: true,
+        message: "Email exists in database",
+        user: {
+          _id: user._id,
+          title: user.title,
+          firstName: user.firstName,
+          middleName: user.middleName,
+          lastName: user.lastName,
+          email: user.email,
+          institution: user.institution,
+          country: user.country,
+          academicDegree: user.academicDegree,
+        },
+      });
+    } else {
+      res.json({
+        exists: false,
+        message: "Email does not exist in database",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
 };
 
 exports.googleAuth = async (req, res) => {
   try {
     const { token } = req.body;
-    
+
     // Verify Google token
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
-    
+
     const payload = ticket.getPayload();
-	    const { sub: googleId, email, given_name, family_name, picture } = payload; // Use given_name and family_name
+    const { sub: googleId, email, given_name, family_name, picture } = payload; // Use given_name and family_name
 
     // const { sub: googleId, email, name, picture } = payload;
 
     // Check if user exists
-    let user = await User.findOne({ 
-      $or: [
-        { email },
-        { googleId }
-      ]
+    let user = await User.findOne({
+      $or: [{ email }, { googleId }],
     });
 
     if (!user) {
@@ -466,9 +477,9 @@ exports.googleAuth = async (req, res) => {
         lastName: family_name || ".",
         email,
         googleId,
-        username: email.split('@')[0] + '_' + googleId.slice(0, 4),
+        username: email.split("@")[0] + "_" + googleId.slice(0, 4),
         password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10),
-        isVerified: true
+        isVerified: true,
       });
     } else if (!user.googleId) {
       // Update existing user with Google ID
@@ -485,14 +496,13 @@ exports.googleAuth = async (req, res) => {
       lastName: user.lastName,
       email: user.email,
       username: user.username,
-      token: authToken
+      token: authToken,
     });
-
   } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(401).json({ 
-      message: 'Google authentication failed',
-      error: error.message 
+    console.error("Google auth error:", error);
+    res.status(401).json({
+      message: "Google authentication failed",
+      error: error.message,
     });
   }
 };
@@ -514,10 +524,7 @@ exports.orcidCallback = async (req, res) => {
 
     // Determine redirect URI
     const ORCID_REDIRECT_URI =
-      process.env.NODE_ENV === "production"
-        ? "https://synergyworldpress.com/orcid-callback"
-        : "http://localhost:5000/orcid/callback";
-
+      "https://synergy-world-press-pq5k.onrender.com/api/auth/orcid/callback";
     // Exchange code for access token
     const tokenResponse = await axios.post(
       "https://orcid.org/oauth/token",
