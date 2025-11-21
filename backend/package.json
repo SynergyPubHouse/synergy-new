@@ -5,7 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "echo \"Backend build not required for plain JS\""
   },
   "keywords": [],
   "author": "",
@@ -32,7 +33,7 @@
     "multer": "^1.4.5-lts.1",
     "pdf-lib": "^1.17.1",
     "puppeteer": "^24.30.0",
-    
+    "nodemon": "^3.1.9",
     "python-shell": "^5.0.0"
   },
   "devDependencies": {
