@@ -39,10 +39,8 @@ router.get("/users", auth, getAllUsers);
 router.delete("/users/:id", auth, deleteUser);
 
 router.get("/orcid", (req, res) => {
-  const redirectUri =
-    process.env.NODE_ENV === "production"
-      ? "https://synergyworldpress.com/orcid-callback"
-      : "http://localhost:5000/api/auth/orcid/callback";
+const redirectUri ="https://synergy-world-press-pq5k.onrender.com/api/auth/orcid/callback";
+
 
   const orcidUrl = `https://orcid.org/oauth/authorize?client_id=${
     process.env.ORCID_CLIENT_ID
@@ -53,6 +51,6 @@ router.get("/orcid", (req, res) => {
 });
 
 // Route 2: ORCID callback
-router.get("/orcid/callback", orcidCallback); // controller uses req.query.code
+router.get("/orcid/callback", orcidCallback); 
 
 module.exports = router;
