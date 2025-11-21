@@ -544,9 +544,11 @@ exports.orcidCallback = async (req, res) => {
   try {
     const code = req.query.code; // GET request parameter
     if (!code) return res.status(400).json({ message: "No code provided" });
+    
     // prefer env, fallback to your deployed render url if needed
     const ORCID_REDIRECT_URI = process.env.ORCID_REDIRECT_URI ||
       "https://synergy-world-press-pq5k.onrender.com/api/auth/orcid/callback";
+    
     // Exchange code for access token
     const tokenResponse = await axios.post(
       "https://orcid.org/oauth/token",
@@ -564,13 +566,18 @@ exports.orcidCallback = async (req, res) => {
         } 
       }
     );
-    // log token response for debugging
-    // console.log("tokenResponse.data:", tokenResponse.data);
+
     const { access_token, orcid: orcidFromToken } = tokenResponse.data;
     if (!access_token || !orcidFromToken) {
       return res.status(500).json({ message: "Invalid token response from ORCID", details: tokenResponse.data });
     }
     const orcid = orcidFromToken;
+
+    // Validate ORCID format (basic validation)
+    if (!orcid.match(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/)) {
+      return res.status(400).json({ message: "Invalid ORCID format" });
+    }
+
     // Get user info from ORCID (public API v3)
     const userResponse = await axios.get(
       `https://pub.orcid.org/v3.0/${encodeURIComponent(orcid)}/person`,
@@ -584,41 +591,45 @@ exports.orcidCallback = async (req, res) => {
 
     const orcidData = userResponse.data;
 
-    // Extract name with robust fallbacks
-    let givenName = "ORCID";
-    let familyName = "ORCID";
-    
-    if (orcidData.name) {
-      if (orcidData.name["given-names"]?.value) {
-        givenName = orcidData.name["given-names"].value;
-      } else if (orcidData.name.givenNames?.value) {
-        givenName = orcidData.name.givenNames.value;
-      } else if (orcidData.name["given-names"]) {
-        givenName = orcidData.name["given-names"];
-      } else if (orcidData.name.givenNames) {
-        givenName = orcidData.name.givenNames;
+    // Extract available names with fallbacks
+    const givenName = orcidData.name?.["given-names"]?.value?.trim() || 
+                     orcidData.name?.givenNames?.value?.trim() || 
+                     orcidData.name?.["given-names"]?.trim() || 
+                     orcidData.name?.givenNames?.trim() || 
+                     "ORCID";
+
+    const familyName = orcidData.name?.["family-name"]?.value?.trim() || 
+                      orcidData.name?.familyName?.value?.trim() || 
+                      orcidData.name?.["family-name"]?.trim() || 
+                      orcidData.name?.familyName?.trim() || 
+                      orcid.slice(-4); // Use last 4 digits of ORCID as fallback
+
+    // Generate username from available names (clean and unique)
+    let username;
+    try {
+      const cleanGivenName = givenName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanFamilyName = familyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      if (cleanGivenName && cleanFamilyName && cleanGivenName !== 'orcid') {
+        username = `${cleanGivenName}_${cleanFamilyName}`;
+      } else {
+        username = `orcid_${orcid.slice(-6)}`;
       }
       
-      if (orcidData.name["family-name"]?.value) {
-        familyName = orcidData.name["family-name"].value;
-      } else if (orcidData.name.familyName?.value) {
-        familyName = orcidData.name.familyName.value;
-      } else if (orcidData.name["family-name"]) {
-        familyName = orcidData.name["family-name"];
-      } else if (orcidData.name.familyName) {
-        familyName = orcidData.name.familyName;
+      // Ensure username uniqueness
+      const existingUsername = await User.findOne({ username });
+      if (existingUsername) {
+        username = `${username}_${orcid.slice(-4)}`;
       }
+    } catch (err) {
+      username = `orcid_${orcid.slice(-6)}`;
     }
 
-    // Ensure we have non-empty strings for required fields
-    givenName = givenName && givenName.trim() ? givenName.trim() : "ORCID";
-    familyName = familyName && familyName.trim() ? familyName.trim() : "ORCID";
-
-    // Generate fallback email if ORCID email is not available
-    let primaryEmail = `orcid_${orcid.slice(-6)}@example.com`;
+    // Try to get real email from ORCID (optional)
+    let primaryEmail = null;
+    let emailVerified = false;
     
     try {
-      // Try to fetch email separately (may be private)
       const emailResponse = await axios.get(`https://pub.orcid.org/v3.0/${encodeURIComponent(orcid)}/email`, {
         headers: {
           Authorization: `Bearer ${access_token}`,
@@ -627,75 +638,117 @@ exports.orcidCallback = async (req, res) => {
       });
 
       const emails = emailResponse.data?.email || emailResponse.data?.emails || [];
-      if (emails.length > 0) {
-        const foundEmail = emails.find(e => e.primary)?.email || emails[0]?.email;
-        if (foundEmail && foundEmail.trim()) {
-          primaryEmail = foundEmail.trim();
-        }
+      const primaryEmailObj = emails.find(e => e.primary && e.verified);
+      const unverifiedPrimaryEmail = emails.find(e => e.primary);
+      
+      if (primaryEmailObj && primaryEmailObj.email) {
+        primaryEmail = primaryEmailObj.email.trim();
+        emailVerified = primaryEmailObj.verified;
+      } else if (unverifiedPrimaryEmail && unverifiedPrimaryEmail.email) {
+        primaryEmail = unverifiedPrimaryEmail.email.trim();
+        emailVerified = false;
       }
     } catch (emailErr) {
-      console.log("ORCID email not available, using fallback email:", emailErr.message);
+      console.log("ORCID email not available:", emailErr.message);
     }
 
-    // Ensure email is valid
-    primaryEmail = primaryEmail && primaryEmail.trim() ? primaryEmail.trim() : `orcid_${orcid.slice(-6)}@example.com`;
+    // Use fallback email if no verified email (required by schema)
+    if (!primaryEmail || !emailVerified) {
+      primaryEmail = `orcid_${orcid.slice(-6)}@example.com`;
+      emailVerified = false;
+    }
 
-    console.log("Final user data:", { givenName, familyName, primaryEmail, orcid });
+    console.log(`ORCID Login: ${orcid} -> ${username} (${givenName} ${familyName})`);
 
-    // Check if user exists in database
+    // Check if user exists by ORCID iD (primary identifier)
     let user = await User.findOne({ orcidId: orcid });
 
     if (!user) {
-      // Check if user exists with the same email (merge accounts)
-      const existingEmailUser = await User.findOne({ email: primaryEmail });
-      if (existingEmailUser) {
-        // Add ORCID ID to existing user
-        existingEmailUser.orcidId = orcid;
-        user = await existingEmailUser.save();
-      } else {
-        // Validate required fields before creating user
+      // Check if user exists with same email (merge accounts)
+      if (primaryEmail && !primaryEmail.includes('@example.com')) {
+        const existingEmailUser = await User.findOne({ email: primaryEmail });
+        if (existingEmailUser && !existingEmailUser.orcidId) {
+          // Link ORCID to existing account
+          existingEmailUser.orcidId = orcid;
+          existingEmailUser.orcidVerified = true;
+          user = await existingEmailUser.save();
+        }
+      }
+      
+      if (!user) {
+        // Create new user with ORCID as primary identifier
         const userData = {
           firstName: givenName,
           lastName: familyName,
           email: primaryEmail,
-          orcidId: orcid,
-          username: `orcid_${orcid.slice(-6)}`,
+          username: username,
           password: await bcrypt.hash(orcid + (process.env.JWT_SECRET || "secret"), 10),
           roles: ["author"],
-          isVerified: true,
+          isVerified: emailVerified,
+          orcidId: orcid,
+          orcidVerified: true,
+          profileCompleted: emailVerified // Mark as complete only if email verified
         };
 
-        // Final validation
-        if (!userData.firstName || !userData.lastName || !userData.email) {
-          console.error("Missing required fields:", userData);
-          return res.status(400).json({ 
-            message: "Failed to create user - missing required fields",
-            data: userData
-          });
-        }
-
-        // Create new user with ORCID data
         user = await User.create(userData);
+        console.log(`Created new user: ${username} with ORCID ${orcid}`);
       }
+    } else {
+      // Update last login
+      user.lastLogin = new Date();
+      await user.save();
     }
 
     // Generate JWT token
     const token = generateToken(user._id);
 
-    // Return user data consistent with other auth methods
-    res.json({
+    // Return user data
+    const userData = {
       _id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
-      email: user.email || null,
+      email: user.email,
       username: user.username,
       roles: user.roles,
       token,
       accountType: "author",
       currentRole: "author",
       availableRoles: user.roles,
-      orcidId: user.orcidId
-    });
+      orcidId: user.orcidId,
+      isVerified: user.isVerified,
+      orcidVerified: user.orcidVerified,
+      profileCompleted: user.profileCompleted,
+      needsProfileCompletion: !emailVerified
+    };
+
+    // Check if request expects HTML (browser redirect) or JSON (API call)
+    if (req.headers.accept && req.headers.accept.includes('text/html')) {
+      // Redirect to frontend with user data
+      const frontendUrl = process.env.FRONTEND_URL || 'https://synergyworldpress.com';
+      const redirectUrl = `${frontendUrl}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
+      
+      // Send HTML page that redirects
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Logging in...</title>
+          <script>
+            setTimeout(function() {
+              window.location.href = '${redirectUrl}';
+            }, 100);
+          </script>
+        </head>
+        <body>
+          <p>Successfully authenticated with ORCID... Redirecting to your dashboard.</p>
+          <p>If you are not redirected, <a href="${redirectUrl}">click here</a>.</p>
+        </body>
+        </html>
+      `);
+    } else {
+      // Return JSON for API calls
+      res.json(userData);
+    }
 
   } catch (error) {
     console.error("ORCID callback error:", error.response?.data || error.message || error);

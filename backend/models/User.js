@@ -24,11 +24,23 @@ const userSchema = new mongoose.Schema({
 	orcidId: { type: String, unique: true, sparse: true },
 	
 	// Verification status
-	isVerified: { type: Boolean, default: false }
+	isVerified: { type: Boolean, default: false },
+	
+	// ORCID specific verification fields
+	orcidVerified: { type: Boolean, default: false },
+	hasResearcherData: { type: Boolean, default: false },
+	emailVerified: { type: Boolean, default: false },
+	
+	// Profile completeness
+	profileCompleted: { type: Boolean, default: false },
+	
+	// Timestamps
+	lastLogin: { type: Date, default: Date.now }
 });
 
 // Create indexes for OAuth fields for better query performance
 userSchema.index({ googleId: 1 });
 userSchema.index({ orcidId: 1 });
+userSchema.index({ email: 1 });
 
 module.exports = mongoose.model("User", userSchema);
