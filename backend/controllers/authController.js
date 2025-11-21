@@ -551,7 +551,8 @@ exports.orcidCallback = async (req, res) => {
       }
     );
     console.log("userResponse", userResponse);
-console.log("userResponse.data",userResponse.data);
+console.log("userResponse.data", JSON.stringify(userResponse.data, null, 2));
+
 const orcidData = userResponse.data;
 const name = orcidData.name;
 
