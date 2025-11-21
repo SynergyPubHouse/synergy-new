@@ -542,7 +542,7 @@ exports.orcidCallback = async (req, res) => {
 
     // Get user info from ORCID
     const userResponse = await axios.get(
-      `https://pub.orcid.org/v3.0/${orcid}/person`,
+      `https://pub.orcid.org/v3.0/${orcid}/email`,
       {
         headers: {
           Authorization: `Bearer ${access_token}`,
