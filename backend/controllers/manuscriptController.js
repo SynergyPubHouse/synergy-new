@@ -164,9 +164,52 @@ async function convertDocxToPdf(docxPath) {
 	}
 }
 
-// Helper: Extract text from DOCX using Python (working version)
+// Helper function to extract abstract from text
+function extractAbstract(text) {
+	const lines = text.split('\n').filter(line => line.trim());
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i].toLowerCase();
+		if (line.startsWith('abstract')) {
+			if (line.split(' ').length > 1) {
+				return line.substring(8).trim(': .-');
+			} else {
+				// Abstract is on next lines
+				const abstractLines = [];
+				for (let j = i + 1; j < lines.length; j++) {
+					const nextLine = lines[j].toLowerCase();
+					if (nextLine === '' || nextLine.startsWith(('keywords', 'key words', 'introduction', 'background'))) {
+						break;
+					}
+					abstractLines.push(lines[j]);
+				}
+				return abstractLines.join(' ');
+			}
+		}
+	}
+	return "Document abstract could not be extracted automatically.";
+}
+
+// Helper function to extract keywords from text
+function extractKeywords(text) {
+	const lines = text.split('\n').filter(line => line.trim());
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const match = line.match(/^(keywords?|key words?)[:\-\. ]*(.*)$/i);
+		if (match) {
+			const keywords = match[2].trim();
+			if (keywords) {
+				return keywords;
+			} else if (i + 1 < lines.length) {
+				return lines[i + 1].trim();
+			}
+		}
+	}
+	return "document, manuscript, research";
+}
+
+// Helper: Extract text from DOCX using Python (original working version)
 async function extractTextFromDocx(docxPath) {
-	const pythonPath = "python3"; // Use python3 instead of python for macOS compatibility
+	const pythonPath = "python3"; // Use python3 for production compatibility
 	return new Promise((resolve, reject) => {
 		const scriptPath = path.join(__dirname, "../utils/textExtractor.py");
 		const shell = new PythonShell(scriptPath, {
@@ -208,6 +251,9 @@ async function extractTextFromDocx(docxPath) {
 			let parsed;
 			try {
 				parsed = JSON.parse(finalText);
+				if (parsed.error) {
+					return reject(new Error(parsed.error));
+				}
 			} catch (e) {
 				console.error(
 					"[extractTextFromDocx] Failed to parse JSON:",
