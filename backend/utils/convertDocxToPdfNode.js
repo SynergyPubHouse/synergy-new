@@ -92,20 +92,22 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
         // Step 3: Launch Puppeteer and generate PDF
         console.log('[convertDocxToPdfNode] Launching Puppeteer with bundled Chromium');
         
-        browser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process'
-            ]
-        });
+       browser = await puppeteer.launch({
+    headless: 'new',
+    args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-accelerated-2d-canvas'
+    ],
+    // Remove single-process for better stability
+    timeout: 60000
+});
         
         const page = await browser.newPage();
         await page.setContent(fullHtml, { waitUntil: 'networkidle0', timeout: 0 });
