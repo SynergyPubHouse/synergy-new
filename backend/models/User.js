@@ -19,9 +19,16 @@ const userSchema = new mongoose.Schema({
     default: ["author"]
 }],
 
+	// OAuth provider IDs
 	googleId: { type: String, unique: true, sparse: true },
 	orcidId: { type: String, unique: true, sparse: true },
+	
+	// Verification status
 	isVerified: { type: Boolean, default: false }
 });
+
+// Create indexes for OAuth fields for better query performance
+userSchema.index({ googleId: 1 });
+userSchema.index({ orcidId: 1 });
 
 module.exports = mongoose.model("User", userSchema);

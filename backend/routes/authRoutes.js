@@ -12,6 +12,7 @@ const {
   verifyEmail,
   googleAuth,
   getGoogleClientId,
+  getOrcidLoginUrl,
   orcidCallback,
   sendLoginDetails,
   resetPassword,
@@ -26,7 +27,9 @@ router.get("/google-client-id", getGoogleClientId);
 router.post("/send-login-details", sendLoginDetails);
 router.post("/reset-password", resetPassword);
 
-// router.post("/orcid/callback", orcidCallback);
+// ORCID OAuth routes
+router.get("/orcid/login-url", getOrcidLoginUrl);
+router.get("/orcid/callback", orcidCallback);
 
 // Protected routes
 router.get("/profile", auth, getUserProfile);

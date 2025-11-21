@@ -511,8 +511,34 @@ exports.getGoogleClientId = async (req, res) => {
   res.json({ clientId: process.env.GOOGLE_CLIENT_ID });
 };
 
+// @desc    Get ORCID OAuth login URL
+// @route   GET /api/auth/orcid/login-url
+// @access  Public
+exports.getOrcidLoginUrl = async (req, res) => {
+  try {
+    const redirectUri = process.env.ORCID_REDIRECT_URI || 
+      (process.env.NODE_ENV === "production"
+        ? "https://synergyworldpress.com/api/auth/orcid/callback"
+        : "http://localhost:5000/api/auth/orcid/callback");
+
+    const orcidUrl = `https://orcid.org/oauth/authorize?client_id=${
+      process.env.ORCID_CLIENT_ID
+    }&response_type=code&scope=/authenticate&redirect_uri=${encodeURIComponent(
+      redirectUri
+    )}`;
+
+    res.json({ url: orcidUrl });
+  } catch (error) {
+    console.error("ORCID login URL generation error:", error);
+    res.status(500).json({ 
+      message: "Failed to generate ORCID login URL", 
+      error: error.message 
+    });
+  }
+};
+
 // @desc    Handle ORCID OAuth callback
-// @route   POST /api/auth/orcid/callback
+// @route   GET /api/auth/orcid/callback
 // @access  Public
 exports.orcidCallback = async (req, res) => {
   try {
@@ -531,7 +557,12 @@ exports.orcidCallback = async (req, res) => {
         code,
         redirect_uri: ORCID_REDIRECT_URI,
       }).toString(),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" } }
+      { 
+        headers: { 
+          "Content-Type": "application/x-www-form-urlencoded", 
+          "Accept": "application/json" 
+        } 
+      }
     );
     // log token response for debugging
     // console.log("tokenResponse.data:", tokenResponse.data);
@@ -548,48 +579,66 @@ exports.orcidCallback = async (req, res) => {
           Authorization: `Bearer ${access_token}`,
           Accept: "application/vnd.orcid+json",
         },
-      }
-    );
-    // console.log("userResponse.data:", JSON.stringify(userResponse.data, null, 2));
-    const orcidData = userResponse.data || {};
-    // helper to read nested fields robustly
-    const getNameValue = (obj, primaryKeys) => {
-      if (!obj) return "";
-      for (const key of primaryKeys) {
-        const val = obj[key];
-        if (!val) continue;
-        // If ORCID v3 returns { "given-names": { "value": "X" } }
-        if (typeof val === "object" && val.value) return val.value;
-        // OR fallback property names
-        if (typeof val === "string") return val;
-      }
-      return "";
-    };
-    // ORCID v3 structure: orcidData.name["given-names"].value and ["family-name"].value
-    const nameObj = orcidData.name || {};
-    const givenName = getNameValue(nameObj, ["given-names", "givenNames", "given_name"]);
-    const familyName = getNameValue(nameObj, ["family-name", "familyName", "family_name"]);
-    // find or create user
-    let user = await User.findOne({ orcidId: orcid });
-    if (!user) {
-      const username = `orcid_${orcid.slice(-6)}`; // safer unique-ish username
-      const password = await bcrypt.hash(orcid + (process.env.JWT_SECRET || "secret"), 10);
-      user = await User.create({
-        firstName: givenName || "ORCID",
-        lastName: familyName || "",
-        orcidId: orcid,
-        username,
-        password,
-        roles: ["author"],
-        isVerified: true,
       });
-    } else if (!user.orcidId) {
-      user.orcidId = orcid;
-      await user.save();
+
+      const emails = emailResponse.data?.email || emailResponse.data?.emails || [];
+      if (emails.length > 0) {
+        const foundEmail = emails.find(e => e.primary)?.email || emails[0]?.email;
+        if (foundEmail && foundEmail.trim()) {
+          primaryEmail = foundEmail.trim();
+        }
+      }
+    } catch (emailErr) {
+      console.log("ORCID email not available, using fallback email:", emailErr.message);
     }
+
+    // Ensure email is valid
+    primaryEmail = primaryEmail && primaryEmail.trim() ? primaryEmail.trim() : `orcid_${orcid.slice(-6)}@example.com`;
+
+    console.log("Final user data:", { givenName, familyName, primaryEmail, orcid });
+
+    // Check if user exists in database
+    let user = await User.findOne({ orcidId: orcid });
+
+    if (!user) {
+      // Check if user exists with the same email (merge accounts)
+      const existingEmailUser = await User.findOne({ email: primaryEmail });
+      if (existingEmailUser) {
+        // Add ORCID ID to existing user
+        existingEmailUser.orcidId = orcid;
+        user = await existingEmailUser.save();
+      } else {
+        // Validate required fields before creating user
+        const userData = {
+          firstName: givenName,
+          lastName: familyName,
+          email: primaryEmail,
+          orcidId: orcid,
+          username: `orcid_${orcid.slice(-6)}`,
+          password: await bcrypt.hash(orcid + (process.env.JWT_SECRET || "secret"), 10),
+          roles: ["author"],
+          isVerified: true,
+        };
+
+        // Final validation
+        if (!userData.firstName || !userData.lastName || !userData.email) {
+          console.error("Missing required fields:", userData);
+          return res.status(400).json({ 
+            message: "Failed to create user - missing required fields",
+            data: userData
+          });
+        }
+
+        // Create new user with ORCID data
+        user = await User.create(userData);
+      }
+    }
+
+    // Generate JWT token
     const token = generateToken(user._id);
-    // Return JSON to frontend (you can also redirect to FRONTEND with token if you prefer)
-    return res.json({
+
+    // Return user data consistent with other auth methods
+    res.json({
       _id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
@@ -600,7 +649,9 @@ exports.orcidCallback = async (req, res) => {
       accountType: "author",
       currentRole: "author",
       availableRoles: user.roles,
+      orcidId: user.orcidId
     });
+
   } catch (error) {
     console.error("ORCID callback error:", error.response?.data || error.message || error);
     return res.status(500).json({
