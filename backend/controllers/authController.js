@@ -505,102 +505,99 @@ exports.getGoogleClientId = async (req, res) => {
 // @route   POST /api/auth/orcid/callback
 // @access  Public
 exports.orcidCallback = async (req, res) => {
-    try {
-        const { code } = req.body;
-        
-        // Debug logging
-        console.log('ORCID Client ID:', process.env.ORCID_CLIENT_ID);
-        console.log('ORCID Client Secret:', process.env.ORCID_CLIENT_SECRET ? 'Secret is set' : 'Secret is not set');
-        console.log('Authorization Code:', code);
+  try {
+    const code = req.query.code; // GET request parameter
 
-        if (!process.env.ORCID_CLIENT_ID || !process.env.ORCID_CLIENT_SECRET) {
-            console.error('Missing ORCID credentials in environment variables');
-            return res.status(500).json({ 
-                message: 'ORCID configuration error',
-                error: 'Missing ORCID credentials'
-            });
-        }
-        
-        // Use localhost for development, production URL for production
-        const ORCID_REDIRECT_URI = process.env.NODE_ENV === 'production'
-            ? `https://synergyworldpress.com/orcid-callback`
-            : `http://localhost:5173/orcid-callback`;
-        // Exchange authorization code for access token
-const tokenResponse = await axios.post(
-  'https://orcid.org/oauth/token',
-  new URLSearchParams({
-    client_id: process.env.ORCID_CLIENT_ID,
-    client_secret: process.env.ORCID_CLIENT_SECRET,
-    grant_type: 'authorization_code',
-    code: code,
-    redirect_uri: ORCID_REDIRECT_URI // Use same variable as frontend
-  }),
-  {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
+    if (!code) {
+      return res.status(400).json({ message: "No code provided" });
     }
+
+    // Determine redirect URI
+    const ORCID_REDIRECT_URI =
+      process.env.NODE_ENV === "production"
+        ? "https://synergyworldpress.com/orcid-callback"
+        : "http://localhost:5000/orcid/callback";
+
+    // Exchange code for access token
+    const tokenResponse = await axios.post(
+      "https://orcid.org/oauth/token",
+      new URLSearchParams({
+        client_id: process.env.ORCID_CLIENT_ID,
+        client_secret: process.env.ORCID_CLIENT_SECRET,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: ORCID_REDIRECT_URI,
+      }),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
+
+    const { access_token, orcid } = tokenResponse.data;
+
+    // Get user info from ORCID
+    const userResponse = await axios.get(
+      `https://api.orcid.org/v3.0/${orcid}/person`,
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          Accept: "application/vnd.orcid+json",
+        },
+      }
+    );
+
+    const orcidData = userResponse.data;
+    const email = orcidData.emails?.[0]?.email;
+    const name = orcidData.name;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ message: "No email found in ORCID profile" });
+    }
+
+    // Check if user exists in User collection
+    let user = await User.findOne({ $or: [{ email }, { orcidId: orcid }] });
+
+    if (!user) {
+      // Create new user as author
+      user = await User.create({
+        firstName: name["given-names"]?.value || name.givenNames || "",
+        lastName: name["family-name"]?.value || name.familyName || "",
+        email,
+        orcidId: orcid,
+        username: email.split("@")[0] + "_" + orcid.slice(-4),
+        password: await bcrypt.hash(orcid + process.env.JWT_SECRET, 10),
+        roles: ["author"],
+        isVerified: true,
+      });
+    } else if (!user.orcidId) {
+      // Add ORCID ID to existing user
+      user.orcidId = orcid;
+      await user.save();
+    }
+
+    // Generate JWT
+    const token = generateToken(user._id);
+
+    // Respond with user info (same as loginUser)
+    res.json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      username: user.username,
+      roles: user.roles,
+      token,
+      accountType: "author",
+      currentRole: "author",
+      availableRoles: user.roles,
+    });
+  } catch (error) {
+    console.error(
+      "ORCID callback error:",
+      error.response?.data || error.message
+    );
+    res
+      .status(500)
+      .json({ message: "ORCID authentication failed", error: error.message });
   }
-).catch(err => {
-  console.error('ORCID Token Error:', err.response.data);
-  throw err;
-});
-
-
-        const { access_token, orcid } = tokenResponse.data;
-
-        // Get user information from ORCID
-const userResponse = await axios.get(`https://api.orcid.org/v3.0/${orcid}/person`, {
-    headers: {
-        'Authorization': `Bearer ${access_token}`,
-        'Accept': 'application/vnd.orcid+json' // OR use 'application/json' if you prefer JSON
-    }
-});
-
-
-        const orcidData = userResponse.data;
-        const email = orcidData.emails?.[0]?.email;
-        const name = orcidData.name;
-
-        if (!email) {
-            return res.status(400).json({ message: "No email found in ORCID profile" });
-        }
-
-        // Check if user exists
-        let user = await User.findOne({
-            $or: [
-                { email },
-                { orcidId: orcid }
-            ]
-        });
-
-        if (!user) {
-            // Create new user with ORCID info
-            user = await User.create({
-                firstName: name['given-names']?.value || name.givenNames,
-                lastName: name['family-name']?.value || name.familyName,
-                email,
-                orcidId: orcid,
-                username: email.split('@')[0] + '_' + orcid.slice(-4),
-                password: await bcrypt.hash(orcid + process.env.JWT_SECRET, 10),
-                isVerified: true
-            });
-        } else if (!user.orcidId) {
-            // Update existing user with ORCID ID
-            user.orcidId = orcid;
-            await user.save();
-        }
-
-        res.json({
-            _id: user._id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            username: user.username,
-            orcidId: user.orcidId,
-            token: generateToken(user._id)
-        });
-    } catch (error) {
-        console.error('ORCID callback error:', error);
-        res.status(500).json({ message: 'ORCID authentication failed', error: error.message });
-    }
 };
