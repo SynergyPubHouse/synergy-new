@@ -40,19 +40,13 @@ router.delete("/users/:id", auth, deleteUser);
 router.get("/orcid", (req, res) => {
   const redirectUri =
     "https://synergy-world-press-pq5k.onrender.com/api/auth/orcid/callback";
-
-  // Use /authenticate to get basic profile OR /read-limited for limited access
-  const scope = "/authenticate"; // or "/read-limited" if needed
-
   const orcidUrl = `https://orcid.org/oauth/authorize?client_id=${
     process.env.ORCID_CLIENT_ID
-  }&response_type=code&scope=${encodeURIComponent(scope)}&redirect_uri=${encodeURIComponent(
+  }&response_type=code&scope=/authenticate&redirect_uri=${encodeURIComponent(
     redirectUri
   )}`;
-
   res.json({ url: orcidUrl });
 });
-
 // Route 2: ORCID callback
 router.get("/orcid/callback", orcidCallback);
 
