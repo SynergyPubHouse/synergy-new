@@ -552,53 +552,40 @@ exports.orcidCallback = async (req, res) => {
     );
     console.log("userResponse", userResponse);
 console.log("userResponse.data",userResponse.data);
-    const orcidData = userResponse.data;
-    const email = orcidData.emails?.[0]?.email;
-    const name = orcidData.name;
+const orcidData = userResponse.data;
+const name = orcidData.name;
 
-    if (!email) {
-      return res
-        .status(400)
-        .json({ message: "No email found in ORCID profile" });
-    }
+let user = await User.findOne({ orcidId: orcid });
 
-    // Check if user exists in User collection
-    let user = await User.findOne({ $or: [{ email }, { orcidId: orcid }] });
+if (!user) {
+  user = await User.create({
+    firstName: name["given-names"]?.value || name.givenNames || "",
+    lastName: name["family-name"]?.value || name.familyName || "",
+    orcidId: orcid,
+    username: `orcid_${orcid.slice(-4)}`,
+    password: await bcrypt.hash(orcid + process.env.JWT_SECRET, 10),
+    roles: ["author"],
+    isVerified: true,
+  });
+} else if (!user.orcidId) {
+  user.orcidId = orcid;
+  await user.save();
+}
 
-    if (!user) {
-      // Create new user as author
-      user = await User.create({
-        firstName: name["given-names"]?.value || name.givenNames || "",
-        lastName: name["family-name"]?.value || name.familyName || "",
-        email,
-        orcidId: orcid,
-        username: email.split("@")[0] + "_" + orcid.slice(-4),
-        password: await bcrypt.hash(orcid + process.env.JWT_SECRET, 10),
-        roles: ["author"],
-        isVerified: true,
-      });
-    } else if (!user.orcidId) {
-      // Add ORCID ID to existing user
-      user.orcidId = orcid;
-      await user.save();
-    }
+const token = generateToken(user._id);
 
-    // Generate JWT
-    const token = generateToken(user._id);
-
-    // Respond with user info (same as loginUser)
-    res.json({
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      username: user.username,
-      roles: user.roles,
-      token,
-      accountType: "author",
-      currentRole: "author",
-      availableRoles: user.roles,
-    });
+res.json({
+  _id: user._id,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  email: user.email || null,
+  username: user.username,
+  roles: user.roles,
+  token,
+  accountType: "author",
+  currentRole: "author",
+  availableRoles: user.roles,
+});
   } catch (error) {
     console.error(
       "ORCID callback error:",
