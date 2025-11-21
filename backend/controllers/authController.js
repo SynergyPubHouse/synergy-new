@@ -725,7 +725,7 @@ exports.orcidCallback = async (req, res) => {
     if (req.headers.accept && req.headers.accept.includes('text/html')) {
       // Redirect to frontend with user data
       const frontendUrl = process.env.FRONTEND_URL || 'https://synergyworldpress.com';
-      const redirectUrl = `${frontendUrl}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
+      const redirectUrl = `${frontendUrl}/orcid-callback?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
       
       // Send HTML page that redirects
       res.send(`
