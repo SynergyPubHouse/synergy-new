@@ -942,7 +942,7 @@ const ManuscriptPage = () => {
 		try {
 			await axios.put(
 				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
-				{ status: "Pending" },  // 👈 Saved → Pending
+				{ status: "Under Review" },  // 👈 Saved → Pending
 				{
 					headers: {
 						Authorization: `Bearer ${user.token}`,
