@@ -14,8 +14,14 @@ const MySubmissions = () => {
   const [showConfirmation, setShowConfirmation] = useState(null);
   const [showNotes, setShowNotes] = useState(null);
   const [uploadingResponseFor, setUploadingResponseFor] = useState(null);
+  const [uploadingHighlightedFor, setUploadingHighlightedFor] = useState(null);
   const [buildingPdfFor, setBuildingPdfFor] = useState(null);
   const [pdfViewedIds, setPdfViewedIds] = useState(new Set());
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
   const navigate = useNavigate();
   console.log("menuscript", manuscripts);
   useEffect(() => {
@@ -87,8 +93,7 @@ const MySubmissions = () => {
       const formData = new FormData();
       formData.append("responseDoc", file);
       await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/manuscripts/${manuscriptId}/upload-response`,
         formData,
         {
@@ -122,8 +127,7 @@ const MySubmissions = () => {
     try {
       setBuildingPdfFor(manuscriptId);
       const response = await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/manuscripts/${manuscriptId}/build-revision-pdf`,
         {},
         {
@@ -145,7 +149,7 @@ const MySubmissions = () => {
       console.error("Error building updated PDF:", error);
       alert(
         error.response?.data?.message ||
-          "Failed to build updated PDF. Please try again."
+        "Failed to build updated PDF. Please try again."
       );
     } finally {
       setBuildingPdfFor(null);
@@ -167,8 +171,7 @@ const MySubmissions = () => {
 
     try {
       await axios.put(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/manuscripts/${manuscriptId}/status`,
         { status: "Pending" },
         {
@@ -220,8 +223,7 @@ const MySubmissions = () => {
   const handleAccept = async (manuscriptId) => {
     try {
       await axios.put(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/manuscripts/${manuscriptId}/status`,
         { status: "Pending" },
         {
@@ -271,15 +273,14 @@ const MySubmissions = () => {
                 {note.action && (
                   <div className="mt-2">
                     <span
-                      className={`px-2 py-1 text-xs rounded ${
-                        note.action === "Rejected"
-                          ? "bg-red-500"
-                          : note.action === "Under Review"
+                      className={`px-2 py-1 text-xs rounded ${note.action === "Rejected"
+                        ? "bg-red-500"
+                        : note.action === "Under Review"
                           ? "bg-yellow-500"
                           : note.action === "Accepted"
-                          ? "bg-green-500"
-                          : "bg-blue-500"
-                      } text-white`}
+                            ? "bg-green-500"
+                            : "bg-blue-500"
+                        } text-white`}
                     >
                       {note.action}
                     </span>
@@ -344,8 +345,7 @@ const MySubmissions = () => {
 
     try {
       await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/manuscripts/${manuscriptId}/upload-highlighted`,
         formData,
         {
@@ -384,374 +384,386 @@ const MySubmissions = () => {
             <p className="text-[#00796b]">No manuscripts submitted yet.</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {manuscripts.map((manuscript) => {
-              const attemptsUsed = manuscript.revisionAttempts || 0;
-              const maxAttempts = manuscript.maxRevisionAttempts || 3;
-              const attemptsExhausted =
-                manuscript.revisionLocked ||
-                attemptsUsed >= maxAttempts ||
-                manuscript.status === "Rejected";
-              const hasResponseDoc =
-                Boolean(manuscript.authorResponse?.pdfUrl) ||
-                Boolean(manuscript.authorResponse?.docxUrl);
-              const hasBuiltRevision = Boolean(manuscript.revisedPdfBuiltAt);
-              const canSendToEditor =
-                manuscript.status === "Revision Required" &&
-                hasBuiltRevision &&
-                pdfViewedIds.has(manuscript._id) &&
-                !attemptsExhausted;
+          <div className="bg-white rounded-lg shadow-md border border-gray-200">
+            {/* Table Header */}
+            <div className="bg-[#00796b] text-white p-4">
+              <h2 className="text-lg font-semibold">My Submissions ({manuscripts.length})</h2>
+            </div>
 
-              return (
-                <div
-                  key={manuscript._id}
-                  className="bg-white rounded-lg p-6 shadow-md border border-[#e0e0e0]"
-                >
-                  <div className="flex justify-between items-center mb-4 border-b border-[#e0e0e0] pb-4">
-                    <h2 className="text-xl font-bold text-[#00796b]">
-                      {manuscript.title}
-                    </h2>
-                    <div className="text-right">
-                      <div className="text-sm text-[#00796b] font-medium">
-                        Manuscript ID:{" "}
-                        {manuscript.customId ||
-                          manuscript._id.slice(-6).toUpperCase()}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {manuscript.createdAt
-                          ? `Submitted: ${new Date(
-                              manuscript.createdAt
-                            ).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })} at ${new Date(
-                              manuscript.createdAt
-                            ).toLocaleTimeString("en-US", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}`
-                          : "Date not available"}
-                      </div>
-                    </div>
-                  </div>
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1200px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-80">Title</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-32">Submitted</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-32">Updated</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-24">Type</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-28">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-32">Actions</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-28">Files</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-36">Response</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {manuscripts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((manuscript, index) => {
+                    const attemptsUsed = manuscript.revisionAttempts || 0;
+                    const maxAttempts = manuscript.maxRevisionAttempts || 3;
+                    const attemptsExhausted =
+                      manuscript.revisionLocked ||
+                      attemptsUsed >= maxAttempts ||
+                      manuscript.status === "Rejected";
+                    const hasResponseDoc =
+                      Boolean(manuscript.authorResponse?.pdfUrl) ||
+                      Boolean(manuscript.authorResponse?.docxUrl);
+                    const hasBuiltRevision = Boolean(manuscript.revisedPdfBuiltAt);
+                    const canSendToEditor =
+                      manuscript.status === "Revision Required" &&
+                      hasBuiltRevision &&
+                      pdfViewedIds.has(manuscript._id) &&
+                      !attemptsExhausted;
 
-                  {/* Timestamp Section */}
-                  <div className="mb-4 bg-[#f5f5f5] p-3 rounded-lg border border-[#e0e0e0]">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div className="flex items-center">
-                        <span className="font-semibold text-[#00796b] mr-2">
-                          Submitted:
-                        </span>
-                        <span className="text-[#212121]">
-                          {manuscript.createdAt
-                            ? new Date(manuscript.createdAt).toLocaleDateString(
-                                "en-US",
-                                {
-                                  year: "numeric",
-                                  month: "long",
+                    return (
+                      <tr key={manuscript._id} className="hover:bg-gray-50">
+                        {/* ID Column */}
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                            {manuscript.customId || manuscript._id.slice(-6).toUpperCase()}
+                          </span>
+                        </td>
+
+                        {/* Title Column */}
+                        <td className="px-4 py-3 w-80">
+                          <div className="text-sm font-medium text-gray-900 break-words" title={manuscript.title}>
+                            {manuscript.title}
+                          </div>
+                        </td>
+
+                        {/* Submitted Column */}
+                        <td className="px-4 py-3 text-center">
+                          <div className="text-xs text-gray-600">
+                            <div className="font-medium">
+                              {manuscript.createdAt
+                                ? new Date(manuscript.createdAt).toLocaleDateString("en-US", {
+                                  month: "short",
                                   day: "numeric",
-                                }
-                              )
-                            : "N/A"}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="font-semibold text-[#00796b] mr-2">
-                          Time:
-                        </span>
-                        <span className="text-[#212121]">
-                          {manuscript.createdAt
-                            ? new Date(manuscript.createdAt).toLocaleTimeString(
-                                "en-US",
-                                {
+                                  year: "numeric",
+                                })
+                                : "N/A"}
+                            </div>
+                            <div className="text-gray-500">
+                              {manuscript.createdAt
+                                ? new Date(manuscript.createdAt).toLocaleTimeString("en-US", {
                                   hour: "2-digit",
                                   minute: "2-digit",
                                   hour12: true,
-                                }
-                              )
-                            : "N/A"}
-                        </span>
-                      </div>
-                      {manuscript.updatedAt &&
-                        manuscript.updatedAt !== manuscript.createdAt && (
-                          <>
-                            <div className="flex items-center">
-                              <span className="font-semibold text-[#00796b] mr-2">
-                                Last Updated:
-                              </span>
-                              <span className="text-[#212121]">
-                                {new Date(
-                                  manuscript.updatedAt
-                                ).toLocaleDateString("en-US", {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })}
-                              </span>
+                                })
+                                : "N/A"}
                             </div>
-                            <div className="flex items-center">
-                              <span className="font-semibold text-[#00796b] mr-2">
-                                Updated Time:
-                              </span>
-                              <span className="text-[#212121]">
-                                {new Date(
-                                  manuscript.updatedAt
-                                ).toLocaleTimeString("en-US", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  hour12: true,
-                                })}
-                              </span>
+                          </div>
+                        </td>
+
+                        {/* Updated Column */}
+                        <td className="px-4 py-3 text-center">
+                          <div className="text-xs text-gray-600">
+                            {manuscript.updatedAt && manuscript.updatedAt !== manuscript.createdAt ? (
+                              <>
+                                <div className="font-medium">
+                                  {new Date(manuscript.updatedAt).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </div>
+                                <div className="text-gray-500">
+                                  {new Date(manuscript.updatedAt).toLocaleTimeString("en-US", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    hour12: true,
+                                  })}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-gray-400">Not updated</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Type Column */}
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {manuscript.type}
+                          </span>
+                        </td>
+
+                        {/* Status Column */}
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex flex-col items-center space-y-1">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${manuscript.status === "Under Review"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : manuscript.status === "Rejected"
+                                  ? "bg-red-100 text-red-800"
+                                  : manuscript.status === "Accepted"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                            >
+                              {manuscript.status || "Pending"}
+                            </span>
+                            {manuscript.status === "Revision Required" && (
+                              <div className="text-xs text-gray-500">
+                                {attemptsUsed}/{maxAttempts} attempts
+                              </div>
+                            )}
+                            {attemptsExhausted && (
+                              <div className="text-xs text-red-600 font-medium">
+                                Attempts exhausted
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Actions Column */}
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col space-y-1 min-w-[140px]">
+                            {manuscript.reviewDocxUrl && (
+                              <button
+                                onClick={() => handleDownloadReviewDocx(manuscript.reviewDocxUrl)}
+                                className="px-2 py-1 text-xs border border-purple-600 text-purple-600 rounded hover:bg-purple-50 transition-colors"
+                              >
+                                Review Comments
+                              </button>
+                            )}
+                            {manuscript.reviewDocxUrl && (
+                              <button
+                                onClick={() => handleBuildRevisionPdf(manuscript._id)}
+                                disabled={!hasResponseDoc || buildingPdfFor === manuscript._id || attemptsExhausted}
+                                className={`px-2 py-1 text-xs border rounded transition-colors ${!hasResponseDoc
+                                  ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                  : buildingPdfFor === manuscript._id
+                                    ? "border-orange-600 text-orange-600 bg-orange-50 cursor-wait"
+                                    : attemptsExhausted
+                                      ? "border-gray-300 text-gray-400 cursor-not-allowed"
+                                      : "border-orange-600 text-orange-600 hover:bg-orange-50"
+                                  }`}
+                              >
+                                {buildingPdfFor === manuscript._id ? "Building..." : "Build PDF"}
+                              </button>
+                            )}
+                            {canSendToEditor && (
+                              <button
+                                onClick={() => handleSendToEditor(manuscript._id)}
+                                className="px-2 py-1 text-xs border border-green-600 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              >
+                                Send to Editor
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleNotesClick(manuscript._id)}
+                              className="px-2 py-1 text-xs border border-indigo-600 text-indigo-600 rounded hover:bg-indigo-50 transition-colors"
+                            >
+                              Notes
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Files Column */}
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col space-y-1 min-w-[100px]">
+                            {manuscript.mergedFileUrl && (
+                              <button
+                                onClick={() => {
+                                  window.open(manuscript.mergedFileUrl, "_blank");
+                                  setPdfViewedIds((prev) => {
+                                    const updated = new Set(prev);
+                                    updated.add(manuscript._id);
+                                    return updated;
+                                  });
+                                }}
+                                className="px-2 py-1 text-xs border border-teal-600 text-teal-600 rounded hover:bg-teal-50 transition-colors"
+                              >
+                                Original
+                              </button>
+                            )}
+                            {manuscript.highlightedRevisionFileUrl && (
+                              <button
+                                onClick={() => {
+                                  const url = manuscript.highlightedRevisionFileUrl;
+                                  const viewerUrl = url.endsWith(".pdf")
+                                    ? url
+                                    : `https://docs.google.com/gview?url=${encodeURIComponent(
+                                      url
+                                    )}&embedded=true`;
+                                  window.open(viewerUrl, "_blank");
+                                }}
+                                className="px-2 py-1 text-xs border border-teal-600 text-teal-600 rounded hover:bg-teal-50 transition-colors"
+                              >
+                                Highlighted
+                              </button>
+                            )}
+                            {manuscript.revisionCombinedPdfUrl && (
+                              <button
+                                onClick={() => {
+                                  window.open(manuscript.revisionCombinedPdfUrl, "_blank");
+                                  setPdfViewedIds((prev) => {
+                                    const updated = new Set(prev);
+                                    updated.add(manuscript._id);
+                                    return updated;
+                                  });
+                                }}
+                                className="px-2 py-1 text-xs border border-teal-600 text-teal-600 rounded hover:bg-teal-50 transition-colors"
+                              >
+                                Combined
+                              </button>
+                            )}
+                            {manuscript.revisedPdfBuiltAt && !pdfViewedIds.has(manuscript._id) && manuscript.status === "Revision Required" && (
+                              <p className="text-xs text-amber-600 text-center bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                                View PDF to enable "Send to Editor"
+                              </p>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Response Column */}
+                        <td className="px-4 py-3">
+                          {manuscript.status === "Revision Required" && (
+                            <div className="space-y-2 min-w-[140px]">
+                              <div className="text-xs font-medium text-gray-700 border-b border-gray-200 pb-1">Response Upload</div>
+                              <input
+                                type="file"
+                                accept=".docx"
+                                onChange={(e) => {
+                                  handleResponseUpload(manuscript._id, e.target.files?.[0]);
+                                  e.target.value = null;
+                                }}
+                                disabled={uploadingResponseFor === manuscript._id || attemptsExhausted}
+                                className="w-full text-xs text-gray-500 border border-dashed border-gray-300 rounded p-1 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                              />
+                              {manuscript.authorResponse?.docxUrl && (
+                                <a
+                                  href={manuscript.authorResponse.docxUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block text-xs text-blue-600 hover:text-blue-800 underline text-center"
+                                >
+                                  View Response
+                                </a>
+                              )}
+
+                              <div className="text-xs font-medium text-gray-700 border-b border-gray-200 pb-1">Highlighted File</div>
+                              <input
+                                type="file"
+                                accept=".docx,.pdf"
+                                onChange={(e) => {
+                                  handleUploadHighlightedFile(manuscript._id, e.target.files?.[0]);
+                                  e.target.value = null;
+                                }}
+                                disabled={uploadingHighlightedFor === manuscript._id || attemptsExhausted}
+                                className="w-full text-xs text-gray-500 border border-dashed border-gray-300 rounded p-1 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                              />
+                              {manuscript.authorResponse?.highlightedFileUrl && (
+                                <a
+                                  href={manuscript.authorResponse.highlightedFileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block text-xs text-blue-600 hover:text-blue-800 underline text-center"
+                                >
+                                  View Highlighted
+                                </a>
+                              )}
+
+                              {uploadingResponseFor === manuscript._id && (
+                                <p className="text-xs text-blue-600 text-center bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                  Uploading response...
+                                </p>
+                              )}
+                              {uploadingHighlightedFor === manuscript._id && (
+                                <p className="text-xs text-blue-600 text-center bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                  Uploading highlighted...
+                                </p>
+                              )}
                             </div>
-                          </>
-                        )}
-                    </div>
-                  </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="flex items-center justify-center">
-                      <div className="text-lg font-semibold text-[#00796b]">
-                        {manuscript.type}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col space-y-3 items-center">
-                      {manuscript.reviewDocxUrl && (
-                        <button
-                          onClick={() =>
-                            handleDownloadReviewDocx(manuscript.reviewDocxUrl)
-                          }
-                          className="w-full px-4 py-2 bg-[#9c27b0] hover:bg-[#7b1fa2] text-white font-semibold rounded-lg transition-colors"
-                        >
-                          📄 Download Review Comments
-                        </button>
-                      )}
-                      {manuscript.reviewDocxUrl && (
-                        <button
-                          onClick={() => handleBuildRevisionPdf(manuscript._id)}
-                          disabled={
-                            !hasResponseDoc ||
-                            buildingPdfFor === manuscript._id ||
-                            attemptsExhausted
-                          }
-                          className={`w-full px-4 py-2 font-semibold rounded-lg transition-colors ${
-                            !hasResponseDoc
-                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : buildingPdfFor === manuscript._id
-                              ? "bg-[#ff9800] text-white cursor-wait"
-                              : attemptsExhausted
-                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : "bg-[#ff9800] hover:bg-[#fb8c00] text-white"
-                          }`}
-                        >
-                          {buildingPdfFor === manuscript._id
-                            ? "Building..."
-                            : "Build Updated PDF"}
-                        </button>
-                      )}
-                      {/* Original PDF */}
-                      {manuscript.mergedFileUrl && (
-                        <button
-                          onClick={() => {
-                            window.open(manuscript.mergedFileUrl, "_blank");
-                            setPdfViewedIds((prev) => {
-                              const updated = new Set(prev);
-                              updated.add(manuscript._id);
-                              return updated;
-                            });
-                          }}
-                          className="w-full px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-lg transition-colors mb-2"
-                        >
-                          📄 View Original PDF
-                        </button>
-                      )}
-
-                      {/* Highlighted Revision */}
-                      {manuscript.highlightedRevisionFileUrl && (
-                        <button
-                          onClick={() => {
-                            const url = manuscript.highlightedRevisionFileUrl;
-                            const viewerUrl = url.endsWith(".pdf")
-                              ? url
-                              : `https://docs.google.com/gview?url=${encodeURIComponent(
-                                  url
-                                )}&embedded=true`;
-                            window.open(viewerUrl, "_blank");
-                          }}
-                          className="w-full px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-lg transition-colors mb-2"
-                        >
-                          ✏️ View Highlighted Revision
-                        </button>
-                      )}
-
-                      {/* Combined Revision PDF */}
-                      {manuscript.revisionCombinedPdfUrl && (
-                        <button
-                          onClick={() => {
-                            window.open(
-                              manuscript.revisionCombinedPdfUrl,
-                              "_blank"
-                            );
-                            setPdfViewedIds((prev) => {
-                              const updated = new Set(prev);
-                              updated.add(manuscript._id);
-                              return updated;
-                            });
-                          }}
-                          className="w-full px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-lg transition-colors"
-                        >
-                          📑 View Combined Revision PDF
-                        </button>
-                      )}
-
-                      {manuscript.revisedPdfBuiltAt &&
-                        !pdfViewedIds.has(manuscript._id) &&
-                        manuscript.status === "Revision Required" && (
-                          <p className="text-xs text-[#00796b] text-center">
-                            View the updated PDF to enable "Send to Editor".
-                          </p>
-                        )}
-                      {canSendToEditor && (
-                        <button
-                          onClick={() => handleSendToEditor(manuscript._id)}
-                          className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-                        >
-                          Send to Editor
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleNotesClick(manuscript._id)}
-                        className={`w-full px-4 py-2 
-												 bg-purple-500 hover:bg-purple-600 text-white
-													
-											 font-semibold rounded-lg transition-colors`}
-                      >
-                        Notes
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-center">
-                      <span
-                        className={`text-lg font-semibold ${getStatusColor(
-                          manuscript.status
-                        )}`}
-                      >
-                        {manuscript.status || "Pending"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {manuscript.status === "Revision Required" && (
-                    <p className="text-xs text-[#496580] mt-2">
-                      Revision attempts used: {attemptsUsed}/{maxAttempts}
-                    </p>
-                  )}
-                  {attemptsExhausted && (
-                    <p className="text-xs text-red-600 font-semibold mt-1">
-                      All revision attempts exhausted. Manuscript automatically
-                      rejected.
-                    </p>
-                  )}
-
-                  {manuscript.reviewDocxUrl && (
-                    <div className="mt-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                      <p className="text-sm font-semibold text-[#00796b] mb-2">
-                        Response to Reviewers
-                      </p>
-
-                      {/* RESPONSE DOCX UPLOAD */}
-                      <div className="flex flex-col md:flex-row gap-3">
-                        <input
-                          type="file"
-                          accept=".docx"
-                          onChange={(e) => {
-                            handleResponseUpload(
-                              manuscript._id,
-                              e.target.files?.[0]
-                            );
-                            e.target.value = null;
-                          }}
-                          disabled={
-                            uploadingResponseFor === manuscript._id ||
-                            attemptsExhausted
-                          }
-                          className="w-full border border-dashed border-[#00796b] rounded-lg px-3 py-2 text-sm text-[#00796b] bg-white"
-                        />
-                        {manuscript.authorResponse?.docxUrl && (
-                          <a
-                            href={manuscript.authorResponse.docxUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-sm text-[#00796b] underline"
-                          >
-                            View uploaded response
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Show uploading text */}
-                      {uploadingResponseFor === manuscript._id && (
-                        <p className="text-xs text-[#00796b] mt-2">
-                          Uploading response...
-                        </p>
-                      )}
-
-                      {/* HIGHLIGHTED FILE UPLOAD */}
-                      <div className="mt-3">
-                        <p className="text-sm font-semibold text-[#00796b] mb-1">
-                          Upload Highlighted Revision File
-                        </p>
-
-                        <input
-                          type="file"
-                          accept=".doc,.docx,.pdf"
-                          onChange={(e) => {
-                            handleUploadHighlightedFile(
-                              manuscript._id,
-                              e.target.files?.[0]
-                            );
-                            e.target.value = null;
-                          }}
-                          disabled={attemptsExhausted}
-                          className="w-full border border-dashed border-[#00796b] rounded-lg px-3 py-2 text-sm text-[#00796b] bg-white"
-                        />
-
-                        {manuscript.highlightedRevisionFileUrl && (
-                          <a
-                            href={manuscript.highlightedRevisionFileUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-sm text-[#00796b] underline mt-2 inline-block"
-                          >
-                            View Uploaded Highlighted File
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Disable messages */}
-                      {!hasResponseDoc && (
-                        <p className="text-xs text-[#00796b] mt-2">
-                          Upload your response DOCX to enable the updated PDF
-                          build.
-                        </p>
-                      )}
-
-                      {attemptsExhausted && (
-                        <p className="text-xs text-red-600 font-semibold mt-2">
-                          Uploads disabled because all revision attempts are
-                          exhausted.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {showNotes === manuscript._id && (
-                    <div className="mt-4">{renderNotes(manuscript)}</div>
-                  )}
+            {/* Pagination */}
+            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
+                  <span className="font-medium">
+                    {Math.min(currentPage * itemsPerPage, manuscripts.length)}
+                  </span>{" "}
+                  of <span className="font-medium">{manuscripts.length}</span> results
                 </div>
-              );
-            })}
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex space-x-1">
+                    {Array.from({ length: Math.ceil(manuscripts.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 text-sm border rounded ${currentPage === page
+                          ? "bg-[#00796b] text-white border-[#00796b]"
+                          : "border-gray-300 hover:bg-gray-100"
+                          }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === Math.ceil(manuscripts.length / itemsPerPage)}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Footer */}
+            <div className="bg-gray-50 p-4 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-800">{manuscripts.length}</div>
+                  <div className="text-gray-600">Total Submissions</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-amber-600">
+                    {manuscripts.filter(m => m.status === "Under Review").length}
+                  </div>
+                  <div className="text-gray-600">Under Review</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {manuscripts.filter(m => m.status === "Accepted").length}
+                  </div>
+                  <div className="text-gray-600">Accepted</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">
+                    {manuscripts.filter(m => m.status === "Rejected").length}
+                  </div>
+                  <div className="text-gray-600">Rejected</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

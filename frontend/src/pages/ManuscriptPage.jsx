@@ -27,13 +27,7 @@ const ManuscriptPage = () => {
 		author: [],
 		funding: "",
 		billingInfo: {
-			name: "",
-			organization: "",
-			address: "",
-			city: "",
-			state: "",
-			postalCode: "",
-			country: "",
+			findFunder: "",
 			awardNumber: "",
 			grantRecipient: "",
 		},
@@ -62,6 +56,8 @@ const ManuscriptPage = () => {
 	const [allAuthors, setAllAuthors] = useState([]);
 	const [isAuthorModalOpen, setIsAuthorModalOpen] = useState(false);
 	const [correspondingAuthorId, setCorrespondingAuthorId] = useState(null);
+	const [isEditAuthorModalOpen, setIsEditAuthorModalOpen] = useState(false);
+	const [editingAuthorId, setEditingAuthorId] = useState(null);
 
 	const [users, setUsers] = useState([]);
 
@@ -451,27 +447,23 @@ const ManuscriptPage = () => {
 			position: "top-center",
 			autoClose: 2000,
 		});
-
-		// Auto move to next section ONLY once
-		if (newList.length === 3) {
-			setTimeout(() => {
-				setCurrentSection(5);
-				setCompletedSections([1, 2, 3, 4]) // section 4 → section 5
-			}, 300);
-		}
 	};
 
-
 	// Handle billing info nested fields
-	const handleBillingInfoChange = (e) => {
+const handleBillingInfoChange = (e) => {
 		const { name, value } = e.target;
-		setFormData((prevData) => ({
-			...prevData,
-			billingInfo: {
-				...prevData.billingInfo,
-				[name]: value,
-			},
-		}));
+		console.log('Billing field change:', { name, value });
+		setFormData((prevData) => {
+			const newData = {
+				...prevData,
+				billingInfo: {
+					...prevData.billingInfo,
+					[name]: value,
+				},
+			};
+			console.log('Updated billingInfo:', newData.billingInfo);
+			return newData;
+		});
 	};
 
 	const validateSection = (section) => {
@@ -943,7 +935,13 @@ const ManuscriptPage = () => {
 
 	const handleAcceptPdf = async () => {
 		try {
-			await axios.put(
+			console.log('Starting manuscript acceptance process...');
+			console.log('Manuscript ID:', manuscriptId);
+			console.log('User token available:', !!user.token);
+
+			// First update the manuscript status
+			console.log('Updating manuscript status...');
+			const response = await axios.put(
 				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
 				{ status: "Under Review" },  // 👈 Saved → Pending
 				{
@@ -952,6 +950,154 @@ const ManuscriptPage = () => {
 					},
 				}
 			);
+			console.log('Status update successful:', response.data);
+
+			// Get manuscript details to fetch author information
+			console.log('Fetching manuscript details...');
+			const manuscriptResponse = await axios.get(
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}`,
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			console.log('Manuscript fetch successful');
+
+			const manuscript = manuscriptResponse.data.data; // Extract actual manuscript data
+
+			// Debug: Check authors data
+			console.log('Manuscript data:', manuscript);
+			console.log('Authors:', manuscript.authors);
+			console.log('Authors length:', manuscript.authors?.length);
+			console.log('Full manuscript object keys:', Object.keys(manuscript));
+			console.log('Manuscript title:', manuscript.title);
+			console.log('Manuscript customId:', manuscript.customId);
+			console.log('Manuscript _id:', manuscript._id);
+
+			// Fallback: Try to get authors from different possible fields
+			let authors = manuscript.authors || [];
+
+			// Check if authors is in different field or format
+			if (!authors || authors.length === 0) {
+				// Try alternative field names
+				authors = manuscript.author || manuscript.authorList || manuscript.contributors || [];
+				console.log('Trying alternative authors field:', authors);
+			}
+
+			// If still no authors, try to get from user data
+			if (!authors || authors.length === 0) {
+				// Fallback to current user if they are the author
+				if (user && user.email) {
+					authors = [{
+						email: user.email,
+						firstName: user.firstName || user.name || 'Author',
+						lastName: user.lastName || '',
+						_id: user._id
+					}];
+					console.log('Using current user as author:', authors);
+				}
+			}
+
+			console.log("manuscript dataaaaaaaaa", manuscript)
+			// Get manuscript details with fallbacks
+			const manuscriptTitle = manuscript.title || manuscript.manuscriptTitle || 'Untitled Manuscript';
+
+			// Debug all possible ID fields
+			console.log('Available ID fields:', {
+				customId: manuscript.customId,
+				_id: manuscript._id,
+				id: manuscript.id,
+				title: manuscript.title
+			});
+
+			// Try multiple ID field names
+			const manuscriptIdForEmail = manuscript.customId ||
+				manuscript._id ||
+				manuscript.id ||
+				`MS-${Date.now()}`; // Fallback to generated ID
+
+			console.log('Final manuscript title:', manuscriptTitle);
+			console.log('Final manuscript ID:', manuscriptIdForEmail);
+
+			// Send email to all authors
+			if (authors && authors.length > 0) {
+				console.log('Final authors list:', authors);
+				const emailPromises = authors.map(async (author) => {
+					try {
+						await axios.post(
+							`${import.meta.env.VITE_BACKEND_URL}/api/send-email`,
+							{
+								to: author.email,
+								subject: `Manuscript Successfully Submitted: ${manuscriptIdForEmail}`,
+								html: `
+									<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+										<div style="margin-bottom: 30px;">
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												Dear Authors,
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												Your manuscript entitled "<strong>${manuscriptTitle}</strong>" has been successfully submitted online and is presently being given full consideration for publication in IEEE Access.
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												If you are receiving this email, that means you are listed as an author. If you do not approve of being listed as a co-author on this article, please reach out to ieeeaccesseic@ieee.org as soon as possible.  
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												As a reminder, IEEE Access is a fully open access journal. Open Access provides unrestricted access to published articles via IEEE Xplore. In lieu of paid subscriptions, authors are required to pay an article processing charge of $2,075 (plus applicable local taxes) after the article has been accepted for publication.
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												Your manuscript ID is <strong>${manuscriptIdForEmail}</strong>. Please mention the manuscript ID in all future correspondence to the IEEE Access Editorial Office. The submitting author can view the manuscript status at any time by checking their author dashboard on the IEEE Author Portal. If the submitting author needs to update their email address after submission, please reach out to ieeeaccesseic@ieee.org so we can assist you in doing so.
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												<strong>Please note that any change to the author list after the article has been submitted is considered rare and exceptional, and the decision to allow such changes rests with the Editor. Once the list and order of authors has been established, the list and order of authors should not be altered without permission of all living authors of that article and will still be subject to editorial review.</strong>
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												Thank you again for submitting your manuscript to IEEE Access.
+											</p>
+											
+											<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+												<p style="font-size: 16px; margin: 0; font-style: italic;">Sincerely,</p>
+												<p style="font-size: 16px; margin: 5px 0 0 0; font-weight: bold;">IEEE Access Editorial Office</p>
+											</div>
+										</div>
+										
+										<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; text-align: center;">
+											<p style="margin: 0;">This email was sent by the IEEE Access Editorial Office</p>
+											<p style="margin: 5px 0 0 0;">© 2024 IEEE Access. All rights reserved.</p>
+										</div>
+									</div>
+								`,
+							},
+							{
+								headers: {
+									Authorization: `Bearer ${user.token}`,
+								},
+							}
+						);
+						console.log(`Email sent to ${author.email}`);
+					} catch (emailError) {
+						console.error(`Failed to send email to ${author.email}:`, emailError);
+					}
+				});
+
+				await Promise.all(emailPromises);
+				toast.success(`Email notifications sent to ${authors.length} author(s)`, {
+					position: "top-center",
+					autoClose: 3000,
+				});
+			} else {
+				console.log('No authors found to send emails');
+				toast.warning('No authors found to send email notifications', {
+					position: "top-center",
+					autoClose: 3000,
+				});
+			}
 
 			setAcceptOrRejectPdf(false);
 
@@ -960,7 +1106,28 @@ const ManuscriptPage = () => {
 
 		} catch (error) {
 			console.error("Error accepting manuscript:", error);
-			toast.error("Failed to accept manuscript. Please try again.", {
+			console.error("Error details:", {
+				message: error.message,
+				status: error.response?.status,
+				statusText: error.response?.statusText,
+				data: error.response?.data,
+				url: error.config?.url
+			});
+
+			// Show specific error message based on error type
+			let errorMessage = "Failed to accept manuscript. Please try again.";
+
+			if (error.response?.status === 401) {
+				errorMessage = "Session expired. Please login again.";
+			} else if (error.response?.status === 404) {
+				errorMessage = "Manuscript not found.";
+			} else if (error.response?.status === 403) {
+				errorMessage = "You don't have permission to accept this manuscript.";
+			} else if (error.message?.includes('Network Error')) {
+				errorMessage = "Network error. Please check your connection.";
+			}
+
+			toast.error(errorMessage, {
 				position: "top-center",
 				autoClose: 3000,
 			});
@@ -1287,8 +1454,8 @@ const ManuscriptPage = () => {
 			return;
 		}
 
-		// Check if trying to add self
-		if (newAuthor.email.toLowerCase() === user.email.toLowerCase()) {
+		// Check if trying to add self (only for new co-authors, not when editing)
+		if (!editingAuthorId && newAuthor.email.toLowerCase() === user.email.toLowerCase()) {
 			toast.error("You cannot add yourself as a co-author.", {
 				position: "top-center",
 				autoClose: 3000,
@@ -1296,11 +1463,17 @@ const ManuscriptPage = () => {
 			return;
 		}
 
-		// Check if author is already in the list
-		const isAlreadyAdded = authors.some(
-			(author) =>
+		// Check if author is already in the list (ignore the one being edited)
+		const isAlreadyAdded = authors.some((author) => {
+			if (editingAuthorId && author._id === editingAuthorId) {
+				return false;
+			}
+			return (
+				author.email &&
+				newAuthor.email &&
 				author.email.toLowerCase() === newAuthor.email.toLowerCase()
-		);
+			);
+		});
 
 		if (isAlreadyAdded) {
 			toast.warning("This author is already in the list.", {
@@ -1311,44 +1484,133 @@ const ManuscriptPage = () => {
 		}
 
 		try {
-			// Verify email exists in database
-			const response = await axios.post(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-email`,
-				{ email: newAuthor.email },
-				{
-					headers: {
-						Authorization: `Bearer ${user.token}`,
-					},
-				}
-			);
+			// If editing an existing author, just update local data and skip email/invitation logic
+			if (editingAuthorId) {
+				const updatedAuthor = {
+					_id: editingAuthorId,
+					...newAuthor,
+				};
 
-			if (!response.data.exists) {
-				toast.error(
-					"Cannot add author: Email does not exist in our database. Please enter a valid registered email.",
-					{
-						position: "top-center",
-						autoClose: 4000,
-					}
+				setAuthors((prev) =>
+					prev.map((a) => (a._id === editingAuthorId ? { ...a, ...updatedAuthor } : a)),
 				);
+				// IDs stay the same when editing
+				if (correspondingAuthorId === editingAuthorId && newAuthor.isCorresponding) {
+					setCorrespondingAuthorId(editingAuthorId);
+				}
+
+				setNewAuthor({
+					title: "",
+					firstName: "",
+					middleName: "",
+					lastName: "",
+					academicDegree: "",
+					email: "",
+					institution: "",
+					country: "",
+					isCorresponding: false,
+				});
+				setIsAuthorModalOpen(false);
+				setIsEditAuthorModalOpen(false);
+				setEditingAuthorId(null);
+				setIsEmailVerified(false);
 				return;
 			}
 
-			// Create new author object with the actual user ID from the response
+			// ADD MODE: verify email and optionally send invitation
+			let response;
+			try {
+				response = await axios.post(
+					`${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-email`,
+					{ email: newAuthor.email },
+					{
+						headers: {
+							Authorization: `Bearer ${user.token}`,
+						},
+					},
+				);
+			} catch (verifyError) {
+				console.error("Error verifying email:", verifyError);
+			}
+
+			let authorIdToUse = null;
+			let authorFromDb = null;
+
+			if (response && response.data && response.data.exists && response.data.user) {
+				authorFromDb = response.data.user;
+				authorIdToUse = authorFromDb._id;
+			} else {
+				authorIdToUse = `temp-${Date.now()}-${newAuthor.email}`;
+				const frontendUrl = import.meta.env.VITE_FRONTEND_URL || "https://synergyworldpress.com";
+				try {
+					await axios.post(
+						`${import.meta.env.VITE_BACKEND_URL}/api/send-email`,
+						{
+							to: newAuthor.email,
+							subject:
+								"You have been added as a corresponding author on a manuscript at SynergyWorldPress",
+							html: `
+								<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+									<p style="font-size: 16px;">Dear Colleague,</p>
+									<p style="font-size: 16px;">
+										You have been added as a corresponding author on a manuscript at <strong>SynergyWorldPress</strong>.
+									</p>
+									<p style="font-size: 16px;">
+										To review your details, manage submissions, and complete your profile, please register on our platform using the link below:
+									</p>
+									<p style="font-size: 16px;">
+										<a href="${frontendUrl}/register" target="_blank" rel="noopener noreferrer">${frontendUrl}/register</a>
+									</p>
+									<p style="font-size: 14px; color: #555;">
+										If you did not expect this email, you may safely ignore it.
+									</p>
+									<p style="margin-top: 24px; font-size: 14px;">
+										Best regards,<br />
+										SynergyWorldPress Editorial Office
+									</p>
+								</div>
+							`,
+						},
+					);
+					toast.info(
+						`Invitation email sent to ${newAuthor.email}. They will need to register to access the platform.`,
+						{
+							position: "top-center",
+							autoClose: 4000,
+						},
+					);
+				} catch (inviteError) {
+					console.error("Error sending invitation email:", inviteError);
+				}
+			}
+
 			const author = {
-				_id: response.data.user._id, // Use the actual MongoDB ObjectId from the user
+				_id: authorIdToUse,
 				...newAuthor,
+				...(authorFromDb
+					? {
+						// Prefer data from DB where available
+						title: authorFromDb.title || newAuthor.title,
+						firstName: authorFromDb.firstName || newAuthor.firstName,
+						middleName: authorFromDb.middleName || newAuthor.middleName,
+						lastName: authorFromDb.lastName || newAuthor.lastName,
+						academicDegree:
+							authorFromDb.academicDegree || newAuthor.academicDegree,
+						institution:
+							authorFromDb.institution || newAuthor.institution,
+						country: authorFromDb.country || newAuthor.country,
+						email: authorFromDb.email || newAuthor.email,
+					}
+					: {}),
 			};
 
-			// Update authors list
 			setAuthors((prev) => [...prev, author]);
 			setSelectedAuthors((prev) => [...prev, author._id]);
 
-			// If marked as corresponding author, update corresponding author
 			if (newAuthor.isCorresponding) {
 				setCorrespondingAuthorId(author._id);
 			}
 
-			// Reset form and close modal
 			setNewAuthor({
 				title: "",
 				firstName: "",
@@ -1361,6 +1623,9 @@ const ManuscriptPage = () => {
 				isCorresponding: false,
 			});
 			setIsAuthorModalOpen(false);
+			setIsEditAuthorModalOpen(false);
+			setEditingAuthorId(null);
+			setIsEmailVerified(false);
 		} catch (error) {
 			console.error("Error adding author:", error);
 			toast.error("Error adding author. Please try again.", {
@@ -1383,7 +1648,39 @@ const ManuscriptPage = () => {
 	};
 
 	const handleRemoveAuthor = (authorId) => {
-		setSelectedAuthors((prev) => prev.filter((id) => id !== authorId));
+		setSelectedAuthors((prev) => {
+			if (prev.length <= 1) {
+				return prev;
+			}
+			return prev.filter((id) => id !== authorId);
+		});
+		setAuthors((prev) => prev.filter((a) => a._id !== authorId));
+		if (correspondingAuthorId === authorId) {
+			setCorrespondingAuthorId((prevId) => {
+				const remaining = selectedAuthors.filter((id) => id !== authorId);
+				return remaining[0] || prevId;
+			});
+		}
+	};
+
+	const handleEditAuthor = (authorId) => {
+		const existing = authors.find((a) => a._id === authorId);
+		if (!existing) return;
+		setNewAuthor({
+			title: existing.title || "",
+			firstName: existing.firstName || "",
+			middleName: existing.middleName || "",
+			lastName: existing.lastName || "",
+			academicDegree: existing.academicDegree || "",
+			email: existing.email || "",
+			institution: existing.institution || "",
+			country: existing.country || "",
+			isCorresponding:
+				correspondingAuthorId === existing._id || !!existing.isCorresponding,
+		});
+		setEditingAuthorId(existing._id);
+		setIsEditAuthorModalOpen(true);
+		setIsAuthorModalOpen(true);
 	};
 
 	const renderNextButton = (section) => {
@@ -2213,7 +2510,7 @@ const ManuscriptPage = () => {
 																						<div>
 																							Author
 																						</div>
-																						{isCorrespondingAuthor && (
+																						{isCorrespondingAuthor && authorId !== user._id && (
 																							<div className="text-[#00796b] text-xs mt-1">
 																								Corresponding
 																								Author
@@ -2222,39 +2519,40 @@ const ManuscriptPage = () => {
 																					</div>
 																				</td>
 																				<td className="px-4 py-3">
-																					{authorId !==
-																						user._id && (
-																							<div className="flex space-x-2">
-																								<button
-																									onClick={() =>
-																										handleRemoveAuthor(
-																											authorId
-																										)
-																									}
-																									className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
-																								>
-																									Remove
-																								</button>
-																								<button
-																									onClick={() =>
-																										setCorrespondingAuthorId(
-																											authorId
-																										)
-																									}
-																									className={`px-3 py-1 rounded text-sm transition-colors ${isCorrespondingAuthor
+																					<div className="flex space-x-2 items-center">
+																						<button
+																							onClick={() => handleEditAuthor(authorId)}
+																							className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-3 py-1 rounded text-sm transition-colors"
+																							title="Edit author"
+																						>
+																							✏️
+																						</button>
+																						{selectedAuthors.length > 1 && (
+																							<button
+																								onClick={() => handleRemoveAuthor(authorId)}
+																								className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
+																								title="Delete author"
+																							>
+																								🗑
+																							</button>
+																						)}
+																						{authorId !== user._id && (
+																							<button
+																								onClick={() =>
+																									setCorrespondingAuthorId(authorId)
+																								}
+																								className={`px-3 py-1 rounded text-sm transition-colors ${isCorrespondingAuthor
 																										? "bg-[#BAFFF5] text-[#00796b] cursor-default"
-																										: "bg-[#00796b] hover:bg-[#3a5269] text-white"
-																										}`}
-																									disabled={
-																										isCorrespondingAuthor
-																									}
-																								>
-																									{isCorrespondingAuthor
+																										: "bg-[#00796b] hover:bg-[#3a5269] text-white"}
+																								`}
+																								disabled={isCorrespondingAuthor}
+																							>
+																								{isCorrespondingAuthor
 																										? "Current Corresponding"
 																										: "Make Corresponding"}
-																								</button>
-																							</div>
+																							</button>
 																						)}
+																					</div>
 																				</td>
 																			</tr>
 																		)}
@@ -2277,11 +2575,16 @@ const ManuscriptPage = () => {
 									<div className="bg-white p-4 rounded text-[#212121] w-[500px]">
 										<div className="flex justify-between items-center mb-2">
 											<h3 className="font-bold">
-												Add New Author
+												{editingAuthorId ? "Edit Author" : "Add New Author"}
 											</h3>
 											<button
 												onClick={() =>
-													setIsAuthorModalOpen(false)
+													{
+														setIsAuthorModalOpen(false);
+														setIsEditAuthorModalOpen(false);
+														setEditingAuthorId(null);
+														setIsEmailVerified(false);
+													}
 												}
 												className="text-[#9e9e9e] hover:text-[#212121]"
 											>
@@ -2593,100 +2896,22 @@ const ManuscriptPage = () => {
 								</div>
 							</div>
 
-							{formData.funding === "Yes" && (
+						{formData.funding === "Yes" && (
 								<div className="mb-4 mt-4 p-4 border border-[#e0e0e0] rounded-lg bg-gray-50">
 									<h3 className="font-semibold mb-3 text-[#00796b]">
 										Billing Information
 									</h3>
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<div className="grid grid-cols-1 md:grid-cols-1 gap-4">
 										<div>
 											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Name *
+												Find a Funder
 											</label>
 											<input
 												type="text"
-												name="name"
-												value={formData.billingInfo.name}
+												name="findFunder"
+												value={formData.billingInfo.findFunder}
 												onChange={handleBillingInfoChange}
-												placeholder="Full name"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Organization *
-											</label>
-											<input
-												type="text"
-												name="organization"
-												value={formData.billingInfo.organization}
-												onChange={handleBillingInfoChange}
-												placeholder="Organization name"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div className="md:col-span-2">
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Address *
-											</label>
-											<input
-												type="text"
-												name="address"
-												value={formData.billingInfo.address}
-												onChange={handleBillingInfoChange}
-												placeholder="Street address"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												City *
-											</label>
-											<input
-												type="text"
-												name="city"
-												value={formData.billingInfo.city}
-												onChange={handleBillingInfoChange}
-												placeholder="City"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												State/Province
-											</label>
-											<input
-												type="text"
-												name="state"
-												value={formData.billingInfo.state}
-												onChange={handleBillingInfoChange}
-												placeholder="State or Province"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Postal Code *
-											</label>
-											<input
-												type="text"
-												name="postalCode"
-												value={formData.billingInfo.postalCode}
-												onChange={handleBillingInfoChange}
-												placeholder="Postal code"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Country *
-											</label>
-											<input
-												type="text"
-												name="country"
-												value={formData.billingInfo.country}
-												onChange={handleBillingInfoChange}
-												placeholder="Country"
+												placeholder="Funding organization or agency"
 												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
 											/>
 										</div>
@@ -2719,7 +2944,6 @@ const ManuscriptPage = () => {
 									</div>
 								</div>
 							)}
-
 							<div className="flex justify-between">
 								{renderBackButton(6)}
 

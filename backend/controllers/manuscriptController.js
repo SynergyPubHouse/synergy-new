@@ -1,4 +1,3 @@
-// manuscriptController.js
 const Manuscript = require("../models/Manuscript");
 const multer = require("multer");
 const path = require("path");
@@ -18,6 +17,7 @@ const axios = require("axios");
 // At the top of manuscriptController.js
 const { uploadToCloudinary } = require("../utils/cloudinary");
 const sendEmail = require("../utils/sendEmail");
+const { console } = require("inspector");
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
@@ -317,7 +317,7 @@ async function createTablePdf(formData, manuscriptId = null) {
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const margin = 50;
     let currentY = page.getHeight() - margin;
-
+console.log('[createTablePdf] Creating table PDF with form data:', formData);
     // Draw title
     page.drawText("Manuscript Submission Details", {
         x: margin,
@@ -483,9 +483,10 @@ async function createTablePdf(formData, manuscriptId = null) {
     drawTableRow("Funding", formData.funding);
     
     // Add billing information if funding is "Yes"
-    if (formData.funding === "Yes" && formData.billingInfo) {
-        drawTableRow("Award Number", formData.billingInfo.awardNumber || '');
-        drawTableRow("Grant Recipient", formData.billingInfo.grantRecipient || '');
+    if (formData.funding === "Yes" && formData?.billingInfo) {
+        drawTableRow("Find a Funder", formData?.billingInfo?.findFunder || 'Not provided');
+        drawTableRow("Award Number", formData?.billingInfo?.awardNumber || 'Not provided');
+        drawTableRow("Grant Recipient", formData?.billingInfo?.grantRecipient || 'Not provided');
     }
     
 drawTableRow("Submission Date", new Date().toLocaleString());
@@ -655,6 +656,20 @@ exports.createManuscript = async (req, res) => {
                         "[createManuscript] Error parsing additionalInfo:",
                         e
                     );
+                }
+            }
+
+            // Parse billingInfo if it exists
+            if (req.body.billingInfo) {
+                try {
+                    req.body.billingInfo = JSON.parse(req.body.billingInfo);
+                    console.log('[createManuscript] Parsed billingInfo:', req.body.billingInfo);
+                } catch (e) {
+                    console.error(
+                        "[createManuscript] Error parsing billingInfo:",
+                        e
+                    );
+                    req.body.billingInfo = {};
                 }
             }
 

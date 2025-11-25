@@ -1,35 +1,44 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaUserCircle, FaBars, FaTimes, FaSearch } from 'react-icons/fa';
+import { FaUserCircle, FaBars, FaTimes, FaSearch, FaChevronDown } from 'react-icons/fa';
 import { useAuth } from '../App';
 
 const BASE_URL = '';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const displayName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || user.email
+    : "";
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false); // name info dropdown
+  const [userMenuOpen, setUserMenuOpen] = useState(false); // icon options dropdown
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
-console.log("user", user)
+  console.log("user", user)
+
   const logoTarget =
-    user?.editor?.role === 'editor'
+    user?.editor
       ? '/journal/jics/editor/dashboard'
-      : user?.reviewer?.role === 'reviewer'
+      : user?.reviewer
       ? '/journal/jics/reviewer/dashboard'
       : '/';
 
-  // Build available roles and infer current role for the selector
+  // Build available roles from backend-provided role strings
+  const rawRoles = (user?.availableRoles || user?.roles || []).map((r) =>
+    (typeof r === 'string' ? r : r?.role) || 'author'
+  );
+  const hasRole = (role) => rawRoles.includes(role);
   const availableRoles = [
     { key: 'author', label: 'Author', path: '/' },
-    ...(user?.reviewer?.role === 'reviewer'
+    ...(hasRole('reviewer')
       ? [{ key: 'reviewer', label: 'Reviewer', path: '/journal/jics/reviewer/dashboard' }]
       : []),
-    ...(user?.editor?.role === 'editor'
+    ...(hasRole('editor')
       ? [{ key: 'editor', label: 'Editor', path: '/journal/jics/editor/dashboard' }]
       : []),
   ];
@@ -55,6 +64,7 @@ console.log("user", user)
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setUserDropdownOpen(false);
+        setUserMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -69,15 +79,13 @@ console.log("user", user)
       transition={{ duration: 0.5 }}
     >
       <div className="container mx-auto flex justify-between items-center">
-<Link to={logoTarget} className="flex items-center hover:opacity-80 transition-opacity">
-  <img 
-    src="/images/SWP-bgremove.png" 
-    alt="Synergy World Press Logo" 
-    className="h-10 w-auto rounded-md" 
-  /> 
-</Link>
-
-
+        <Link to={logoTarget} className="flex items-center hover:opacity-80 transition-opacity">
+          <img 
+            src="/images/SWP-bgremove.png" 
+            alt="Synergy World Press Logo" 
+            className="h-10 w-auto rounded-md" 
+          /> 
+        </Link>
 
         <div className="hidden md:flex gap-8">
           {navItems.map((item) => (
@@ -103,23 +111,39 @@ console.log("user", user)
         <div className="flex items-center gap-4">
           {user ? (
             <div className="relative" ref={dropdownRef}>
-               {location.pathname !== "/" && (
-        <button
-          onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-          className="flex items-center gap-2 focus:outline-none"
-        >
-          {user?.photoURL ? (
-            <img
-              src={user.photoURL}
-              alt="User"
-              className="w-10 h-10 rounded-full border-2 border-[#00acc1]"
-            />
-          ) : (
-            <FaUserCircle className="w-10 h-10 text-[#00acc1]" />
-          )}
-          <span className="text-sm">{user?.name}</span>
-        </button>
-      )}
+              {location.pathname !== "/" && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setUserDropdownOpen(!userDropdownOpen);
+                      setUserMenuOpen(false);
+                    }}
+                    className="flex items-center gap-1 text-sm focus:outline-none"
+                  >
+                    <span className="flex items-center gap-1">
+                      {displayName}
+                      <FaChevronDown className="w-3 h-3" />
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(!userMenuOpen);
+                      setUserDropdownOpen(false);
+                    }}
+                    className="flex items-center focus:outline-none"
+                  >
+                    {user?.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="User"
+                        className="w-10 h-10 rounded-full border-2 border-[#00acc1]"
+                      />
+                    ) : (
+                      <FaUserCircle className="w-10 h-10 text-[#00acc1]" />
+                    )}
+                  </button>
+                </div>
+              )}
 
               <AnimatePresence>
                 {userDropdownOpen && (
@@ -128,17 +152,16 @@ console.log("user", user)
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl py-3 text-[#212121] border border-[#e0e0e0] ring-1 ring-black/5"
+                    className="absolute right-0 mt-2 w-72 bg-white text-[#212121] border border-[#e0e0e0] shadow-lg"
                   >
-                    <div className="px-4 pb-3 text-sm">
-                      <p className="font-semibold truncate">{user.name}</p>
-                      <p className="opacity-70 text-xs truncate">{user.email}</p>
-                    </div>
-                    <hr className="border-[#e0e0e0] my-1" />
-                    {(user?.reviewer?.role === 'reviewer' || user?.editor?.role === 'editor') && (
-                      <>
-                        <div className="px-4 py-1 text-sm flex items-center justify-between gap-3">
-                          <span className="font-medium">Role</span>
+                    <div className="text-sm">
+                      <div className="flex justify-between px-4 py-2 border-b border-[#e0e0e0]">
+                        <span className="text-gray-600">Username</span>
+                        <span className="font-semibold truncate max-w-[55%] text-right">{displayName || user.email}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2 border-b border-[#e0e0e0] gap-3">
+                        <span className="text-gray-600">Role</span>
+                        {availableRoles.length > 1 ? (
                           <select
                             value={currentRole}
                             onChange={(e) => {
@@ -147,49 +170,84 @@ console.log("user", user)
                               setUserDropdownOpen(false);
                               navigate(target);
                             }}
-                            className="border border-[#e0e0e0] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#00acc1]"
+                            className="border border-[#e0e0e0] rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#00acc1] max-w-[55%]"
                           >
-                            {availableRoles?.map((r) => (
+                            {availableRoles.map((r) => (
                               <option key={r.key} value={r.key}>{r.label}</option>
                             ))}
                           </select>
-                        </div>
-                        <hr className="border-[#e0e0e0] my-2" />
-                      </>
-                    )}
-                    <Link
-                      to={`${BASE_URL}/account`}
-                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
-                    >
-                      My Account
-                    </Link>
-                    <Link
-                      to="/journal/jics/my-submissions"
-                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
-                    >
-                      My Submissions
-                    </Link>
-                    <Link
-                      to={`${BASE_URL}/subscriptions`}
-                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
-                    >
-                      My Subscriptions
-                    </Link>
-                    {/* <Link
-                      to={`${BASE_URL}settings`}
-                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors"
-                    >
-                      Settings
-                    </Link> */}
-                    <button
-                      onClick={() => setLogoutModalOpen(true)}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-red-600/10 hover:text-red-700 transition-colors rounded-md mx-2"
-                    >
-                      Logout
-                    </button>
+                        ) : (
+                          <span className="font-semibold">
+                            {(availableRoles.find(r => r.key === currentRole) || { label: 'Author' }).label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex justify-between px-4 py-2 border-b border-[#e0e0e0]">
+                        <span className="text-gray-600">Site Language</span>
+                        <span className="font-semibold">English</span>
+                      </div>
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm text-[#0077cc] hover:bg-[#f5f5f5]"
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          navigate(`${BASE_URL}/account`);
+                        }}
+                      >
+                        Update My Information
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
+
+		      {/* Icon options dropdown (My Account, etc.) */}
+		      <AnimatePresence>
+		        {userMenuOpen && (
+		          <motion.div
+		            initial={{ opacity: 0, y: -10 }}
+		            animate={{ opacity: 1, y: 0 }}
+		            exit={{ opacity: 0, y: -10 }}
+		            transition={{ duration: 0.2 }}
+		            className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl py-3 text-[#212121] border border-[#e0e0e0] ring-1 ring-black/5"
+		          >
+		            <div className="px-4 pb-3 text-sm">
+		              <p className="font-semibold truncate">{displayName}</p>
+		              <p className="opacity-70 text-xs truncate">{user.email}</p>
+		            </div>
+		            <hr className="border-[#e0e0e0] my-1" />
+		            <Link
+		              to={`${BASE_URL}/account`}
+		              className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+		              onClick={() => setUserMenuOpen(false)}
+		            >
+		              My Account
+		            </Link>
+		            <Link
+		              to="/journal/jics/my-submissions"
+		              className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+		              onClick={() => setUserMenuOpen(false)}
+		            >
+		              My Submissions
+		            </Link>
+		            <Link
+		              to={`${BASE_URL}/subscriptions`}
+		              className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+		              onClick={() => setUserMenuOpen(false)}
+		            >
+		              My Subscriptions
+		            </Link>
+		            <button
+		              onClick={() => {
+		                setUserMenuOpen(false);
+		                setLogoutModalOpen(true);
+		              }}
+		              className="w-full text-left px-4 py-2 text-sm hover:bg-red-600/10 hover:text-red-700 transition-colors rounded-md mx-2"
+		            >
+		              Logout
+		            </button>
+		          </motion.div>
+		        )}
+		      </AnimatePresence>
             </div>
           ) : (
       location.pathname !== '/' && (

@@ -73,6 +73,7 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/auth/editor", require("./routes/editorRoutes"));
 app.use("/api/auth/reviewer", require("./routes/reviewerRoutes"));
 app.use("/api/institutions", require("./routes/institutionRoutes"));
+app.use("/api/send-email", require("./routes/emailRoutes"));
 
 
 // Root route to confirm backend is working

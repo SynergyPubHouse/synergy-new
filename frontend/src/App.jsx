@@ -101,6 +101,7 @@ function AppContent() {
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");
+    window.location.href = "/journal/jics/about/overview";
   };
 
   if (isLoading) {
