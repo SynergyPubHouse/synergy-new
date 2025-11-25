@@ -173,7 +173,7 @@ const MySubmissions = () => {
       await axios.put(
         `${import.meta.env.VITE_BACKEND_URL
         }/api/manuscripts/${manuscriptId}/status`,
-        { status: "Pending" },
+        { status: "Under Review" },
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
