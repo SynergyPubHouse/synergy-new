@@ -21,8 +21,9 @@ function ReviewerDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [manuscripts, setManuscripts] = useState([]);
   const navigate = useNavigate();
-  const [reviewText, setReviewText] = useState("");
-  const [recommendation, setRecommendation] = useState("");
+  // Store review inputs per-manuscript so text doesn't mirror across rows
+  const [reviewTexts, setReviewTexts] = useState({}); // { [manuscriptId]: string }
+  const [recommendations, setRecommendations] = useState({}); // { [manuscriptId]: string }
   const [pendingInvitations, setPendingInvitations] = useState([]);
   const [showRejectForm, setShowRejectForm] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -145,15 +146,18 @@ function ReviewerDashboard() {
         return;
       }
 
-      if (!reviewText.trim() || !recommendation) {
+      const currentReviewText = (reviewTexts[manuscriptId] || "").trim();
+      const currentRecommendation = recommendations[manuscriptId] || "";
+
+      if (!currentReviewText || !currentRecommendation) {
         alert("Please provide both review comments and a recommendation");
         return;
       }
 
       const reviewerName = getUserFullName(user);
       const reviewerNote = {
-        text: reviewText,
-        action: recommendation,
+        text: currentReviewText,
+        action: currentRecommendation,
         addedBy: {
           name: reviewerName,
           role: "reviewer",
@@ -166,8 +170,8 @@ function ReviewerDashboard() {
           import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/review`,
         {
-          comments: reviewText,
-          recommendation: recommendation,
+          comments: currentReviewText,
+          recommendation: currentRecommendation,
           reviewerNote: reviewerNote,
         },
         {
@@ -190,8 +194,8 @@ function ReviewerDashboard() {
       );
 
       // Clear the form
-      setReviewText("");
-      setRecommendation("");
+      setReviewTexts((prev) => ({ ...prev, [manuscriptId]: "" }));
+      setRecommendations((prev) => ({ ...prev, [manuscriptId]: "" }));
 
       alert("Review submitted successfully!");
       window.location.reload();
@@ -535,8 +539,13 @@ function ReviewerDashboard() {
                             Review Comments:
                           </label>
                           <textarea
-                            value={reviewText}
-                            onChange={(e) => setReviewText(e.target.value)}
+                            value={reviewTexts[manuscript._id] || ""}
+                            onChange={(e) =>
+                              setReviewTexts((prev) => ({
+                                ...prev,
+                                [manuscript._id]: e.target.value,
+                              }))
+                            }
                             className="w-full h-32 bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
                             placeholder="Enter your review comments here..."
                           />
@@ -546,8 +555,13 @@ function ReviewerDashboard() {
                             Recommendation:
                           </label>
                           <select
-                            value={recommendation}
-                            onChange={(e) => setRecommendation(e.target.value)}
+                            value={recommendations[manuscript._id] || ""}
+                            onChange={(e) =>
+                              setRecommendations((prev) => ({
+                                ...prev,
+                                [manuscript._id]: e.target.value,
+                              }))
+                            }
                             className="w-full bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
                           >
                             <option value="">Select a recommendation</option>
@@ -564,7 +578,10 @@ function ReviewerDashboard() {
                         <div className="flex justify-end">
                           <button
                             onClick={() => handleAddReview(manuscript._id)}
-                            disabled={!reviewText.trim() || !recommendation}
+                            disabled={
+                              !(reviewTexts[manuscript._id] || "").trim() ||
+                              !(recommendations[manuscript._id] || "")
+                            }
                             className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Add Review
