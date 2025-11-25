@@ -62,6 +62,8 @@ const ManuscriptPage = () => {
 	const [allAuthors, setAllAuthors] = useState([]);
 	const [isAuthorModalOpen, setIsAuthorModalOpen] = useState(false);
 	const [correspondingAuthorId, setCorrespondingAuthorId] = useState(null);
+	const [isEditAuthorModalOpen, setIsEditAuthorModalOpen] = useState(false);
+	const [editingAuthorId, setEditingAuthorId] = useState(null);
 
 	const [users, setUsers] = useState([]);
 
@@ -451,16 +453,7 @@ const ManuscriptPage = () => {
 			position: "top-center",
 			autoClose: 2000,
 		});
-
-		// Auto move to next section ONLY once
-		if (newList.length === 3) {
-			setTimeout(() => {
-				setCurrentSection(5);
-				setCompletedSections([1, 2, 3, 4]) // section 4 → section 5
-			}, 300);
-		}
 	};
-
 
 	// Handle billing info nested fields
 	const handleBillingInfoChange = (e) => {
@@ -1462,8 +1455,8 @@ const ManuscriptPage = () => {
 			return;
 		}
 
-		// Check if trying to add self
-		if (newAuthor.email.toLowerCase() === user.email.toLowerCase()) {
+		// Check if trying to add self (only for new co-authors, not when editing)
+		if (!editingAuthorId && newAuthor.email.toLowerCase() === user.email.toLowerCase()) {
 			toast.error("You cannot add yourself as a co-author.", {
 				position: "top-center",
 				autoClose: 3000,
@@ -1471,11 +1464,17 @@ const ManuscriptPage = () => {
 			return;
 		}
 
-		// Check if author is already in the list
-		const isAlreadyAdded = authors.some(
-			(author) =>
+		// Check if author is already in the list (ignore the one being edited)
+		const isAlreadyAdded = authors.some((author) => {
+			if (editingAuthorId && author._id === editingAuthorId) {
+				return false;
+			}
+			return (
+				author.email &&
+				newAuthor.email &&
 				author.email.toLowerCase() === newAuthor.email.toLowerCase()
-		);
+			);
+		});
 
 		if (isAlreadyAdded) {
 			toast.warning("This author is already in the list.", {
@@ -1486,44 +1485,133 @@ const ManuscriptPage = () => {
 		}
 
 		try {
-			// Verify email exists in database
-			const response = await axios.post(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-email`,
-				{ email: newAuthor.email },
-				{
-					headers: {
-						Authorization: `Bearer ${user.token}`,
-					},
-				}
-			);
+			// If editing an existing author, just update local data and skip email/invitation logic
+			if (editingAuthorId) {
+				const updatedAuthor = {
+					_id: editingAuthorId,
+					...newAuthor,
+				};
 
-			if (!response.data.exists) {
-				toast.error(
-					"Cannot add author: Email does not exist in our database. Please enter a valid registered email.",
-					{
-						position: "top-center",
-						autoClose: 4000,
-					}
+				setAuthors((prev) =>
+					prev.map((a) => (a._id === editingAuthorId ? { ...a, ...updatedAuthor } : a)),
 				);
+				// IDs stay the same when editing
+				if (correspondingAuthorId === editingAuthorId && newAuthor.isCorresponding) {
+					setCorrespondingAuthorId(editingAuthorId);
+				}
+
+				setNewAuthor({
+					title: "",
+					firstName: "",
+					middleName: "",
+					lastName: "",
+					academicDegree: "",
+					email: "",
+					institution: "",
+					country: "",
+					isCorresponding: false,
+				});
+				setIsAuthorModalOpen(false);
+				setIsEditAuthorModalOpen(false);
+				setEditingAuthorId(null);
+				setIsEmailVerified(false);
 				return;
 			}
 
-			// Create new author object with the actual user ID from the response
+			// ADD MODE: verify email and optionally send invitation
+			let response;
+			try {
+				response = await axios.post(
+					`${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-email`,
+					{ email: newAuthor.email },
+					{
+						headers: {
+							Authorization: `Bearer ${user.token}`,
+						},
+					},
+				);
+			} catch (verifyError) {
+				console.error("Error verifying email:", verifyError);
+			}
+
+			let authorIdToUse = null;
+			let authorFromDb = null;
+
+			if (response && response.data && response.data.exists && response.data.user) {
+				authorFromDb = response.data.user;
+				authorIdToUse = authorFromDb._id;
+			} else {
+				authorIdToUse = `temp-${Date.now()}-${newAuthor.email}`;
+				const frontendUrl = import.meta.env.VITE_FRONTEND_URL || "https://synergyworldpress.com";
+				try {
+					await axios.post(
+						`${import.meta.env.VITE_BACKEND_URL}/api/send-email`,
+						{
+							to: newAuthor.email,
+							subject:
+								"You have been added as a corresponding author on a manuscript at SynergyWorldPress",
+							html: `
+								<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+									<p style="font-size: 16px;">Dear Colleague,</p>
+									<p style="font-size: 16px;">
+										You have been added as a corresponding author on a manuscript at <strong>SynergyWorldPress</strong>.
+									</p>
+									<p style="font-size: 16px;">
+										To review your details, manage submissions, and complete your profile, please register on our platform using the link below:
+									</p>
+									<p style="font-size: 16px;">
+										<a href="${frontendUrl}/register" target="_blank" rel="noopener noreferrer">${frontendUrl}/register</a>
+									</p>
+									<p style="font-size: 14px; color: #555;">
+										If you did not expect this email, you may safely ignore it.
+									</p>
+									<p style="margin-top: 24px; font-size: 14px;">
+										Best regards,<br />
+										SynergyWorldPress Editorial Office
+									</p>
+								</div>
+							`,
+						},
+					);
+					toast.info(
+						`Invitation email sent to ${newAuthor.email}. They will need to register to access the platform.`,
+						{
+							position: "top-center",
+							autoClose: 4000,
+						},
+					);
+				} catch (inviteError) {
+					console.error("Error sending invitation email:", inviteError);
+				}
+			}
+
 			const author = {
-				_id: response.data.user._id, // Use the actual MongoDB ObjectId from the user
+				_id: authorIdToUse,
 				...newAuthor,
+				...(authorFromDb
+					? {
+						// Prefer data from DB where available
+						title: authorFromDb.title || newAuthor.title,
+						firstName: authorFromDb.firstName || newAuthor.firstName,
+						middleName: authorFromDb.middleName || newAuthor.middleName,
+						lastName: authorFromDb.lastName || newAuthor.lastName,
+						academicDegree:
+							authorFromDb.academicDegree || newAuthor.academicDegree,
+						institution:
+							authorFromDb.institution || newAuthor.institution,
+						country: authorFromDb.country || newAuthor.country,
+						email: authorFromDb.email || newAuthor.email,
+					}
+					: {}),
 			};
 
-			// Update authors list
 			setAuthors((prev) => [...prev, author]);
 			setSelectedAuthors((prev) => [...prev, author._id]);
 
-			// If marked as corresponding author, update corresponding author
 			if (newAuthor.isCorresponding) {
 				setCorrespondingAuthorId(author._id);
 			}
 
-			// Reset form and close modal
 			setNewAuthor({
 				title: "",
 				firstName: "",
@@ -1536,6 +1624,9 @@ const ManuscriptPage = () => {
 				isCorresponding: false,
 			});
 			setIsAuthorModalOpen(false);
+			setIsEditAuthorModalOpen(false);
+			setEditingAuthorId(null);
+			setIsEmailVerified(false);
 		} catch (error) {
 			console.error("Error adding author:", error);
 			toast.error("Error adding author. Please try again.", {
@@ -1558,7 +1649,39 @@ const ManuscriptPage = () => {
 	};
 
 	const handleRemoveAuthor = (authorId) => {
-		setSelectedAuthors((prev) => prev.filter((id) => id !== authorId));
+		setSelectedAuthors((prev) => {
+			if (prev.length <= 1) {
+				return prev;
+			}
+			return prev.filter((id) => id !== authorId);
+		});
+		setAuthors((prev) => prev.filter((a) => a._id !== authorId));
+		if (correspondingAuthorId === authorId) {
+			setCorrespondingAuthorId((prevId) => {
+				const remaining = selectedAuthors.filter((id) => id !== authorId);
+				return remaining[0] || prevId;
+			});
+		}
+	};
+
+	const handleEditAuthor = (authorId) => {
+		const existing = authors.find((a) => a._id === authorId);
+		if (!existing) return;
+		setNewAuthor({
+			title: existing.title || "",
+			firstName: existing.firstName || "",
+			middleName: existing.middleName || "",
+			lastName: existing.lastName || "",
+			academicDegree: existing.academicDegree || "",
+			email: existing.email || "",
+			institution: existing.institution || "",
+			country: existing.country || "",
+			isCorresponding:
+				correspondingAuthorId === existing._id || !!existing.isCorresponding,
+		});
+		setEditingAuthorId(existing._id);
+		setIsEditAuthorModalOpen(true);
+		setIsAuthorModalOpen(true);
 	};
 
 	const renderNextButton = (section) => {
@@ -2388,7 +2511,7 @@ const ManuscriptPage = () => {
 																						<div>
 																							Author
 																						</div>
-																						{isCorrespondingAuthor && (
+																						{isCorrespondingAuthor && authorId !== user._id && (
 																							<div className="text-[#00796b] text-xs mt-1">
 																								Corresponding
 																								Author
@@ -2397,39 +2520,40 @@ const ManuscriptPage = () => {
 																					</div>
 																				</td>
 																				<td className="px-4 py-3">
-																					{authorId !==
-																						user._id && (
-																							<div className="flex space-x-2">
-																								<button
-																									onClick={() =>
-																										handleRemoveAuthor(
-																											authorId
-																										)
-																									}
-																									className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
-																								>
-																									Remove
-																								</button>
-																								<button
-																									onClick={() =>
-																										setCorrespondingAuthorId(
-																											authorId
-																										)
-																									}
-																									className={`px-3 py-1 rounded text-sm transition-colors ${isCorrespondingAuthor
+																					<div className="flex space-x-2 items-center">
+																						<button
+																							onClick={() => handleEditAuthor(authorId)}
+																							className="bg-[#e2e8f0] hover:bg-[#e0e0e0] text-[#00796b] px-3 py-1 rounded text-sm transition-colors"
+																							title="Edit author"
+																						>
+																							✏️
+																						</button>
+																						{selectedAuthors.length > 1 && (
+																							<button
+																								onClick={() => handleRemoveAuthor(authorId)}
+																								className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
+																								title="Delete author"
+																							>
+																								🗑
+																							</button>
+																						)}
+																						{authorId !== user._id && (
+																							<button
+																								onClick={() =>
+																									setCorrespondingAuthorId(authorId)
+																								}
+																								className={`px-3 py-1 rounded text-sm transition-colors ${isCorrespondingAuthor
 																										? "bg-[#BAFFF5] text-[#00796b] cursor-default"
-																										: "bg-[#00796b] hover:bg-[#3a5269] text-white"
-																										}`}
-																									disabled={
-																										isCorrespondingAuthor
-																									}
-																								>
-																									{isCorrespondingAuthor
+																										: "bg-[#00796b] hover:bg-[#3a5269] text-white"}
+																								`}
+																								disabled={isCorrespondingAuthor}
+																							>
+																								{isCorrespondingAuthor
 																										? "Current Corresponding"
 																										: "Make Corresponding"}
-																								</button>
-																							</div>
+																							</button>
 																						)}
+																					</div>
 																				</td>
 																			</tr>
 																		)}
@@ -2452,11 +2576,16 @@ const ManuscriptPage = () => {
 									<div className="bg-white p-4 rounded text-[#212121] w-[500px]">
 										<div className="flex justify-between items-center mb-2">
 											<h3 className="font-bold">
-												Add New Author
+												{editingAuthorId ? "Edit Author" : "Add New Author"}
 											</h3>
 											<button
 												onClick={() =>
-													setIsAuthorModalOpen(false)
+													{
+														setIsAuthorModalOpen(false);
+														setIsEditAuthorModalOpen(false);
+														setEditingAuthorId(null);
+														setIsEmailVerified(false);
+													}
 												}
 												className="text-[#9e9e9e] hover:text-[#212121]"
 											>
