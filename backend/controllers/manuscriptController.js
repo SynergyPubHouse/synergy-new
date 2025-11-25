@@ -494,23 +494,22 @@ drawTableRow("Submission Date", new Date().toLocaleString());
 if (formData.authorsData) {
     try {
         const authors = JSON.parse(formData.authorsData);
+        console.log('[createTablePdf] All authors:', authors);
+        console.log('[createTablePdf] Corresponding Author ID:', formData.correspondingAuthorId);
         
-        // Exclude main author (corresponding author) from Authors list, only show co-authors
-        const coAuthors = authors.filter(author => author._id?.toString() !== formData.correspondingAuthorId?.toString());
-        
-        // Only show Authors table if there are actual co-authors
-        if (coAuthors.length > 0) {
-            const coAuthorNames = coAuthors.map(author => {
-                const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-                const email = author.email ? ` (${author.email})` : '';
-                const orcid = author.orcid ? ` [ORCID: ${author.orcid}]` : '';
-                return `${name}${email}${orcid}`;
-            }).join('\n');
-            drawTableRow("Authors", coAuthorNames);
-        }
+        // Show all authors (main author + co-authors) in Authors list
+        const authorNames = authors.map(author => {
+            const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
+            const email = author.email ? ` (${author.email})` : '';
+            const orcid = author.orcid ? ` [ORCID: ${author.orcid}]` : '';
+            return `${name}${email}${orcid}`;
+        }).join(', '); // Use comma instead of newline to avoid PDF encoding issues
+        drawTableRow("Authors", authorNames);
 
-        // Always show corresponding author (main author)
+        // Show corresponding author only if it's different from main author OR if user explicitly changed it
         const correspondingAuthor = authors.find(a => a._id?.toString() === formData.correspondingAuthorId?.toString());
+        console.log('[createTablePdf] Found corresponding author:', correspondingAuthor);
+        
         if (correspondingAuthor) {
             const corrName = `${correspondingAuthor.firstName || ''} ${correspondingAuthor.lastName || ''}`.trim();
             const corrEmail = correspondingAuthor.email ? ` (${correspondingAuthor.email})` : '';
@@ -518,12 +517,29 @@ if (formData.authorsData) {
         }
     } catch (error) {
         console.error("Error processing author data:", error);
-        // Fallback to just showing the IDs if there's an error
-        if (formData.authors && formData.authors.length > 1) {
-            drawTableRow("Authors", formData.authors || '');
+        // Better fallback: try to extract names from available data
+        if (formData.authors && Array.isArray(formData.authors)) {
+            // If authors array contains IDs, try to find them in the authors array
+            const authorNames = formData.authors.map(authorId => {
+                const author = authors.find(a => a._id?.toString() === authorId.toString());
+                if (author) {
+                    const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
+                    return author.email ? `${name} (${author.email})` : name;
+                }
+                return authorId; // Fallback to ID if not found
+            }).join(', ');
+            drawTableRow("Authors", authorNames);
         }
         if (formData.correspondingAuthorId) {
-            drawTableRow("Corresponding Author ID", formData.correspondingAuthorId);
+            // Try to find corresponding author by ID
+            const corrAuthor = authors.find(a => a._id?.toString() === formData.correspondingAuthorId.toString());
+            if (corrAuthor) {
+                const corrName = `${corrAuthor.firstName || ''} ${corrAuthor.lastName || ''}`.trim();
+                const corrEmail = corrAuthor.email ? ` (${corrAuthor.email})` : '';
+                drawTableRow("Corresponding Author", `${corrName}${corrEmail}`);
+            } else {
+                drawTableRow("Corresponding Author ID", formData.correspondingAuthorId);
+            }
         }
     }
 }

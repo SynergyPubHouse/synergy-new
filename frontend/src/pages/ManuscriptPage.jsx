@@ -863,15 +863,10 @@ const ManuscriptPage = () => {
 			data.append("declaration", files.declaration);
 		}
 
-		// Add authors data - only send if co-authors exist (excluding main author)
-		const coAuthors = authors.filter(author =>
-			selectedAuthors.includes(author._id) && author._id !== correspondingAuthorId
-		);
-		if (coAuthors.length > 0) {
-			data.append("authorsData", JSON.stringify(
-				authors.filter(author => selectedAuthors.includes(author._id))
-			));
-		}
+		// Add authors data
+		// Add authors data with full author details
+		const authorsData = authors.filter(author => selectedAuthors.includes(author._id));
+		data.append("authorsData", JSON.stringify(authorsData));
 		data.append("authors", JSON.stringify(selectedAuthors));
 		data.append("correspondingAuthorId", correspondingAuthorId);
 
@@ -1022,6 +1017,7 @@ const ManuscriptPage = () => {
 
 		// Save manuscript
 		const result = await proceedbeforebuildpdf(e);
+		console.log("result", result)
 		if (!result) {
 			setIsBuildingPdf(false);
 			setBuildError("Failed to save manuscript.");

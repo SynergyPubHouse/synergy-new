@@ -48,6 +48,8 @@ import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationInte
 import PageNotAvailable from "./pages/pagenotavailable";
 // import BookPublication from "./pages/BookPublication";
 import BookPublication from "./pages/BookPublication";
+import WebSeriesCast from "./pages/WebSeriesCast";
+import ConferencePublication from "./pages/ConferencePublication";
 
 // Create Authentication Context
 const AuthContext = createContext(null);
@@ -78,8 +80,8 @@ function AppContent() {
       location.pathname,
       "Hide Navbar:",
       location.pathname === "/" ||
-        location.pathname.startsWith("/jics") ||
-        location.pathname.startsWith("/peer-review")
+      location.pathname.startsWith("/jics") ||
+      location.pathname.startsWith("/peer-review")
     );
   }, [location.pathname]);
 
@@ -171,6 +173,8 @@ function AppContent() {
         <Route path="/orcid-callback" element={<OrcidCallback />} />
 
         <Route path="/books" element={<BookPublication />} />
+        <Route path="/web-series-cast" element={<WebSeriesCast />} />
+        <Route path="/conference-publication" element={<ConferencePublication />} />
 
         {/* Journal Management Routes */}
         {/* <Route path={BASE_URL} element={<HomePage />} /> */}
@@ -204,7 +208,7 @@ function AppContent() {
           path={`${JICS_URL}/editor/dashboard`}
           element={
             user?.accountType === "editor" ||
-            user?.availableRoles?.includes("editor") ? (
+              user?.availableRoles?.includes("editor") ? (
               <EditorDashboard />
             ) : (
               <Navigate to="/login" replace />
@@ -237,7 +241,7 @@ function AppContent() {
           path={`${JICS_URL}/reviewer/dashboard`}
           element={
             user?.accountType === "reviewer" ||
-            user?.availableRoles?.includes("reviewer") ? (
+              user?.availableRoles?.includes("reviewer") ? (
               <ReviewerDashboard />
             ) : (
               <Navigate to="/login" replace />
