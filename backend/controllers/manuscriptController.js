@@ -1737,31 +1737,24 @@ exports.uploadNotesWord = async (req, res) => {
         const prefix = titleWords.slice(0, 3).map(w => w.charAt(0).toUpperCase()).join("");
         fileName = `${prefix || "REV"}-review.docx`;
       }
-      const fileUploadManager = new FileUploadManager();
-      fileUploadManager.useGoogleDrive = process.env.USE_GOOGLE_DRIVE === "true";
-      const driveResult = await fileUploadManager.uploadFile(
-        req.file.path,
-        fileName,
-        "notes"
-      );
- let docxUrl;
-
-if (driveResult?.webViewLink || driveResult?.webContentLink || driveResult?.url) {
-    docxUrl = driveResult.webViewLink || driveResult.webContentLink || driveResult.url;
-} else {
-// Generate ALWAYS unique final filename
-// Generate ALWAYS unique final filename
-const uniqueFileName = `${Date.now()}_${fileName}`;
-
-// Copy to uploads
-const finalPath = path.join(uploadDir, uniqueFileName);
-await fs.copyFile(req.file.path, finalPath);
-
-// Final URL
-docxUrl = `${process.env.BACKEND_URL || "http://localhost:5000"}/uploads/${uniqueFileName}`;
-
-
-}
+      // Upload directly to Cloudinary (like PDF files)
+      const cloudinary = require('cloudinary').v2;
+      const uploadResult = await new Promise((resolve, reject) => {
+          cloudinary.uploader.upload(
+              req.file.path,
+              {
+                  resource_type: 'raw',
+                  public_id: `review-documents/${fileName}`,
+                  format: 'docx',
+                  access_mode: 'public'
+              },
+              (error, result) => {
+                  if (error) reject(error);
+                  else resolve(result);
+              }
+          );
+      });
+      const docxUrl = uploadResult.secure_url;
 
       // Store the link in manuscript
       manuscript.reviewDocxUrl = docxUrl;
