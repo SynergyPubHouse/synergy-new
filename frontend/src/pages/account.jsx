@@ -1,12 +1,72 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../App";
 import { FaUserCircle, FaCamera } from "react-icons/fa";
 import { getUserRole, getUserFullName } from "../utils/roleUtils";
+import axios from "axios";
 
 function MyAccount() {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const userRole = getUserRole(user);
   const userFullName = getUserFullName(user);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    email:
+      user?.email || user?.editor?.email || user?.reviewer?.email || "",
+    username: user?.username || "",
+  });
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!user?.token) {
+      alert("You must be logged in to update your profile.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/profile`,
+        {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          username: formData.username,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+
+      if (response?.data) {
+        login({
+          ...(user || {}),
+          ...response.data,
+        });
+      }
+
+      alert("Profile updated successfully.");
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      const message =
+        error?.response?.data?.message || "Failed to update profile. Please try again.";
+      alert(message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Function to handle profile picture change
   const handleProfilePictureChange = (event) => {
@@ -90,20 +150,92 @@ function MyAccount() {
             {/* Personal Information */}
             <div className="p-6 bg-white rounded-xl shadow-md border border-[#e0e0e0]">
               <h3 className="text-xl font-semibold text-[#00796b] mb-4">Personal Details</h3>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-[#212121]"><strong>Name:</strong> {userFullName || user?.name || "Not provided"}</p>
-                </div>
-                <div>
-                  <p className="text-[#212121]"><strong>Email:</strong> {user?.email || user?.editor?.email || user?.reviewer?.email || "Not provided"}</p>
-                </div>
-                <div>
-                  <p className="text-[#212121]"><strong>Role:</strong> {userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "Not specified"}</p>
-                </div>
-              </div>
-              <button className="mt-6 px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-xl shadow-md transition-all duration-300 transform hover:scale-105">
-                Edit Profile
-              </button>
+              {!isEditing ? (
+                <>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[#212121]"><strong>Name:</strong> {userFullName || `${formData.firstName} ${formData.lastName}`.trim() || user?.name || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#212121]"><strong>Email:</strong> {formData.email || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#212121]"><strong>Username:</strong> {formData.username || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#212121]"><strong>Role:</strong> {userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "Not specified"}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="mt-6 px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white font-semibold rounded-xl shadow-md transition-all duration-300 transform hover:scale-105"
+                  >
+                    Edit Profile
+                  </button>
+                </>
+              ) : (
+                <form onSubmit={handleSaveProfile} className="mt-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[#212121] mb-1">First Name</label>
+                      <input
+                        type="text"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        className="w-full border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#212121] mb-1">Last Name</label>
+                      <input
+                        type="text"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        className="w-full border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#212121] mb-1">Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#212121] mb-1">Username</label>
+                    <input
+                      type="text"
+                      name="username"
+                      value={formData.username}
+                      onChange={handleInputChange}
+                      className="w-full border border-[#e0e0e0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00796b]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] disabled:bg-[#80cbc4] text-white font-semibold rounded-xl shadow-md transition-all duration-300 transform hover:scale-105"
+                    >
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-[#212121] font-semibold rounded-xl shadow-md transition-all duration-300"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
 
             {/* Subscription Information */}
@@ -211,281 +343,3 @@ export default MyAccount;
 
 
 
-// import { motion } from "framer-motion";
-// import { useAuth } from "../App"; // Assuming you have an Auth context
-// import { FaUserCircle, FaCamera, FaEdit, FaCog, FaBell, FaShieldAlt, FaQuestionCircle } from "react-icons/fa";
-
-// function MyAccount() {
-//   const { user } = useAuth(); // Fetch user details from Auth context
-
-//   const handleProfilePictureChange = (event) => {
-//     const file = event.target.files[0];
-//     if (file) {
-//       const reader = new FileReader();
-//       reader.onload = (e) => {
-//         // Update the user's profile picture
-//         alert("Profile picture updated successfully!");
-//         console.log("New profile picture:", e.target.result);
-//       };
-//       reader.readAsDataURL(file);
-//     }
-//   };
-
-//   return (
-//     <div className="bg-gray-50 min-h-screen">
-//       {/* Header */}
-//       <div className="bg-white shadow-sm">
-//         <div className="container mx-auto px-4 py-6">
-//           <motion.div
-//             initial={{ opacity: 0, y: -10 }}
-//             animate={{ opacity: 1, y: 0 }}
-//             className="flex justify-between items-center"
-//           >
-//             <h1 className="text-2xl font-bold text-gray-800">Account Settings</h1>
-//             <div className="flex items-center space-x-4">
-//               <button className="text-gray-600 hover:text-gray-900">
-//                 <FaQuestionCircle className="w-5 h-5" />
-//               </button>
-//             </div>
-//           </motion.div>
-//         </div>
-//       </div>
-
-//       {/* Main Content */}
-//       <div className="container mx-auto px-4 py-8">
-//         <div className="flex flex-col md:flex-row gap-6">
-//           {/* Sidebar */}
-//           <div className="w-full md:w-64 flex-shrink-0">
-//             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-//               <div className="relative mx-auto w-24 h-24 mb-4">
-//                 {user?.photoURL ? (
-//                   <img
-//                     src={user.photoURL}
-//                     alt="Profile"
-//                     className="w-full h-full rounded-full object-cover border-2 border-teal-500"
-//                   />
-//                 ) : (
-//                   <FaUserCircle className="w-full h-full text-gray-400" />
-//                 )}
-//                 <label
-//                   htmlFor="profile-picture"
-//                   className="absolute bottom-0 right-0 bg-teal-500 p-1.5 rounded-full cursor-pointer hover:bg-teal-600 transition-colors"
-//                 >
-//                   <FaCamera className="w-4 h-4 text-white" />
-//                   <input
-//                     type="file"
-//                     id="profile-picture"
-//                     accept="image/*"
-//                     className="hidden"
-//                     onChange={handleProfilePictureChange}
-//                   />
-//                 </label>
-//               </div>
-//               <h2 className="text-center font-semibold text-gray-800">{user?.name || "User"}</h2>
-//               <p className="text-center text-sm text-gray-500">{user?.email || "user@example.com"}</p>
-//             </div>
-
-//             <nav className="bg-white rounded-lg shadow-sm p-2">
-//               <ul className="space-y-1">
-//                 <li>
-//                   <a href="#profile" className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100 font-medium">
-//                     <FaUserCircle className="w-5 h-5 mr-3 text-teal-500" />
-//                     Profile
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#subscription" className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100">
-//                     <FaCog className="w-5 h-5 mr-3 text-teal-500" />
-//                     Subscription
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#notifications" className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100">
-//                     <FaBell className="w-5 h-5 mr-3 text-teal-500" />
-//                     Notifications
-//                   </a>
-//                 </li>
-//                 <li>
-//                   <a href="#privacy" className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100">
-//                     <FaShieldAlt className="w-5 h-5 mr-3 text-teal-500" />
-//                     Privacy
-//                   </a>
-//                 </li>
-//               </ul>
-//             </nav>
-//           </div>
-
-//           {/* Main Panel */}
-//           <div className="flex-1">
-//             {/* Profile Section */}
-//             <motion.section
-//               initial={{ opacity: 0, y: 10 }}
-//               animate={{ opacity: 1, y: 0 }}
-//               transition={{ duration: 0.3 }}
-//               className="bg-white rounded-lg shadow-sm p-6 mb-6"
-//               id="profile"
-//             >
-//               <div className="flex justify-between items-center mb-6">
-//                 <h2 className="text-xl font-semibold text-gray-800">Personal Information</h2>
-//                 <button className="flex items-center text-sm text-teal-600 hover:text-teal-700">
-//                   <FaEdit className="w-4 h-4 mr-1" />
-//                   Edit
-//                 </button>
-//               </div>
-              
-//               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-//                 <div>
-//                   <label className="block text-sm font-medium text-gray-500 mb-1">Full Name</label>
-//                   <p className="text-gray-800">{user?.name || "Not provided"}</p>
-//                 </div>
-//                 <div>
-//                   <label className="block text-sm font-medium text-gray-500 mb-1">Email Address</label>
-//                   <p className="text-gray-800">{user?.email || "Not provided"}</p>
-//                 </div>
-//                 <div>
-//                   <label className="block text-sm font-medium text-gray-500 mb-1">Account Role</label>
-//                   <p className="text-gray-800">{user?.EditorRole === "yes" ? "Editor" : "Author"}</p>
-//                 </div>
-//                 <div>
-//                   <label className="block text-sm font-medium text-gray-500 mb-1">Member Since</label>
-//                   <p className="text-gray-800">January 2023</p>
-//                 </div>
-//               </div>
-//             </motion.section>
-
-//             {/* Subscription Section */}
-//             <motion.section
-//               initial={{ opacity: 0, y: 10 }}
-//               animate={{ opacity: 1, y: 0 }}
-//               transition={{ duration: 0.3, delay: 0.1 }}
-//               className="bg-white rounded-lg shadow-sm p-6 mb-6"
-//               id="subscription"
-//             >
-//               <div className="flex justify-between items-center mb-6">
-//                 <h2 className="text-xl font-semibold text-gray-800">Subscription</h2>
-//                 <button className="text-sm text-teal-600 hover:text-teal-700">Manage</button>
-//               </div>
-              
-//               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-//                 <div>
-//                   <label className="block text-sm font-medium text-gray-500 mb-1">Plan</label>
-//                   <p className="text-gray-800">Premium</p>
-//                 </div>
-//                 <div>
-//                   <label className="block text-sm font-medium text-gray-500 mb-1">Status</label>
-//                   <p className="text-green-600 font-medium">Active</p>
-//                 </div>
-//                 <div>
-//                   <label className="block text-sm font-medium text-gray-500 mb-1">Renewal Date</label>
-//                   <p className="text-gray-800">January 1, 2024</p>
-//                 </div>
-//               </div>
-//             </motion.section>
-
-//             {/* Notifications Section */}
-//             <motion.section
-//               initial={{ opacity: 0, y: 10 }}
-//               animate={{ opacity: 1, y: 0 }}
-//               transition={{ duration: 0.3, delay: 0.2 }}
-//               className="bg-white rounded-lg shadow-sm p-6 mb-6"
-//               id="notifications"
-//             >
-//               <h2 className="text-xl font-semibold text-gray-800 mb-6">Notification Preferences</h2>
-              
-//               <div className="space-y-4">
-//                 <div className="flex items-center justify-between">
-//                   <div>
-//                     <label htmlFor="email-notifications" className="block text-sm font-medium text-gray-700 mb-1">Email Notifications</label>
-//                     <p className="text-xs text-gray-500">Receive important updates via email</p>
-//                   </div>
-//                   <div className="relative inline-block w-10 mr-2 align-middle select-none">
-//                     <input 
-//                       type="checkbox" 
-//                       id="email-notifications" 
-//                       defaultChecked
-//                       className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
-//                     />
-//                     <label 
-//                       htmlFor="email-notifications" 
-//                       className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"
-//                     ></label>
-//                   </div>
-//                 </div>
-                
-//                 <div className="flex items-center justify-between">
-//                   <div>
-//                     <label htmlFor="sms-notifications" className="block text-sm font-medium text-gray-700 mb-1">SMS Notifications</label>
-//                     <p className="text-xs text-gray-500">Get text message alerts</p>
-//                   </div>
-//                   <div className="relative inline-block w-10 mr-2 align-middle select-none">
-//                     <input 
-//                       type="checkbox" 
-//                       id="sms-notifications" 
-//                       className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
-//                     />
-//                     <label 
-//                       htmlFor="sms-notifications" 
-//                       className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"
-//                     ></label>
-//                   </div>
-//                 </div>
-//               </div>
-//             </motion.section>
-
-//             {/* Privacy Section */}
-//             <motion.section
-//               initial={{ opacity: 0, y: 10 }}
-//               animate={{ opacity: 1, y: 0 }}
-//               transition={{ duration: 0.3, delay: 0.3 }}
-//               className="bg-white rounded-lg shadow-sm p-6"
-//               id="privacy"
-//             >
-//               <h2 className="text-xl font-semibold text-gray-800 mb-6">Privacy Settings</h2>
-              
-//               <div className="space-y-4">
-//                 <div className="flex items-center justify-between">
-//                   <div>
-//                     <label htmlFor="public-profile" className="block text-sm font-medium text-gray-700 mb-1">Public Profile</label>
-//                     <p className="text-xs text-gray-500">Make your profile visible to others</p>
-//                   </div>
-//                   <div className="relative inline-block w-10 mr-2 align-middle select-none">
-//                     <input 
-//                       type="checkbox" 
-//                       id="public-profile" 
-//                       className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
-//                     />
-//                     <label 
-//                       htmlFor="public-profile" 
-//                       className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"
-//                     ></label>
-//                   </div>
-//                 </div>
-                
-//                 <div className="flex items-center justify-between">
-//                   <div>
-//                     <label htmlFor="data-sharing" className="block text-sm font-medium text-gray-700 mb-1">Data Sharing</label>
-//                     <p className="text-xs text-gray-500">Allow data to be used for research</p>
-//                   </div>
-//                   <div className="relative inline-block w-10 mr-2 align-middle select-none">
-//                     <input 
-//                       type="checkbox" 
-//                       id="data-sharing" 
-//                       defaultChecked
-//                       className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
-//                     />
-//                     <label 
-//                       htmlFor="data-sharing" 
-//                       className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"
-//                     ></label>
-//                   </div>
-//                 </div>
-//               </div>
-//             </motion.section>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default MyAccount;
