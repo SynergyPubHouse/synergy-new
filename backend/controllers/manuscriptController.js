@@ -494,15 +494,22 @@ drawTableRow("Submission Date", new Date().toLocaleString());
 if (formData.authorsData) {
     try {
         const authors = JSON.parse(formData.authorsData);
-        const authorNames = authors.map(author => {
-            const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-            const email = author.email ? ` (${author.email})` : '';
-            const orcid = author.orcid ? ` [ORCID: ${author.orcid}]` : '';
-            return `${name}${email}${orcid}`;
-        }).join('\n');
-        drawTableRow("Authors", authorNames);
+        
+        // Exclude main author (corresponding author) from Authors list, only show co-authors
+        const coAuthors = authors.filter(author => author._id?.toString() !== formData.correspondingAuthorId?.toString());
+        
+        // Only show Authors table if there are actual co-authors
+        if (coAuthors.length > 0) {
+            const coAuthorNames = coAuthors.map(author => {
+                const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
+                const email = author.email ? ` (${author.email})` : '';
+                const orcid = author.orcid ? ` [ORCID: ${author.orcid}]` : '';
+                return `${name}${email}${orcid}`;
+            }).join('\n');
+            drawTableRow("Authors", coAuthorNames);
+        }
 
-        // Add corresponding author
+        // Always show corresponding author (main author)
         const correspondingAuthor = authors.find(a => a._id?.toString() === formData.correspondingAuthorId?.toString());
         if (correspondingAuthor) {
             const corrName = `${correspondingAuthor.firstName || ''} ${correspondingAuthor.lastName || ''}`.trim();
@@ -512,7 +519,9 @@ if (formData.authorsData) {
     } catch (error) {
         console.error("Error processing author data:", error);
         // Fallback to just showing the IDs if there's an error
-        drawTableRow("Authors", formData.authors || '');
+        if (formData.authors && formData.authors.length > 1) {
+            drawTableRow("Authors", formData.authors || '');
+        }
         if (formData.correspondingAuthorId) {
             drawTableRow("Corresponding Author ID", formData.correspondingAuthorId);
         }
