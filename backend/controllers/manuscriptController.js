@@ -488,9 +488,38 @@ async function createTablePdf(formData, manuscriptId = null) {
         drawTableRow("Grant Recipient", formData.billingInfo.grantRecipient || '');
     }
     
-    drawTableRow("Submission Date", new Date().toLocaleString());
+drawTableRow("Submission Date", new Date().toLocaleString());
 
-    const tableFileName = manuscriptId ? `table_${manuscriptId}.pdf` : `table_${Date.now()}.pdf`;
+// Add author information to the PDF
+if (formData.authorsData) {
+    try {
+        const authors = JSON.parse(formData.authorsData);
+        const authorNames = authors.map(author => {
+            const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
+            const email = author.email ? ` (${author.email})` : '';
+            const orcid = author.orcid ? ` [ORCID: ${author.orcid}]` : '';
+            return `${name}${email}${orcid}`;
+        }).join('\n');
+        drawTableRow("Authors", authorNames);
+
+        // Add corresponding author
+        const correspondingAuthor = authors.find(a => a._id === formData.correspondingAuthorId);
+        if (correspondingAuthor) {
+            const corrName = `${correspondingAuthor.firstName || ''} ${correspondingAuthor.lastName || ''}`.trim();
+            const corrEmail = correspondingAuthor.email ? ` (${correspondingAuthor.email})` : '';
+            drawTableRow("Corresponding Author", `${corrName}${corrEmail}`);
+        }
+    } catch (error) {
+        console.error("Error processing author data:", error);
+        // Fallback to just showing the IDs if there's an error
+        drawTableRow("Authors", formData.authors || '');
+        if (formData.correspondingAuthorId) {
+            drawTableRow("Corresponding Author ID", formData.correspondingAuthorId);
+        }
+    }
+}
+
+const tableFileName = manuscriptId ? `table_${manuscriptId}.pdf` : `table_${Date.now()}.pdf`;
     const tablePdfPath = path.join(os.tmpdir(), tableFileName);
     const pdfBytes = await pdfDoc.save();
     await fs.writeFile(tablePdfPath, pdfBytes);

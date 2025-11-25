@@ -864,6 +864,9 @@ const ManuscriptPage = () => {
 		}
 
 		// Add authors data
+		// Add authors data with full author details
+		const authorsData = authors.filter(author => selectedAuthors.includes(author._id));
+		data.append("authorsData", JSON.stringify(authorsData));
 		data.append("authors", JSON.stringify(selectedAuthors));
 		data.append("correspondingAuthorId", correspondingAuthorId);
 
