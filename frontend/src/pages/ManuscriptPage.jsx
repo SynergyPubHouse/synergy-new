@@ -27,13 +27,7 @@ const ManuscriptPage = () => {
 		author: [],
 		funding: "",
 		billingInfo: {
-			name: "",
-			organization: "",
-			address: "",
-			city: "",
-			state: "",
-			postalCode: "",
-			country: "",
+			findFunder: "",
 			awardNumber: "",
 			grantRecipient: "",
 		},
@@ -456,15 +450,20 @@ const ManuscriptPage = () => {
 	};
 
 	// Handle billing info nested fields
-	const handleBillingInfoChange = (e) => {
+const handleBillingInfoChange = (e) => {
 		const { name, value } = e.target;
-		setFormData((prevData) => ({
-			...prevData,
-			billingInfo: {
-				...prevData.billingInfo,
-				[name]: value,
-			},
-		}));
+		console.log('Billing field change:', { name, value });
+		setFormData((prevData) => {
+			const newData = {
+				...prevData,
+				billingInfo: {
+					...prevData.billingInfo,
+					[name]: value,
+				},
+			};
+			console.log('Updated billingInfo:', newData.billingInfo);
+			return newData;
+		});
 	};
 
 	const validateSection = (section) => {
@@ -2897,100 +2896,22 @@ const ManuscriptPage = () => {
 								</div>
 							</div>
 
-							{formData.funding === "Yes" && (
+						{formData.funding === "Yes" && (
 								<div className="mb-4 mt-4 p-4 border border-[#e0e0e0] rounded-lg bg-gray-50">
 									<h3 className="font-semibold mb-3 text-[#00796b]">
 										Billing Information
 									</h3>
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<div className="grid grid-cols-1 md:grid-cols-1 gap-4">
 										<div>
 											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Name *
+												Find a Funder
 											</label>
 											<input
 												type="text"
-												name="name"
-												value={formData.billingInfo.name}
+												name="findFunder"
+												value={formData.billingInfo.findFunder}
 												onChange={handleBillingInfoChange}
-												placeholder="Full name"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Organization *
-											</label>
-											<input
-												type="text"
-												name="organization"
-												value={formData.billingInfo.organization}
-												onChange={handleBillingInfoChange}
-												placeholder="Organization name"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div className="md:col-span-2">
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Address *
-											</label>
-											<input
-												type="text"
-												name="address"
-												value={formData.billingInfo.address}
-												onChange={handleBillingInfoChange}
-												placeholder="Street address"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												City *
-											</label>
-											<input
-												type="text"
-												name="city"
-												value={formData.billingInfo.city}
-												onChange={handleBillingInfoChange}
-												placeholder="City"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												State/Province
-											</label>
-											<input
-												type="text"
-												name="state"
-												value={formData.billingInfo.state}
-												onChange={handleBillingInfoChange}
-												placeholder="State or Province"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Postal Code *
-											</label>
-											<input
-												type="text"
-												name="postalCode"
-												value={formData.billingInfo.postalCode}
-												onChange={handleBillingInfoChange}
-												placeholder="Postal code"
-												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-medium mb-1 text-[#00796b]">
-												Country *
-											</label>
-											<input
-												type="text"
-												name="country"
-												value={formData.billingInfo.country}
-												onChange={handleBillingInfoChange}
-												placeholder="Country"
+												placeholder="Funding organization or agency"
 												className="w-full border border-[#e0e0e0] rounded-lg p-2 bg-white text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
 											/>
 										</div>
@@ -3023,7 +2944,6 @@ const ManuscriptPage = () => {
 									</div>
 								</div>
 							)}
-
 							<div className="flex justify-between">
 								{renderBackButton(6)}
 
