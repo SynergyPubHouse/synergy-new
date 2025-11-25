@@ -84,6 +84,17 @@ function ReviewerDashboard() {
           userManuscripts[groupKey].manuscripts.push(manuscript);
         });
 
+        // Sort each author's manuscripts so latest submissions appear first
+        Object.values(userManuscripts).forEach((u) => {
+          u.manuscripts.sort((a, b) => {
+            const dateB =
+              new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
+            const dateA =
+              new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
+            return dateB - dateA;
+          });
+        });
+
         const usersList = Object.values(userManuscripts);
         setUsers(usersList);
         if (usersList.length > 0) {
