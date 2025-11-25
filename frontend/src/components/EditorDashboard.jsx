@@ -80,18 +80,40 @@ console.log("EditorDashboard user:", user);
 			);
 			const processedUsers = (response.data || []).map((userRecord) => {
 				const authorName = formatFullName(userRecord);
+				const manuscriptsWithAuthor = (userRecord.manuscripts || []).map(
+					(manuscript) => ({
+						...manuscript,
+						authorName: manuscript.authorName || authorName,
+					})
+				);
+
+				// Sort manuscripts for this author: newest submissions first
+				manuscriptsWithAuthor.sort((a, b) => {
+					const dateB =
+						new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
+					const dateA =
+						new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
+					return dateB - dateA;
+				});
+
 				return {
 					...userRecord,
 					authorName,
-					manuscripts: (userRecord.manuscripts || []).map((manuscript) => ({
-						...manuscript,
-						authorName: manuscript.authorName || authorName,
-					})),
+					manuscripts: manuscriptsWithAuthor,
 				};
 			});
 
 			setUsers(processedUsers);
-			const allManuscripts = processedUsers.flatMap((user) => user.manuscripts || []);
+			// When showing all manuscripts, also sort newest-first globally
+			const allManuscripts = processedUsers
+				.flatMap((user) => user.manuscripts || [])
+				.sort((a, b) => {
+					const dateB =
+						new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
+					const dateA =
+						new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
+					return dateB - dateA;
+				});
 			setManuscripts(allManuscripts);
 		} catch (error) {
 			console.error("Error fetching users:", error);
@@ -584,72 +606,72 @@ console.log("EditorDashboard user:", user);
 const handleSendInvitations = async () => {
   setIsSendingInvitations(true); // Start loading
   try {
-    // Filter out empty emails and trim whitespace
-    const emailArray = inviteEmails
-      .map((email) => email.trim())
-      .filter((email) => email.length > 0);
+	// Filter out empty emails and trim whitespace
+	const emailArray = inviteEmails
+	  .map((email) => email.trim())
+	  .filter((email) => email.length > 0);
 
-    // Minimum 3, maximum 6 emails check
-    if (emailArray.length < 3 || emailArray.length > 6) {
-      addToast("Please enter between 3 and 6 email addresses", "error");
-      setIsSendingInvitations(false);
-      return;
-    }
+	// Minimum 3, maximum 6 emails check
+	if (emailArray.length < 3 || emailArray.length > 6) {
+	  addToast("Please enter between 3 and 6 email addresses", "error");
+	  setIsSendingInvitations(false);
+	  return;
+	}
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const invalidEmails = emailArray.filter(
-      (email) => !emailRegex.test(email)
-    );
+	// Validate email format
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	const invalidEmails = emailArray.filter(
+	  (email) => !emailRegex.test(email)
+	);
 
-    if (invalidEmails.length > 0) {
-      addToast(
-        `Invalid email addresses: ${invalidEmails.join(", ")}`,
-        "error"
-      );
-      setIsSendingInvitations(false);
-      return;
-    }
+	if (invalidEmails.length > 0) {
+	  addToast(
+		`Invalid email addresses: ${invalidEmails.join(", ")}`,
+		"error"
+	  );
+	  setIsSendingInvitations(false);
+	  return;
+	}
 
-    const requestData = {
-      emails: emailArray,
-    };
+	const requestData = {
+	  emails: emailArray,
+	};
 
-    // Add editor note if provided
-    if (editorNote.trim()) {
-      requestData.editorNote = editorNote.trim();
-      requestData.id = user._id;
-      requestData.fullName = formatFullName(
-        `${user.firstName} ${user.lastName}`
-      );
-      requestData.edittorEmail = user.email;
-    }
+	// Add editor note if provided
+	if (editorNote.trim()) {
+	  requestData.editorNote = editorNote.trim();
+	  requestData.id = user._id;
+	  requestData.fullName = formatFullName(
+		`${user.firstName} ${user.lastName}`
+	  );
+	  requestData.edittorEmail = user.email;
+	}
 
-    await axios.post(
-      `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${
-        inviteManuscript._id
-      }/invite-reviewers`,
-      requestData,
-      {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
-      }
-    );
+	await axios.post(
+	  `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${
+		inviteManuscript._id
+	  }/invite-reviewers`,
+	  requestData,
+	  {
+		headers: {
+		  Authorization: `Bearer ${user.token}`,
+		},
+	  }
+	);
 
-    addToast(
-      `Invitations sent successfully to ${emailArray.length} reviewers!`,
-      "success"
-    );
-    setShowInviteDialog(false);
-    setInviteEmails([""]);
-    setEditorNote("");
-    setInviteManuscript(null);
+	addToast(
+	  `Invitations sent successfully to ${emailArray.length} reviewers!`,
+	  "success"
+	);
+	setShowInviteDialog(false);
+	setInviteEmails([""]);
+	setEditorNote("");
+	setInviteManuscript(null);
   } catch (error) {
-    console.error("Error sending invitations:", error);
-    addToast("Failed to send invitations", "error");
+	console.error("Error sending invitations:", error);
+	addToast("Failed to send invitations", "error");
   } finally {
-    setIsSendingInvitations(false); // Stop loading
+	setIsSendingInvitations(false); // Stop loading
   }
 };
 
@@ -1499,36 +1521,36 @@ const handleSendInvitations = async () => {
 										<div className="flex flex-col space-y-2">
 											{/* View PDF Button - Always Available */}
 											  {manuscript.mergedFileUrl && (
-    <button
-      onClick={() => window.open(manuscript.mergedFileUrl, "_blank")}
-      className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-    >
-      📄 View Original PDF
-    </button>
+	<button
+	  onClick={() => window.open(manuscript.mergedFileUrl, "_blank")}
+	  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+	>
+	  📄 View Original PDF
+	</button>
   )}
 
   {/* Highlighted Revision (Word Doc) */}
   {manuscript.highlightedRevisionFileUrl && (
-    <button
-      onClick={() => {
-        const url = manuscript.highlightedRevisionFileUrl;
-        const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-        window.open(viewerUrl, "_blank");
-      }}
-      className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-    >
-      ✏️ View Highlighted Revision
-    </button>
+	<button
+	  onClick={() => {
+		const url = manuscript.highlightedRevisionFileUrl;
+		const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+		window.open(viewerUrl, "_blank");
+	  }}
+	  className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+	>
+	  ✏️ View Highlighted Revision
+	</button>
   )}
 
   {/* Combined Revision PDF */}
   {manuscript.revisionCombinedPdfUrl && (
-    <button
-      onClick={() => window.open(manuscript.revisionCombinedPdfUrl, "_blank")}
-      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-    >
-      📑 View Combined Revision PDF
-    </button>
+	<button
+	  onClick={() => window.open(manuscript.revisionCombinedPdfUrl, "_blank")}
+	  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+	>
+	  📑 View Combined Revision PDF
+	</button>
   )}
 
 											{/* Invite Reviewers Button */}

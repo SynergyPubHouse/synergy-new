@@ -407,27 +407,36 @@ const MySubmissions = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {manuscripts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((manuscript, index) => {
-                    const attemptsUsed = manuscript.revisionAttempts || 0;
-                    const maxAttempts = manuscript.maxRevisionAttempts || 3;
-                    const attemptsExhausted =
-                      manuscript.revisionLocked ||
-                      attemptsUsed >= maxAttempts ||
-                      manuscript.status === "Rejected";
-                    const hasResponseDoc =
-                      Boolean(manuscript.authorResponse?.pdfUrl) ||
-                      Boolean(manuscript.authorResponse?.docxUrl);
-                    const hasBuiltRevision = Boolean(manuscript.revisedPdfBuiltAt);
-                    const canSendToEditor =
-                      manuscript.status === "Revision Required" &&
-                      hasBuiltRevision &&
-                      pdfViewedIds.has(manuscript._id) &&
-                      !attemptsExhausted;
+                  {[...manuscripts]
+                    .sort((a, b) => {
+                      const dateB =
+                        new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
+                      const dateA =
+                        new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
+                      return dateB - dateA;
+                    })
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((manuscript, index) => {
+                      const attemptsUsed = manuscript.revisionAttempts || 0;
+                      const maxAttempts = manuscript.maxRevisionAttempts || 3;
+                      const attemptsExhausted =
+                        manuscript.revisionLocked ||
+                        attemptsUsed >= maxAttempts ||
+                        manuscript.status === "Rejected";
+                      const hasResponseDoc =
+                        Boolean(manuscript.authorResponse?.pdfUrl) ||
+                        Boolean(manuscript.authorResponse?.docxUrl);
+                      const hasBuiltRevision = Boolean(manuscript.revisedPdfBuiltAt);
+                      const canSendToEditor =
+                        manuscript.status === "Revision Required" &&
+                        hasBuiltRevision &&
+                        pdfViewedIds.has(manuscript._id) &&
+                        !attemptsExhausted;
 
-                    return (
-                      <tr key={manuscript._id} className="hover:bg-gray-50">
-                        {/* ID Column */}
-                        <td className="px-4 py-3 text-center">
+                      return (
+                        <tr key={manuscript._id} className="hover:bg-gray-50">
+                          {/* ID Column */}
+                          <td className="px-4 py-3 text-center">
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
                             {manuscript.customId || manuscript._id.slice(-6).toUpperCase()}
                           </span>
@@ -628,7 +637,7 @@ const MySubmissions = () => {
 
                         {/* Response Column */}
                         <td className="px-4 py-3">
-                          {manuscript.status === "Revision Required" && (
+                          {!["Accepted", "Rejected", "Withdrawn", "Under Review"].includes(manuscript.status) && !attemptsExhausted && (
                             <div className="space-y-2 min-w-[140px]">
                               <div className="text-xs font-medium text-gray-700 border-b border-gray-200 pb-1">Response Upload</div>
                               <input
