@@ -426,9 +426,11 @@ const MySubmissions = () => {
                       const hasResponseDoc =
                         Boolean(manuscript.authorResponse?.pdfUrl) ||
                         Boolean(manuscript.authorResponse?.docxUrl);
-                      const hasBuiltRevision = Boolean(manuscript.revisedPdfBuiltAt);
-                      const canSendToEditor =
-                        manuscript.status === "Revision Required" &&
+                      const hasBuiltRevision = Boolean(
+                        manuscript.revisedPdfBuiltAt || manuscript.revisionCombinedPdfUrl
+                      );
+                      const canSendToEditor = 
+                        ["Revision Required", "Resubmit", "Minor Revision Required", "Major Revision Required", "Revision Requested", "Reviewed"].includes(manuscript.status) &&
                         hasBuiltRevision &&
                         pdfViewedIds.has(manuscript._id) &&
                         !attemptsExhausted;
