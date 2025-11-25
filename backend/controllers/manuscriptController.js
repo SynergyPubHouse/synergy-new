@@ -503,7 +503,7 @@ if (formData.authorsData) {
         drawTableRow("Authors", authorNames);
 
         // Add corresponding author
-        const correspondingAuthor = authors.find(a => a._id === formData.correspondingAuthorId);
+        const correspondingAuthor = authors.find(a => a._id?.toString() === formData.correspondingAuthorId?.toString());
         if (correspondingAuthor) {
             const corrName = `${correspondingAuthor.firstName || ''} ${correspondingAuthor.lastName || ''}`.trim();
             const corrEmail = correspondingAuthor.email ? ` (${correspondingAuthor.email})` : '';
