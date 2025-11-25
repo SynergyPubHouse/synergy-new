@@ -62,31 +62,29 @@ const Navigation = () => {
     setClickedAuthorLogin(false); // Reset on menu toggle
   };
 
-const handleAuthorLoginClick = (e) => {
-  if (user) {
-    e.preventDefault();
-    setClickedAuthorLogin(true);
-    setTimeout(() => setClickedAuthorLogin(false), 3000);
-  } else {
-    navigate("/login", {
-      state: { from: location.pathname },
-    });
-  }
-};
+  const handleAuthorLoginClick = (e) => {
+    if (user) {
+      e.preventDefault();
+      setClickedAuthorLogin(true);
+      setTimeout(() => setClickedAuthorLogin(false), 3000);
+    } else {
+      navigate("/login", {
+        state: { from: location.pathname },
+      });
+    }
+  };
 
   return (
     <nav
       ref={navRef}
-      className={`bg-[#f9f9f9] shadow-sm z-40 transition-all duration-300 ${
-        isSticky
-          ? "fixed left-0 right-0 top-[75px] border-b border-[#e0e0e0]"
-          : "relative"
-      } ${isSmall ? "h-12" : "h-16"}`}
+      className={`bg-[#f9f9f9] shadow-sm z-40 transition-all duration-300 ${isSticky
+        ? "fixed left-0 right-0 top-[75px] border-b border-[#e0e0e0]"
+        : "relative"
+        } ${isSmall ? "h-12" : "h-16"}`}
     >
       <div className="max-w-7xl mx-auto px-4">
-        <div className={`flex justify-between items-center h-full transition-all duration-300 ${
-          isSmall ? "py-1" : "py-2"
-        }`}>
+        <div className={`flex justify-between items-center h-full transition-all duration-300 ${isSmall ? "py-1" : "py-2"
+          }`}>
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
             <button
@@ -119,9 +117,8 @@ const handleAuthorLoginClick = (e) => {
           <div className="hidden md:flex items-center justify-center w-full space-x-8">
             <Link
               to="/"
-              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
-                isSmall ? "text-sm" : "text-base"
-              }`}
+              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${isSmall ? "text-sm" : "text-base"
+                }`}
             >
               About Us
             </Link>
@@ -131,14 +128,12 @@ const handleAuthorLoginClick = (e) => {
               onMouseEnter={() => handleMouseEnter("peerReview")}
               onMouseLeave={handleMouseLeave}
             >
-              <button className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
-                isSmall ? "text-sm" : "text-base"
-              }`}>
+              <button className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${isSmall ? "text-sm" : "text-base"
+                }`}>
                 Peer Review Process
                 <svg
-                  className={`ml-2 transform transition-transform duration-200 ${
-                    isSmall ? "h-4 w-4" : "h-5 w-5"
-                  } ${activeDropdown === "peerReview" ? "rotate-180" : ""}`}
+                  className={`ml-2 transform transition-transform duration-200 ${isSmall ? "h-4 w-4" : "h-5 w-5"
+                    } ${activeDropdown === "peerReview" ? "rotate-180" : ""}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -147,9 +142,8 @@ const handleAuthorLoginClick = (e) => {
                 </svg>
               </button>
               {activeDropdown === "peerReview" && (
-                <div className={`absolute left-0 w-72 rounded-md shadow-lg bg-white ring-1 ring-[#e0e0e0] transform transition-all duration-200 ease-out ${
-                  isSticky ? "mt-1" : "mt-2"
-                }`}>
+                <div className={`absolute left-0 w-72 rounded-md shadow-lg bg-white ring-1 ring-[#e0e0e0] transform transition-all duration-200 ease-out ${isSticky ? "mt-1" : "mt-2"
+                  }`}>
                   <div className="py-1">
                     {peerReviewItems.map((item, index) => (
                       <Link
@@ -170,14 +164,12 @@ const handleAuthorLoginClick = (e) => {
               onMouseEnter={() => handleMouseEnter("journals")}
               onMouseLeave={handleMouseLeave}
             >
-              <button className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
-                isSmall ? "text-sm" : "text-base"
-              }`}>
+              <button className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${isSmall ? "text-sm" : "text-base"
+                }`}>
                 JOURNALS
                 <svg
-                  className={`ml-2 transform transition-transform duration-200 ${
-                    isSmall ? "h-4 w-4" : "h-5 w-5"
-                  } ${activeDropdown === "journals" ? "rotate-180" : ""}`}
+                  className={`ml-2 transform transition-transform duration-200 ${isSmall ? "h-4 w-4" : "h-5 w-5"
+                    } ${activeDropdown === "journals" ? "rotate-180" : ""}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -186,9 +178,8 @@ const handleAuthorLoginClick = (e) => {
                 </svg>
               </button>
               {activeDropdown === "journals" && (
-                <div className={`absolute left-0 w-72 rounded-md shadow-lg bg-white ring-1 ring-[#e0e0e0] transform transition-all duration-200 ease-out ${
-                  isSticky ? "mt-1" : "mt-2"
-                }`}>
+                <div className={`absolute left-0 w-72 rounded-md shadow-lg bg-white ring-1 ring-[#e0e0e0] transform transition-all duration-200 ease-out ${isSticky ? "mt-1" : "mt-2"
+                  }`}>
                   <div className="py-1">
                     {journalsItems.map((item, index) => (
                       <Link
@@ -206,22 +197,35 @@ const handleAuthorLoginClick = (e) => {
 
             <Link
               to="/books"
-              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${
-                isSmall ? "text-sm" : "text-base"
-              }`}
+              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${isSmall ? "text-sm" : "text-base"
+                }`}
             >
-             Book Publication
+              Book Publication
+            </Link>
+
+            <Link
+              to="/web-series-cast"
+              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${isSmall ? "text-sm" : "text-base"
+                }`}
+            >
+              Web Series Cast
+            </Link>
+
+            <Link
+              to="/conference-publication"
+              className={`inline-flex items-center px-3 py-2 text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200 ${isSmall ? "text-sm" : "text-base"
+                }`}
+            >
+              Conference Publication
             </Link>
 
             <span
               onClick={handleAuthorLoginClick}
-              className={`inline-flex items-center px-3 py-2 cursor-pointer ${
-                isSmall ? "text-sm" : "text-base"
-              } ${
-                user && clickedAuthorLogin
+              className={`inline-flex items-center px-3 py-2 cursor-pointer ${isSmall ? "text-sm" : "text-base"
+                } ${user && clickedAuthorLogin
                   ? "text-[#00796b] font-medium"
                   : "text-[#212121] hover:text-[#00796b] font-medium transition-colors duration-200"
-              }`}
+                }`}
             >
               {user && clickedAuthorLogin ? "User already logged in" : "AUTHOR LOGIN"}
             </span>
@@ -231,11 +235,9 @@ const handleAuthorLoginClick = (e) => {
 
       {/* Mobile menu */}
       <div
-        className={`${
-          isMobileMenuOpen ? "block" : "hidden"
-        } md:hidden bg-white shadow-lg absolute w-full ${
-          isSticky ? "top-[100%]" : "top-[calc(100%-1px)]"
-        } border-t border-[#e0e0e0]`}
+        className={`${isMobileMenuOpen ? "block" : "hidden"
+          } md:hidden bg-white shadow-lg absolute w-full ${isSticky ? "top-[100%]" : "top-[calc(100%-1px)]"
+          } border-t border-[#e0e0e0]`}
       >
         <div className="px-2 pt-2 pb-3 space-y-1">
           <Link
@@ -252,9 +254,8 @@ const handleAuthorLoginClick = (e) => {
             >
               Peer Review Process
               <svg
-                className={`ml-2 h-5 w-5 inline transform transition-transform duration-200 ${
-                  activeDropdown === "peerReview" ? "rotate-180" : ""
-                }`}
+                className={`ml-2 h-5 w-5 inline transform transition-transform duration-200 ${activeDropdown === "peerReview" ? "rotate-180" : ""
+                  }`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -285,9 +286,8 @@ const handleAuthorLoginClick = (e) => {
             >
               JOURNALS
               <svg
-                className={`ml-2 h-5 w-5 inline transform transition-transform duration-200 ${
-                  activeDropdown === "journals" ? "rotate-180" : ""
-                }`}
+                className={`ml-2 h-5 w-5 inline transform transition-transform duration-200 ${activeDropdown === "journals" ? "rotate-180" : ""
+                  }`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -315,16 +315,15 @@ const handleAuthorLoginClick = (e) => {
             to="/books"
             className="block px-3 py-2 rounded-md text-base font-medium text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
           >
-         Book Publication
+            Book Publication
           </Link>
 
           <span
             onClick={handleAuthorLoginClick}
-            className={`block px-3 py-2 rounded-md text-base font-medium cursor-pointer ${
-              user && clickedAuthorLogin
-                ? "text-[#00796b]"
-                : "text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
-            }`}
+            className={`block px-3 py-2 rounded-md text-base font-medium cursor-pointer ${user && clickedAuthorLogin
+              ? "text-[#00796b]"
+              : "text-[#212121] hover:text-[#00796b] hover:bg-[#f9f9f9]"
+              }`}
           >
             {user && clickedAuthorLogin ? "User already logged in" : "AUTHOR LOGIN"}
           </span>

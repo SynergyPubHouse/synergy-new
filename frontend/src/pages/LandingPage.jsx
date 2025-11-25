@@ -37,19 +37,19 @@ const LandingPage = () => (
       <div className="flex-1 flex flex-col gap-8">
         {/* First Section */}
         <section className="bg-white rounded-xl shadow-md p-8">
-          <h2 className="text-xl font-bold text-[#00796b] mb-4">Conference Publication</h2>
+          <h2 className="text-xl font-bold text-[#00796b] mb-4">Web Series</h2>
           <p className="text-[#212121]">
-           comming soon...
+            comming soon...
           </p>
         </section>
 
         {/* Second Section */}
-        <section className="bg-white rounded-xl shadow-md p-8">
+        {/* <section className="bg-white rounded-xl shadow-md p-8">
           <h2 className="text-xl font-bold text-[#00796b] mb-4">Web Series Cast</h2>
           <p className="text-[#212121]">
           comming soon...
           </p>
-        </section>
+        </section> */}
       </div>
     </section>
   </div>

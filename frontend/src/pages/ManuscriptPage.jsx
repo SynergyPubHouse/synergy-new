@@ -1017,6 +1017,7 @@ const ManuscriptPage = () => {
 
 		// Save manuscript
 		const result = await proceedbeforebuildpdf(e);
+		console.log("result", result)
 		if (!result) {
 			setIsBuildingPdf(false);
 			setBuildError("Failed to save manuscript.");
