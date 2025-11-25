@@ -943,7 +943,13 @@ const ManuscriptPage = () => {
 
 	const handleAcceptPdf = async () => {
 		try {
-			await axios.put(
+			console.log('Starting manuscript acceptance process...');
+			console.log('Manuscript ID:', manuscriptId);
+			console.log('User token available:', !!user.token);
+
+			// First update the manuscript status
+			console.log('Updating manuscript status...');
+			const response = await axios.put(
 				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
 				{ status: "Under Review" },  // 👈 Saved → Pending
 				{
@@ -952,6 +958,154 @@ const ManuscriptPage = () => {
 					},
 				}
 			);
+			console.log('Status update successful:', response.data);
+
+			// Get manuscript details to fetch author information
+			console.log('Fetching manuscript details...');
+			const manuscriptResponse = await axios.get(
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}`,
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+			console.log('Manuscript fetch successful');
+
+			const manuscript = manuscriptResponse.data.data; // Extract actual manuscript data
+
+			// Debug: Check authors data
+			console.log('Manuscript data:', manuscript);
+			console.log('Authors:', manuscript.authors);
+			console.log('Authors length:', manuscript.authors?.length);
+			console.log('Full manuscript object keys:', Object.keys(manuscript));
+			console.log('Manuscript title:', manuscript.title);
+			console.log('Manuscript customId:', manuscript.customId);
+			console.log('Manuscript _id:', manuscript._id);
+
+			// Fallback: Try to get authors from different possible fields
+			let authors = manuscript.authors || [];
+
+			// Check if authors is in different field or format
+			if (!authors || authors.length === 0) {
+				// Try alternative field names
+				authors = manuscript.author || manuscript.authorList || manuscript.contributors || [];
+				console.log('Trying alternative authors field:', authors);
+			}
+
+			// If still no authors, try to get from user data
+			if (!authors || authors.length === 0) {
+				// Fallback to current user if they are the author
+				if (user && user.email) {
+					authors = [{
+						email: user.email,
+						firstName: user.firstName || user.name || 'Author',
+						lastName: user.lastName || '',
+						_id: user._id
+					}];
+					console.log('Using current user as author:', authors);
+				}
+			}
+
+			console.log("manuscript dataaaaaaaaa", manuscript)
+			// Get manuscript details with fallbacks
+			const manuscriptTitle = manuscript.title || manuscript.manuscriptTitle || 'Untitled Manuscript';
+
+			// Debug all possible ID fields
+			console.log('Available ID fields:', {
+				customId: manuscript.customId,
+				_id: manuscript._id,
+				id: manuscript.id,
+				title: manuscript.title
+			});
+
+			// Try multiple ID field names
+			const manuscriptIdForEmail = manuscript.customId ||
+				manuscript._id ||
+				manuscript.id ||
+				`MS-${Date.now()}`; // Fallback to generated ID
+
+			console.log('Final manuscript title:', manuscriptTitle);
+			console.log('Final manuscript ID:', manuscriptIdForEmail);
+
+			// Send email to all authors
+			if (authors && authors.length > 0) {
+				console.log('Final authors list:', authors);
+				const emailPromises = authors.map(async (author) => {
+					try {
+						await axios.post(
+							`${import.meta.env.VITE_BACKEND_URL}/api/send-email`,
+							{
+								to: author.email,
+								subject: `Manuscript Successfully Submitted: ${manuscriptIdForEmail}`,
+								html: `
+									<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+										<div style="margin-bottom: 30px;">
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												Dear Authors,
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												Your manuscript entitled "<strong>${manuscriptTitle}</strong>" has been successfully submitted online and is presently being given full consideration for publication in IEEE Access.
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												If you are receiving this email, that means you are listed as an author. If you do not approve of being listed as a co-author on this article, please reach out to ieeeaccesseic@ieee.org as soon as possible.  
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												As a reminder, IEEE Access is a fully open access journal. Open Access provides unrestricted access to published articles via IEEE Xplore. In lieu of paid subscriptions, authors are required to pay an article processing charge of $2,075 (plus applicable local taxes) after the article has been accepted for publication.
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												Your manuscript ID is <strong>${manuscriptIdForEmail}</strong>. Please mention the manuscript ID in all future correspondence to the IEEE Access Editorial Office. The submitting author can view the manuscript status at any time by checking their author dashboard on the IEEE Author Portal. If the submitting author needs to update their email address after submission, please reach out to ieeeaccesseic@ieee.org so we can assist you in doing so.
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												<strong>Please note that any change to the author list after the article has been submitted is considered rare and exceptional, and the decision to allow such changes rests with the Editor. Once the list and order of authors has been established, the list and order of authors should not be altered without permission of all living authors of that article and will still be subject to editorial review.</strong>
+											</p>
+											
+											<p style="font-size: 16px; margin-bottom: 20px;">
+												Thank you again for submitting your manuscript to IEEE Access.
+											</p>
+											
+											<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+												<p style="font-size: 16px; margin: 0; font-style: italic;">Sincerely,</p>
+												<p style="font-size: 16px; margin: 5px 0 0 0; font-weight: bold;">IEEE Access Editorial Office</p>
+											</div>
+										</div>
+										
+										<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; text-align: center;">
+											<p style="margin: 0;">This email was sent by the IEEE Access Editorial Office</p>
+											<p style="margin: 5px 0 0 0;">© 2024 IEEE Access. All rights reserved.</p>
+										</div>
+									</div>
+								`,
+							},
+							{
+								headers: {
+									Authorization: `Bearer ${user.token}`,
+								},
+							}
+						);
+						console.log(`Email sent to ${author.email}`);
+					} catch (emailError) {
+						console.error(`Failed to send email to ${author.email}:`, emailError);
+					}
+				});
+
+				await Promise.all(emailPromises);
+				toast.success(`Email notifications sent to ${authors.length} author(s)`, {
+					position: "top-center",
+					autoClose: 3000,
+				});
+			} else {
+				console.log('No authors found to send emails');
+				toast.warning('No authors found to send email notifications', {
+					position: "top-center",
+					autoClose: 3000,
+				});
+			}
 
 			setAcceptOrRejectPdf(false);
 
@@ -960,7 +1114,28 @@ const ManuscriptPage = () => {
 
 		} catch (error) {
 			console.error("Error accepting manuscript:", error);
-			toast.error("Failed to accept manuscript. Please try again.", {
+			console.error("Error details:", {
+				message: error.message,
+				status: error.response?.status,
+				statusText: error.response?.statusText,
+				data: error.response?.data,
+				url: error.config?.url
+			});
+
+			// Show specific error message based on error type
+			let errorMessage = "Failed to accept manuscript. Please try again.";
+
+			if (error.response?.status === 401) {
+				errorMessage = "Session expired. Please login again.";
+			} else if (error.response?.status === 404) {
+				errorMessage = "Manuscript not found.";
+			} else if (error.response?.status === 403) {
+				errorMessage = "You don't have permission to accept this manuscript.";
+			} else if (error.message?.includes('Network Error')) {
+				errorMessage = "Network error. Please check your connection.";
+			}
+
+			toast.error(errorMessage, {
 				position: "top-center",
 				autoClose: 3000,
 			});
