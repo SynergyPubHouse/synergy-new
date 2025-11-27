@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../App";
@@ -20,7 +20,10 @@ function ReviewerDashboard() {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [manuscripts, setManuscripts] = useState([]);
+  const [forceRender, setForceRender] = useState(false);
   const navigate = useNavigate();
+  console.log("users", users);
+  console.log("ReviewerDashboard user:", user);
   // Store review inputs per-manuscript so text doesn't mirror across rows
   const [reviewTexts, setReviewTexts] = useState({}); // { [manuscriptId]: string }
   const [recommendations, setRecommendations] = useState({}); // { [manuscriptId]: string }
@@ -28,115 +31,141 @@ function ReviewerDashboard() {
   const [showRejectForm, setShowRejectForm] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
-  useEffect(() => {
-    const fetchManuscripts = async () => {
-      try {
-        if (!user || !user.token) {
-          console.error("No token found");
-          navigate("/login");
+  const fetchManuscripts = useCallback(async () => {
+    try {
+      if (!user || !user.token) {
+        console.error("No token found");
+        navigate("/login");
+        return;
+      }
+
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/assigned-manuscripts`,
+        {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }
+      );
+
+      const userManuscripts = {};
+      response.data.forEach((manuscript) => {
+        const seen = new Set();
+        const authorsArray = Array.isArray(manuscript.allAuthors)
+          ? manuscript.allAuthors
+          : Array.isArray(manuscript.authors)
+            ? manuscript.authors
+            : [];
+        const candidateAuthors = [];
+
+        authorsArray.forEach((a) => {
+          if (a && a._id && !seen.has(String(a._id))) {
+            seen.add(String(a._id));
+            candidateAuthors.push(a);
+          }
+        });
+
+        if (manuscript.author && manuscript.author._id && !seen.has(String(manuscript.author._id))) {
+          seen.add(String(manuscript.author._id));
+          candidateAuthors.push(manuscript.author);
+        }
+
+        if (candidateAuthors.length === 0) {
+          const fallbackId = manuscript._id;
+          const groupKey = fallbackId;
+          if (!userManuscripts[groupKey]) {
+            userManuscripts[groupKey] = {
+              _id: fallbackId,
+              firstName: "",
+              lastName: "",
+              fullName: "Unknown Author",
+              manuscripts: [],
+            };
+          }
+          userManuscripts[groupKey].manuscripts.push(manuscript);
           return;
         }
 
-        const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL
-          }/api/auth/reviewer/assigned-manuscripts`,
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-
-        const userManuscripts = {};
-        response.data.forEach((manuscript) => {
-          let authorFullName = "Unknown Author";
-          let firstName = "";
-          let lastName = "";
-          let authorId = "";
-
-          if (manuscript.author && typeof manuscript.author === "object") {
-            firstName = manuscript.author.firstName || "";
-            lastName = manuscript.author.lastName || "";
-            authorFullName = `${firstName} ${lastName}`.trim();
-            authorId = manuscript.author._id || "";
-          } else {
-            authorId = manuscript._id;
-          }
-
-          if (!authorFullName || authorFullName.trim() === "") {
-            authorFullName = "Unknown Author";
-          }
-          if (!authorId) {
-            authorId = manuscript._id;
-          }
-
+        candidateAuthors.forEach((au) => {
+          const firstName = au.firstName || "";
+          const lastName = au.lastName || "";
+          const fullName = `${firstName} ${lastName}`.trim() || "Unknown Author";
+          const authorId = au._id || manuscript._id;
           const groupKey = authorId;
           if (!userManuscripts[groupKey]) {
             userManuscripts[groupKey] = {
               _id: authorId,
               firstName,
               lastName,
-              fullName: authorFullName,
+              fullName,
               manuscripts: [],
             };
           }
           userManuscripts[groupKey].manuscripts.push(manuscript);
         });
+      });
 
-        // Sort each author's manuscripts so latest submissions appear first
-        Object.values(userManuscripts).forEach((u) => {
-          u.manuscripts.sort((a, b) => {
-            const dateB =
-              new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
-            const dateA =
-              new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
-            return dateB - dateA;
-          });
+      Object.values(userManuscripts).forEach((u) => {
+        u.manuscripts.sort((a, b) => {
+          const dateB = new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
+          const dateA = new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
+          return dateB - dateA;
         });
+      });
 
-        const usersList = Object.values(userManuscripts);
-        setUsers(usersList);
-        if (usersList.length > 0) {
-          setSelectedUser(usersList[0]);
-          setManuscripts(usersList[0].manuscripts);
-        }
-      } catch (error) {
-        console.error("Error fetching manuscripts:", error);
-        if (error.response?.status === 401) {
-          navigate("/login");
-        }
+      const usersList = Object.values(userManuscripts);
+      setUsers(usersList);
+      if (usersList.length > 0) {
+        setSelectedUser(usersList[0]);
+        setManuscripts(usersList[0].manuscripts);
+      } else {
+        setSelectedUser(null);
+        setManuscripts([]);
       }
-    };
-
-    const fetchInvitations = async () => {
-      try {
-        if (!user || !user.token) {
-          return;
-        }
-        const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL
-          }/api/auth/reviewer/pending-invitations`,
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-        setPendingInvitations(response.data);
-      } catch (error) {
-        console.error("Error fetching invitations:", error);
+      return usersList;
+    } catch (error) {
+      console.error("Error fetching manuscripts:", error);
+      if (error.response?.status === 401) {
+        navigate("/login");
       }
-    };
+    }
+  }, [user, navigate]);
 
+  const fetchInvitations = useCallback(async () => {
+    try {
+      if (!user || !user.token) {
+        return;
+      }
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/pending-invitations`,
+        {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }
+      );
+      setPendingInvitations(response.data);
+    } catch (error) {
+      console.error("Error fetching invitations:", error);
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (user && user.token) {
       fetchManuscripts();
       fetchInvitations();
     }
-  }, [user, navigate]);
+  }, [user, fetchManuscripts, fetchInvitations]);
 
   const handleUserClick = (user) => {
+    console.log("=== Reviewer Dashboard Debug ===");
+    console.log("Clicked user:", user);
+    console.log("User manuscripts count:", user.manuscripts?.length || 0);
+
     setSelectedUser(user);
     setManuscripts(user.manuscripts || []);
+
+    // Force re-render
+    setForceRender(prev => !prev);
+
+    console.log("Selected user manuscripts:", user.manuscripts?.length || 0);
+    console.log("=== End Debug ===");
   };
 
   const handleViewPDF = (manuscriptUrl) => {
@@ -254,6 +283,9 @@ function ReviewerDashboard() {
         navigate("/login");
         return;
       }
+
+      console.log("Accepting invitation for manuscript:", manuscriptId);
+
       await axios.post(
         `${import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/accept-invitation`,
@@ -264,11 +296,29 @@ function ReviewerDashboard() {
           },
         }
       );
+
+      // Remove from pending invitations
       setPendingInvitations((prev) =>
         prev.filter((inv) => inv._id !== manuscriptId)
       );
+
       alert("Invitation accepted successfully!");
-      window.location.reload();
+
+      console.log("Fetching fresh manuscripts after acceptance...");
+      const refreshedUsers = await fetchManuscripts();
+      await fetchInvitations();
+      setForceRender(prev => !prev);
+
+      if (Array.isArray(refreshedUsers) && refreshedUsers.length > 0) {
+        const targetUser = refreshedUsers.find((u) =>
+          (u.manuscripts || []).some((m) => m._id === manuscriptId)
+        );
+        if (targetUser) {
+          setSelectedUser(targetUser);
+          setManuscripts(targetUser.manuscripts || []);
+        }
+      }
+
     } catch (error) {
       console.error("Error accepting invitation:", error);
       alert("Failed to accept invitation");
@@ -402,10 +452,10 @@ function ReviewerDashboard() {
                 ? `Manuscripts Under Review by ${selectedUser.firstName} ${selectedUser.lastName}`
                 : "Select an Author"}
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-4" key={`${selectedUser?._id || 'all'}-${forceRender}`}>
               {manuscripts.map((manuscript) => (
                 <div
-                  key={manuscript._id}
+                  key={`${manuscript._id}-${forceRender}`}
                   className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0]"
                 >
                   <div className="flex justify-between items-start">
@@ -464,10 +514,10 @@ function ReviewerDashboard() {
                             const isZip = url.toLowerCase().includes('.zip');
 
                             if (isZip) {
-                              
+
                               const link = document.createElement('a');
                               link.href = url;
-                              link.download = 'clean-document.zip'; 
+                              link.download = 'clean-document.zip';
                               link.target = '_blank';
                               document.body.appendChild(link);
                               link.click();

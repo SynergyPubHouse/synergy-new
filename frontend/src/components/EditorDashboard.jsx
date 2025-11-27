@@ -28,6 +28,7 @@ function EditorDashboard() {
 	const [users, setUsers] = useState([]);
 	const [selectedUser, setSelectedUser] = useState(null);
 	const [manuscripts, setManuscripts] = useState([]);
+	const [forceRender, setForceRender] = useState(false);
 	const [noteText, setNoteText] = useState("");
 	const [revisionNoteText, setRevisionNoteText] = useState("");
 	const [selectedManuscript, setSelectedManuscript] = useState(null);
@@ -68,8 +69,7 @@ function EditorDashboard() {
 				console.error("No user token found");
 				return;
 			}
-
-			console.log("Fetching users with token:", user.token); // Debug log
+			console.log("Fetching users...");
 			const response = await axios.get(
 				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/users-with-manuscripts`,
 				{
@@ -78,14 +78,24 @@ function EditorDashboard() {
 					},
 				}
 			);
+			console.log("=== Fetch Users Debug ===");
+			console.log("API Response:", response.data);
+
 			const processedUsers = (response.data || []).map((userRecord) => {
 				const authorName = formatFullName(userRecord);
+				console.log(`Processing user: ${authorName} (${userRecord._id})`);
+				console.log(`Raw manuscripts count: ${userRecord.manuscripts?.length || 0}`);
+				console.log(`Raw manuscripts:`, userRecord.manuscripts);
+
 				const manuscriptsWithAuthor = (userRecord.manuscripts || []).map(
 					(manuscript) => ({
 						...manuscript,
 						authorName: manuscript.authorName || authorName,
 					})
 				);
+
+				console.log(`Processed manuscripts count: ${manuscriptsWithAuthor.length}`);
+				console.log(`Processed manuscripts:`, manuscriptsWithAuthor);
 
 				// Sort manuscripts for this author: newest submissions first
 				manuscriptsWithAuthor.sort((a, b) => {
@@ -96,11 +106,22 @@ function EditorDashboard() {
 					return dateB - dateA;
 				});
 
-				return {
+				const processedUser = {
 					...userRecord,
 					authorName,
 					manuscripts: manuscriptsWithAuthor,
 				};
+
+				console.log(`Final processed user:`, processedUser);
+				return processedUser;
+			});
+
+			console.log("=== All Processed Users ===");
+			processedUsers.forEach(user => {
+				console.log(`User: ${user.authorName} - Manuscripts: ${user.manuscripts.length}`);
+				user.manuscripts.forEach(manuscript => {
+					console.log(`  - ${manuscript.customId || manuscript.title} (${manuscript.status})`);
+				});
 			});
 
 			setUsers(processedUsers);
@@ -160,15 +181,58 @@ function EditorDashboard() {
 	}, [user, fetchUsers, fetchReviewers]);
 
 	// Handle user click to fetch manuscripts
-	const handleUserClick = (user) => {
-		setSelectedUser(user);
-		setManuscripts(user.manuscripts || []);
-		// Clear any active filters when switching users
+	const handleUserClick = async (author) => {
+		console.log("=== Editor Dashboard Debug ===");
+		console.log("Clicked author:", author);
+		console.log("Author manuscripts count:", author.manuscripts?.length || 0);
+		console.log("Author manuscripts:", author.manuscripts);
+
+		setSelectedUser(author);
+		try {
+			if (!user?.token) {
+				// If no token, use cached manuscripts
+				console.log("No token found, using cached manuscripts");
+				setManuscripts(author.manuscripts || []);
+			} else {
+				// Fetch fresh data from API
+				console.log("Fetching from API for author ID:", author._id);
+				const response = await axios.get(
+					`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${author._id}`,
+					{
+						headers: { Authorization: `Bearer ${user.token}` },
+					}
+				);
+				// If API returns data, use it; otherwise fallback to cached data
+				const apiManuscripts = response.data || [];
+				console.log("API response manuscripts count:", apiManuscripts.length);
+				console.log("API response manuscripts:", apiManuscripts);
+
+				if (apiManuscripts.length > 0) {
+					setManuscripts(apiManuscripts);
+					console.log("Using API data");
+				} else {
+					setManuscripts(author.manuscripts || []);
+					console.log("Using cached data - API returned empty");
+				}
+			}
+		} catch (err) {
+			console.error("Error fetching manuscripts for author:", err);
+			console.error("Error details:", err.response?.data || err.message);
+			// Fallback to cached manuscripts
+			setManuscripts(author.manuscripts || []);
+			console.log("Using cached data due to error");
+		}
+
+		// Clear filters and selections
 		setFilterType("all");
 		setFilterValue("");
-		// Clear bulk selections
 		setSelectedManuscriptIds([]);
 		setShowBulkActions(false);
+
+		// Force re-render by updating a dummy state
+		setForceRender(prev => !prev);
+
+		console.log("=== End Debug ===");
 	};
 
 	// Handle showing all manuscripts (clear user selection)
@@ -660,6 +724,11 @@ function EditorDashboard() {
 			setInviteEmails([""]);
 			setEditorNote("");
 			setInviteManuscript(null);
+
+			// Auto-refresh data to show new invitations
+			console.log("Refreshing data after sending invitations...");
+			await fetchUsers();
+			setForceRender(prev => !prev);
 		} catch (error) {
 			console.error("Error sending invitations:", error);
 			addToast("Failed to send invitations", "error");
@@ -715,13 +784,21 @@ function EditorDashboard() {
 	};
 
 	// Filter manuscripts based on current filter
-	const getFilteredManuscripts = () => {
+	const getFilteredManuscripts = useCallback(() => {
 		// If no user is selected, show all manuscripts from all users
 		const allManuscripts = selectedUser
 			? manuscripts
 			: users.flatMap(user => user.manuscripts || []);
 
+		console.log("=== getFilteredManuscripts Debug ===");
+		console.log("selectedUser:", selectedUser?.firstName || 'None');
+		console.log("manuscripts state length:", manuscripts.length);
+		console.log("allManuscripts length:", allManuscripts.length);
+		console.log("filterType:", filterType);
+		console.log("filterValue:", filterValue);
+
 		if (filterType === "all") {
+			console.log("Returning all manuscripts:", allManuscripts.length);
 			return allManuscripts;
 		}
 
@@ -767,7 +844,7 @@ function EditorDashboard() {
 		}
 
 		return allManuscripts;
-	};
+	}, [selectedUser, manuscripts, users, filterType, filterValue, forceRender]);
 
 	// Handle filter clicks
 	const handleStatusFilter = (status) => {
@@ -1228,10 +1305,10 @@ function EditorDashboard() {
 								</div>
 							)}
 
-						<div className="space-y-4">
+						<div className="space-y-4" key={`${selectedUser?._id || 'all'}-${forceRender}`}>
 							{getFilteredManuscripts().map((manuscript) => (
 								<div
-									key={manuscript._id}
+									key={`${manuscript._id}-${forceRender}`}
 									data-manuscript-id={manuscript._id}
 									className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0]"
 								>
@@ -1539,10 +1616,10 @@ function EditorDashboard() {
 														const isZip = url.toLowerCase().includes('.zip');
 
 														if (isZip) {
-															
+
 															const link = document.createElement('a');
 															link.href = url;
-															link.download = 'clean-document.zip'; 
+															link.download = 'clean-document.zip';
 															link.target = '_blank';
 															document.body.appendChild(link);
 															link.click();

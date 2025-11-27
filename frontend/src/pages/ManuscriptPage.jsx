@@ -598,10 +598,10 @@ const ManuscriptPage = () => {
 					autoClose: 5000,
 				});
 			} else {
-				toast.warning("Could not extract information automatically. Please enter details manually.", {
-					position: "top-center",
-					autoClose: 4000,
-				});
+				// toast.warning("Could not extract information automatically. Please enter details manually.", {
+				// 	position: "top-center",
+				// 	autoClose: 4000,
+				// });
 			}
 			// Mark as done so user can proceed manually
 			setExtractionDone(true);
@@ -646,13 +646,13 @@ const ManuscriptPage = () => {
 		) {
 			setCurrentSection(step);
 		} else {
-			toast.warning(
-				`Please complete the current section before proceeding to step ${step}`,
-				{
-					position: "top-center",
-					autoClose: 3000,
-				}
-			);
+			// toast.warning(
+			// 	`Please complete the current section before proceeding to step ${step}`,
+			// 	{
+			// 		position: "top-center",
+			// 		autoClose: 3000,
+			// 	}
+			// );
 		}
 	};
 
@@ -1093,10 +1093,10 @@ const ManuscriptPage = () => {
 				});
 			} else {
 				console.log('No authors found to send emails');
-				toast.warning('No authors found to send email notifications', {
-					position: "top-center",
-					autoClose: 3000,
-				});
+				// toast.warning('No authors found to send email notifications', {
+				// 	position: "top-center",
+				// 	autoClose: 3000,
+				// });
 			}
 
 			setAcceptOrRejectPdf(false);
@@ -1491,10 +1491,10 @@ const ManuscriptPage = () => {
 		});
 
 		if (isAlreadyAdded) {
-			toast.warning("This author is already in the list.", {
-				position: "top-center",
-				autoClose: 3000,
-			});
+			// toast.warning("This author is already in the list.", {
+			// 	position: "top-center",
+			// 	autoClose: 3000,
+			// });
 			return;
 		}
 

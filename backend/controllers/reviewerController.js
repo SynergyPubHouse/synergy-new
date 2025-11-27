@@ -178,7 +178,8 @@ exports.getAssignedManuscripts = async (req, res) => {
             id: req.user._id,
             email: req.user.email,
         });
-        // Resolve the Reviewer document using unified login: try id first, then email
+
+        // Resolve reviewer from ID or Email
         let reviewer = await Reviewer.findById(req.user._id);
         if (!reviewer && req.user?.email) {
             reviewer = await Reviewer.findOne({ email: req.user.email });
@@ -186,63 +187,121 @@ exports.getAssignedManuscripts = async (req, res) => {
         if (!reviewer) {
             return res.status(404).json({ message: "Reviewer not found" });
         }
-        // Fetch manuscripts where this reviewer is actually assigned
+
+        const reviewerEmail = reviewer.email;
+        const assignedIds = reviewer.assignedManuscripts || [];
+
+        if (!assignedIds || assignedIds.length === 0) {
+            return res.json([]);
+        }
+
         const manuscripts = await Manuscript.find({
-            assignedReviewers: reviewer._id,
+            _id: { $in: assignedIds },
+            invitations: { $elemMatch: { email: reviewerEmail, status: "accepted" } },
         })
             .select(
-                "customId title correspondingAuthor submissionDate status mergedFileUrl reviewerNotes editorNotes invitations revisionCombinedPdfUrl highlightedRevisionFileUrl"
+                "customId title correspondingAuthor authors submissionDate status mergedFileUrl reviewerNotes editorNotes invitations revisionCombinedPdfUrl highlightedRevisionFileUrl"
             )
             .populate({
                 path: "correspondingAuthor",
                 select: "firstName middleName lastName email",
+            })
+            .populate({
+                path: "authors",
+                select: "firstName middleName lastName email",
             });
+
         // Format the manuscripts data
-        const formattedManuscripts = manuscripts.map(
-            (manuscript) => {
-                console.log(
-                    "Populated manuscript correspondingAuthor:",
-                    manuscript.correspondingAuthor
-                );
-                // Use correspondingAuthor for author data
-                let authorData = {
-                    _id: manuscript.correspondingAuthor?._id || null,
-                    firstName: manuscript.correspondingAuthor?.firstName || "",
-                    lastName: manuscript.correspondingAuthor?.lastName || "",
-                    email: manuscript.correspondingAuthor?.email || "",
-                    fullName: manuscript.correspondingAuthor
-                        ? formatFullName(manuscript.correspondingAuthor)
-                        : "Unknown Author",
-                };
-                // Ensure mergedFileUrl is properly formatted
-                let pdfUrl = manuscript.mergedFileUrl || "";
-                if (pdfUrl && !pdfUrl.startsWith("http")) {
-                    pdfUrl = `https://paper-sphere.vercel.app${pdfUrl}`;
-                }
-                // Filter reviewerNotes to only show notes from the current reviewer
-                const filteredReviewerNotes = manuscript.reviewerNotes.filter(
+        const formattedManuscripts = manuscripts.map((manuscript) => {
+            console.log(
+                "Populated manuscript correspondingAuthor:",
+                manuscript.correspondingAuthor
+            );
+
+            // Use correspondingAuthor for main author info
+            let authorData = {
+                _id: manuscript.correspondingAuthor?._id || null,
+                firstName: manuscript.correspondingAuthor?.firstName || "",
+                lastName: manuscript.correspondingAuthor?.lastName || "",
+                email: manuscript.correspondingAuthor?.email || "",
+                fullName: manuscript.correspondingAuthor
+                    ? formatFullName(manuscript.correspondingAuthor)
+                    : "Unknown Author",
+            };
+
+            // Fix PDF URL formatting
+            let pdfUrl = manuscript.mergedFileUrl || "";
+            if (pdfUrl && !pdfUrl.startsWith("http")) {
+                pdfUrl = `https://paper-sphere.vercel.app${pdfUrl}`;
+            }
+
+            // Filter reviewer notes for only this reviewer
+            const filteredReviewerNotes = manuscript.reviewerNotes.filter(
                 (note) => {
                     if (!note.addedBy?._id) return false;
-                    return (
-                        note.addedBy._id.toString() ===
-                        reviewer._id.toString()
-                    );
+                    return note.addedBy._id.toString() === reviewer._id.toString();
                 }
             );
-                // Filter editorNotes to only show notes visible to reviewers
-                const visibleEditorNotes = manuscript.editorNotes.filter(
-                    (note) =>
-                        note.visibility && note.visibility.includes("reviewer")
-                );
-                return {
-                    ...manuscript.toObject(),
-                    author: authorData, // Continue to use 'author' in frontend for now for consistency
-                    mergedFileUrl: pdfUrl,
-                    reviewerNotes: filteredReviewerNotes, // Override with filtered notes
-                    editorNotes: visibleEditorNotes, // Include editor notes visible to reviewers
-                };
+
+            // Editor notes visible to reviewers only
+            const visibleEditorNotes = manuscript.editorNotes.filter(
+                (note) =>
+                    note.visibility && note.visibility.includes("reviewer")
+            );
+
+            // Collect unique authors (authors + correspondingAuthor)
+            const allAuthorsSet = new Set();
+            const allAuthorsRaw = [];
+
+            if (Array.isArray(manuscript.authors)) {
+                manuscript.authors.forEach((au) => {
+                    if (au && au._id && !allAuthorsSet.has(String(au._id))) {
+                        allAuthorsSet.add(String(au._id));
+                        allAuthorsRaw.push(au);
+                    }
+                });
             }
-        );
+
+            if (
+                manuscript.correspondingAuthor &&
+                manuscript.correspondingAuthor._id &&
+                !allAuthorsSet.has(String(manuscript.correspondingAuthor._id))
+            ) {
+                allAuthorsSet.add(String(manuscript.correspondingAuthor._id));
+                allAuthorsRaw.push(manuscript.correspondingAuthor);
+            }
+
+            const allAuthors = allAuthorsRaw.map((au) => ({
+                _id: au._id,
+                firstName: au.firstName || "",
+                middleName: au.middleName || "",
+                lastName: au.lastName || "",
+                email: au.email || "",
+                fullName: formatFullName(au),
+            }));
+
+            // ADD: Full authors list separately
+            const authorsFull = (manuscript.authors || []).map((au) => ({
+                _id: au._id,
+                firstName: au.firstName || "",
+                middleName: au.middleName || "",
+                lastName: au.lastName || "",
+                email: au.email || "",
+                fullName: formatFullName(au),
+            }));
+
+            return {
+                ...manuscript.toObject(),
+                author: authorData,
+                authors: authorsFull,  // <-- AUTHOR LIST ADDED HERE
+                mergedFileUrl: pdfUrl,
+                reviewerNotes: filteredReviewerNotes,
+                editorNotes: visibleEditorNotes,
+                allAuthors,
+                authorsDetailed: allAuthors,
+            };
+        });
+
         console.log("Found manuscripts:", formattedManuscripts.length);
         res.json(formattedManuscripts);
     } catch (error) {
@@ -253,6 +312,7 @@ exports.getAssignedManuscripts = async (req, res) => {
         });
     }
 };
+
 
 // Submit a review for a manuscript
 exports.submitReview = async (req, res) => {

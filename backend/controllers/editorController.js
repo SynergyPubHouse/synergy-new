@@ -492,73 +492,115 @@ exports.getAuthors = async (req, res) => {
 
 // Get all manuscripts by author
 exports.getManuscriptsByAuthor = async (req, res) => {
-	try {
-		const { author } = req.params;
-		const manuscripts = await Manuscript.find({
-			author,
-			status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
-		})
-			.select(
-				"title type status submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked reviewDocxUrl authorResponse revisedPdfBuiltAt"
-			)
-			.sort({ submissionDate: -1 });
+    try {
+        const { author } = req.params;
+        console.log("=== getManuscriptsByAuthor Debug ===");
+        console.log("Author ID:", author);
+        
+        const manuscripts = await Manuscript.find({
+            $and: [
+                { status: { $nin: ["Saved", "Rejected"] } },
+                { $or: [
+                    { correspondingAuthor: author },
+                    { authors: author },
+                ] },
+            ],
+        })
+            .select(
+                "customId title type status submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked reviewDocxUrl authorResponse revisedPdfBuiltAt revisionCombinedPdfUrl highlightedRevisionFileUrl authors correspondingAuthor invitations"
+            )
+            .populate("authors", "firstName lastName middleName email")
+            .populate("correspondingAuthor", "firstName lastName middleName email")
+            .sort({ submissionDate: -1 });
 
-		res.json(manuscripts);
-	} catch (error) {
-		console.error("Error fetching manuscripts:", error);
-		res.status(500).json({
-			message: "Error fetching manuscripts",
-			error: error.message,
-		});
-	}
+        console.log("Found manuscripts count:", manuscripts.length);
+        manuscripts.forEach(manuscript => {
+            console.log(`- ${manuscript.customId || manuscript.title} (${manuscript.status})`);
+            console.log(`  Authors: ${manuscript.authors?.map(a => `${a.firstName} ${a.lastName}`).join(', ') || 'None'}`);
+            console.log(`  Corresponding Author: ${manuscript.correspondingAuthor ? `${manuscript.correspondingAuthor.firstName} ${manuscript.correspondingAuthor.lastName}` : 'None'}`);
+        });
+        console.log("=== End Debug ===");
+
+        res.json(manuscripts);
+    } catch (error) {
+        console.error("Error fetching manuscripts:", error);
+        res.status(500).json({
+            message: "Error fetching manuscripts",
+            error: error.message,
+        });
+    }
 };
 
 // Get all users who have submitted manuscripts
 exports.getUsersWithManuscripts = async (req, res) => {
 	try {
-		// Find all users who have manuscripts
-		const users = await User.find({
-			manuscripts: { $exists: true, $ne: [] },
+		// Find all manuscripts (excluding "Saved" and "Rejected" status)
+		const manuscripts = await Manuscript.find({
+			status: { $nin: ["Saved", "Rejected"] },
 		})
-			.select("firstName lastName middleName email manuscripts")
+			.select("authors correspondingAuthor customId title type status submissionDate mergedFileUrl invitations")
+			.populate("authors", "firstName lastName middleName email")
+			.populate("correspondingAuthor", "firstName lastName middleName email")
 			.lean();
 
-		// For each user, populate their manuscripts (excluding "Saved" status)
-		const usersWithManuscripts = await Promise.all(
-			users.map(async (user) => {
-				const manuscripts = await Manuscript.find({
-					_id: { $in: user.manuscripts },
-					status: { $nin: ["Saved", "Rejected"] }, // Exclude manuscripts with "Saved" and "Rejected" status
-				})
-					.select(
-						"customId title type status submissionDate mergedFile mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt invitations reviewDocxUrl authorResponse revisedPdfBuiltAt revisionAttempts maxRevisionAttempts revisionLocked revisionCombinedPdfUrl highlightedRevisionFileUrl"
-					)
-					.lean();
+		console.log("=== Backend Debug ===");
+		console.log("Total manuscripts found:", manuscripts.length);
 
-				// Ensure each manuscript has the correct mergedFileUrl
-				const processedManuscripts = manuscripts.map((manuscript) => {
-					if (manuscript.mergedFile && !manuscript.mergedFileUrl) {
-						// If mergedFile exists but mergedFileUrl doesn't, create the URL
-						const filename = manuscript.mergedFile.split("/").pop();
-						manuscript.mergedFileUrl = `/uploads/${filename}`;
-					}
-					manuscript.authorName = formatFullName(user);
-					return manuscript;
-				});
+		// Create a map of user IDs to their manuscripts
+		const userManuscriptMap = new Map();
 
-				return {
-					...user,
-					manuscripts: processedManuscripts,
-				};
-			})
-		);
+		manuscripts.forEach((manuscript) => {
+			console.log(`Processing manuscript: ${manuscript.customId}`);
+			console.log(`Authors: ${manuscript.authors?.map(a => a._id).join(', ')}`);
+			console.log(`Corresponding Author: ${manuscript.correspondingAuthor?._id}`);
+			
+			// Add manuscript to all authors
+			const allAuthors = [
+				...manuscript.authors,
+				manuscript.correspondingAuthor
+			].filter(author => author); // Remove null/undefined
 
-		// Filter out users who have no manuscripts after excluding "Saved" ones
-		const filteredUsers = usersWithManuscripts.filter(
-			(user) => user.manuscripts.length > 0
-		);
+			// Remove duplicate authors from this manuscript
+			const uniqueAuthors = allAuthors.filter((author, index, self) =>
+				index === self.findIndex((a) => a._id.toString() === author._id.toString())
+			);
 
-		res.json(filteredUsers);
+			console.log(`Unique authors for this manuscript: ${uniqueAuthors.length}`);
+
+			uniqueAuthors.forEach((author) => {
+				const authorId = author._id.toString();
+				
+				if (!userManuscriptMap.has(authorId)) {
+					userManuscriptMap.set(authorId, {
+						...author,
+						manuscripts: []
+					});
+				}
+
+				// Check if manuscript already exists for this author (avoid duplicates)
+				const existingManuscriptIds = userManuscriptMap.get(authorId).manuscripts.map(m => m._id.toString());
+				if (!existingManuscriptIds.includes(manuscript._id.toString())) {
+					userManuscriptMap.get(authorId).manuscripts.push({
+						...manuscript,
+						authorName: formatFullName(author)
+					});
+					console.log(`Added manuscript ${manuscript.customId} to author ${author.firstName} ${author.lastName}`);
+				} else {
+					console.log(`Skipping duplicate manuscript ${manuscript.customId} for author ${author.firstName} ${author.lastName}`);
+				}
+			});
+		});
+
+		// Convert map to array and filter users with manuscripts
+		const usersWithManuscripts = Array.from(userManuscriptMap.values())
+			.filter(user => user.manuscripts.length > 0);
+
+		console.log("=== Final User Summary ===");
+		usersWithManuscripts.forEach(user => {
+			console.log(`User: ${user.firstName} ${user.lastName} - Manuscripts: ${user.manuscripts.length}`);
+		});
+
+		res.json(usersWithManuscripts);
 	} catch (error) {
 		console.error("Error in getUsersWithManuscripts:", error);
 		res.status(500).json({
