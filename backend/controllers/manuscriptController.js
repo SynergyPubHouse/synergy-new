@@ -616,6 +616,9 @@ async function mergePdfs(pdfPaths, outputPath) {
 
 exports.createManuscript = async (req, res) => {
     let tempFiles = [];
+
+    console.log("[createManuscript] Request body:", req.body);
+    console.log("[createManuscript] Request files:", req);
     try {
         upload(req, res, async (err) => {
             if (err) {
@@ -2013,6 +2016,195 @@ await manuscript.save();
         console.error(err);
         res.status(500).json({ success: false, message: err.message });
     }
+};
+
+// Configure multer for revision file uploads
+const revisionUpload = multer({
+    storage: storage,
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+    fileFilter: (req, file, cb) => {
+        if (file.fieldname === 'responseSheet' || file.fieldname === 'highlightedDoc') {
+            // Only PDF for response sheet and highlighted doc
+            const isPdf = /pdf/.test(path.extname(file.originalname).toLowerCase());
+            if (isPdf) {
+                return cb(null, true);
+            }
+            cb(new Error('Response Sheet and Highlighted Document must be PDF files!'));
+        } else if (file.fieldname === 'withoutHighlightedDoc') {
+            // DOCX or LaTeX (.tex, .zip) for without highlighted doc
+            const allowedTypes = /docx|tex|zip/;
+            const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+            if (extname) {
+                return cb(null, true);
+            }
+            cb(new Error('Without Highlighted Document must be DOCX, LaTeX (.tex), or ZIP file!'));
+        }
+        cb(new Error('Invalid file field'));
+    },
+}).fields([
+    { name: 'responseSheet', maxCount: 1 },
+    { name: 'highlightedDoc', maxCount: 1 },
+    { name: 'withoutHighlightedDoc', maxCount: 1 }
+]);
+
+exports.uploadRevisionFiles = async (req, res) => {
+    let tempFiles = [];
+    
+    revisionUpload(req, res, async (err) => {
+        if (err) {
+            console.error("[uploadRevisionFiles] Multer error:", err);
+            return res.status(400).json({ 
+                success: false, 
+                message: err.message 
+            });
+        }
+
+        try {
+            const { manuscriptId } = req.params;
+            const { fileType } = req.body; // 'docx' or 'latex'
+
+            // Find manuscript
+            const manuscript = await Manuscript.findById(manuscriptId)
+                .populate("authors", "_id firstName lastName email")
+                .populate("correspondingAuthor", "_id firstName lastName email");
+
+            if (!manuscript) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: "Manuscript not found" 
+                });
+            }
+
+            // Check authorization
+            if (!isUserAuthor(manuscript, req.user?._id)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You are not authorized to upload revision files for this manuscript"
+                });
+            }
+
+            // Check if manuscript is locked
+            if (manuscript.revisionLocked || manuscript.status === "Rejected") {
+                return res.status(403).json({
+                    success: false,
+                    message: "All revision attempts have been exhausted. Cannot upload files."
+                });
+            }
+
+            // Check if all required files are present
+            if (!req.files || !req.files.responseSheet || !req.files.highlightedDoc || !req.files.withoutHighlightedDoc) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "All three files are required: Response Sheet (PDF), Highlighted Document (PDF), and Without Highlighted Document (DOCX/LaTeX)" 
+                });
+            }
+
+            // Track temporary files for cleanup
+            tempFiles = [
+                req.files.responseSheet[0].path,
+                req.files.highlightedDoc[0].path,
+                req.files.withoutHighlightedDoc[0].path
+            ];
+
+            const customId = manuscript.customId || manuscript._id.toString();
+            const timestamp = Date.now();
+
+            // Initialize authorResponse if it doesn't exist
+            if (!manuscript.authorResponse) {
+                manuscript.authorResponse = {
+                    submissionCount: 0
+                };
+            }
+
+            // 1. Upload Response Sheet (PDF only)
+            console.log("[uploadRevisionFiles] Uploading Response Sheet...");
+            const responseSheetUpload = await uploadToCloudinary(
+                req.files.responseSheet[0].path,
+                "author_responses",
+                "raw",
+                `response_sheet_${customId}_${timestamp}`
+            );
+            manuscript.authorResponse.docxUrl = responseSheetUpload.secure_url || responseSheetUpload.url;
+            manuscript.authorResponse.pdfUrl = responseSheetUpload.secure_url || responseSheetUpload.url;
+            manuscript.authorResponse.uploadedAt = new Date();
+            console.log("[uploadRevisionFiles] Response Sheet uploaded successfully");
+
+            // 2. Upload Highlighted Document (PDF only)
+            console.log("[uploadRevisionFiles] Uploading Highlighted Document...");
+            const highlightedUpload = await uploadToCloudinary(
+                req.files.highlightedDoc[0].path,
+                "highlighted_revisions",
+                "raw",
+                `highlighted_${customId}_${timestamp}`
+            );
+            manuscript.authorResponse.highlightedFileUrl = highlightedUpload.secure_url || highlightedUpload.url;
+            manuscript.authorResponse.highlightedUploadedAt = new Date();
+            console.log("[uploadRevisionFiles] Highlighted Document uploaded successfully");
+
+            // 3. Upload Without Highlighted Document (DOCX or LaTeX)
+            console.log("[uploadRevisionFiles] Uploading Without Highlighted Document...");
+            const withoutHighlightedFile = req.files.withoutHighlightedDoc[0];
+            const fileExtension = path.extname(withoutHighlightedFile.originalname);
+            
+            const withoutHighlightedUpload = await uploadToCloudinary(
+                withoutHighlightedFile.path,
+                "clean_revisions",
+                "raw",
+                `clean_${customId}_${timestamp}${fileExtension}`
+            );
+            manuscript.authorResponse.withoutHighlightedFileUrl = withoutHighlightedUpload.secure_url || withoutHighlightedUpload.url;
+            manuscript.authorResponse.withoutHighlightedUploadedAt = new Date();
+            
+            // Store file type information
+            manuscript.authorResponse.fileType = fileType || 'docx';
+            
+            console.log("[uploadRevisionFiles] Without Highlighted Document uploaded successfully");
+
+            // Update metadata
+            manuscript.authorResponse.lastUpdated = new Date();
+            manuscript.authorResponse.submissionCount = (manuscript.authorResponse.submissionCount || 0) + 1;
+            manuscript.updatedAt = new Date();
+
+            // Save manuscript
+            await manuscript.save();
+
+            // Clean up temporary files
+            await cleanupFiles(tempFiles);
+            tempFiles = [];
+
+            console.log(`[uploadRevisionFiles] All revision files uploaded successfully for manuscript: ${customId}`);
+
+            // Send success response
+            return res.json({ 
+                success: true, 
+                message: "All revision files have been successfully uploaded and submitted to the editor",
+                data: {
+                    responseSheetUrl: manuscript.authorResponse.docxUrl,
+                    highlightedDocumentUrl: manuscript.authorResponse.highlightedFileUrl,
+                    withoutHighlightedDocumentUrl: manuscript.authorResponse.withoutHighlightedFileUrl,
+                    fileType: manuscript.authorResponse.fileType,
+                    submissionCount: manuscript.authorResponse.submissionCount,
+                    uploadedAt: manuscript.authorResponse.uploadedAt
+                }
+            });
+
+        } catch (error) {
+            console.error("[uploadRevisionFiles] Error:", error);
+            
+            // Clean up temporary files on error
+            if (tempFiles.length > 0) {
+                await cleanupFiles(tempFiles).catch((cleanupError) => {
+                    console.error("[uploadRevisionFiles] Cleanup error:", cleanupError);
+                });
+            }
+            
+            return res.status(500).json({ 
+                success: false, 
+                message: "Failed to upload revision files. Please try again.",
+                error: error.message
+            });
+        }
+    });
 };
 
 module.exports.convertDocxToPdf = convertDocxToPdf;

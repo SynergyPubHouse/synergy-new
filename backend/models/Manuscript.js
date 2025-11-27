@@ -177,10 +177,23 @@ const manuscriptSchema = new mongoose.Schema(
     default: "",
 },
 	authorResponse: {
-			docxUrl: { type: String, default: "" },
-			pdfUrl: { type: String, default: "" },
-			uploadedAt: { type: Date },
-		},
+		// Response Sheet (Author Response) - now stored as PDF
+		docxUrl: { type: String, default: "" },
+		pdfUrl: { type: String, default: "" },
+		uploadedAt: { type: Date },
+		
+		// Highlighted Document - PDF format
+		highlightedFileUrl: { type: String, default: "" },
+		highlightedUploadedAt: { type: Date },
+		
+		// Without Highlighted Document - DOCX format
+		withoutHighlightedFileUrl: { type: String, default: "" },
+		withoutHighlightedUploadedAt: { type: Date },
+		
+		// Metadata
+		lastUpdated: { type: Date, default: Date.now },
+		submissionCount: { type: Number, default: 0 },
+	},
 
 		revisionCombinedPdfUrl: { type: String, default: "" },
 		highlightedRevisionFileUrl: { type: String, default: "" },

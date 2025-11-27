@@ -38,8 +38,7 @@ function ReviewerDashboard() {
         }
 
         const response = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
+          `${import.meta.env.VITE_BACKEND_URL
           }/api/auth/reviewer/assigned-manuscripts`,
           {
             headers: {
@@ -115,8 +114,7 @@ function ReviewerDashboard() {
           return;
         }
         const response = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
+          `${import.meta.env.VITE_BACKEND_URL
           }/api/auth/reviewer/pending-invitations`,
           {
             headers: {
@@ -177,8 +175,7 @@ function ReviewerDashboard() {
       };
 
       const response = await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/review`,
         {
           comments: currentReviewText,
@@ -193,8 +190,7 @@ function ReviewerDashboard() {
       );
 
       const statusResponse = await axios.put(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/manuscripts/${manuscriptId}/status`,
         { status: "Reviewed" },
         {
@@ -228,8 +224,7 @@ function ReviewerDashboard() {
         return;
       }
       await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/reject-invitation`,
         {
           rejectionReason: rejectionReason.trim(),
@@ -260,8 +255,7 @@ function ReviewerDashboard() {
         return;
       }
       await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/accept-invitation`,
         {},
         {
@@ -390,11 +384,10 @@ function ReviewerDashboard() {
                 <button
                   key={user._id}
                   onClick={() => handleUserClick(user)}
-                  className={`w-full text-left p-3 rounded-lg transition-all ${
-                    selectedUser === user
-                      ? "bg-[#496580] text-white"
-                      : "bg-[#f8fafc] text-[#1a365d] hover:bg-[#e2e8f0]"
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser === user
+                    ? "bg-[#496580] text-white"
+                    : "bg-[#f8fafc] text-[#1a365d] hover:bg-[#e2e8f0]"
+                    }`}
                 >
                   {user.fullName}
                 </button>
@@ -431,38 +424,68 @@ function ReviewerDashboard() {
                       </p>
                     </div>
                     <div className="flex flex-col space-y-2">
-                      <button
-                        onClick={() => handleViewPDF(manuscript.mergedFileUrl)}
-                        className="px-4 py-2 bg-[#496580] text-white rounded hover:bg-[#3a5269]"
-                      >
-                        View PDF
-                      </button>
-                      {manuscript.highlightedRevisionFileUrl && (
+                      {manuscript.mergedFileUrl && (
                         <button
-                          onClick={() => {
-                            const url = manuscript.highlightedRevisionFileUrl;
-                            if (url) {
-                              const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(
-                                url
-                              )}&embedded=true`;
-                              window.open(viewerUrl, "_blank");
-                            } else {
-                              alert("File not available");
-                            }
-                          }}
-                          className="px-4 py-2 bg-[#f59e0b] text-white rounded hover:bg-[#d97706]"
+                          onClick={() => handleViewPDF(manuscript.mergedFileUrl)}
+                          className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                         >
-                          View Highlighted Revision
+                          <span>📄</span>
+                          <span>Original PDF</span>
                         </button>
                       )}
-                      {manuscript.revisionCombinedPdfUrl && (
+
+                      {/* Response Sheet (PDF) */}
+                      {manuscript.authorResponse?.docxUrl && (
                         <button
-                          onClick={() =>
-                            handleViewPDF(manuscript.revisionCombinedPdfUrl)
-                          }
-                          className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669]"
+                          onClick={() => window.open(manuscript.authorResponse.docxUrl, "_blank")}
+                          className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                         >
-                          View Combined Revision PDF
+                          <span>📝</span>
+                          <span>Response Sheet</span>
+                        </button>
+                      )}
+
+                      {/* Highlighted Document (PDF) */}
+                      {manuscript.authorResponse?.highlightedFileUrl && (
+                        <button
+                          onClick={() => window.open(manuscript.authorResponse.highlightedFileUrl, "_blank")}
+                          className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors mb-1 flex items-center justify-center space-x-2"
+                        >
+                          <span>✏️</span>
+                          <span>Highlighted Doc</span>
+                        </button>
+                      )}
+
+                      {/* Without Highlighted Document (DOCX/LaTeX) */}
+                      {manuscript.authorResponse?.withoutHighlightedFileUrl && (
+                        <button
+                          onClick={() => {
+                            const url = manuscript.authorResponse.withoutHighlightedFileUrl;
+                            const isZip = url.toLowerCase().includes('.zip');
+
+                            if (isZip) {
+                              
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = 'clean-document.zip'; 
+                              link.target = '_blank';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            } else {
+                              // Existing logic for other file types
+                              const isPdf = url.toLowerCase().includes('.pdf');
+                              if (isPdf) {
+                                window.open(url, "_blank");
+                              } else {
+                                const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+                                window.open(viewerUrl, "_blank");
+                              }
+                            }
+                          }}
+                          className="px-2 py-1 text-xs border border-green-600 text-green-600 rounded hover:bg-green-50 transition-colors"
+                        >
+                          without highlighted Doc
                         </button>
                       )}
                     </div>
@@ -487,15 +510,14 @@ function ReviewerDashboard() {
                               <p className="text-[#1a365d]">{note.text}</p>
                               {note.action && (
                                 <span
-                                  className={`inline-block mt-2 px-2 py-1 text-xs rounded ${
-                                    note.action === "Under Review"
-                                      ? "bg-[#f59e0b]"
-                                      : note.action === "Reviewed"
+                                  className={`inline-block mt-2 px-2 py-1 text-xs rounded ${note.action === "Under Review"
+                                    ? "bg-[#f59e0b]"
+                                    : note.action === "Reviewed"
                                       ? "bg-[#3b82f6]"
                                       : note.action === "Accepted"
-                                      ? "bg-[#10b981]"
-                                      : "bg-[#ef4444]"
-                                  } text-white`}
+                                        ? "bg-[#10b981]"
+                                        : "bg-[#ef4444]"
+                                    } text-white`}
                                 >
                                   {note.action}
                                 </span>

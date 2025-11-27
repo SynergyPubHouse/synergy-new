@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../App";
 import axios from "axios";
 
-import { exportNotesToWord  } from '../components/exportNotesToWord.jsx';
+import { exportNotesToWord } from '../components/exportNotesToWord.jsx';
 
 function EditorDashboard() {
 	const { user } = useAuth();
-console.log("EditorDashboard user:", user);
+	console.log("EditorDashboard user:", user);
 	// Helper function to format full name including middle name if it exists
 	const formatFullName = (user) => {
 		if (!user) return "Unknown";
@@ -215,8 +215,7 @@ console.log("EditorDashboard user:", user);
 
 				// Add the note first
 				await axios.post(
-					`${
-						import.meta.env.VITE_BACKEND_URL
+					`${import.meta.env.VITE_BACKEND_URL
 					}/api/auth/editor/manuscripts/${manuscriptId}/notes`,
 					noteData,
 					{
@@ -229,8 +228,7 @@ console.log("EditorDashboard user:", user);
 
 			// Update the status
 			const response = await axios.patch(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${manuscriptId}/status`,
 				{ status: newStatus },
 				{
@@ -283,17 +281,17 @@ console.log("EditorDashboard user:", user);
 			console.error("Error updating manuscript:", error);
 
 			// Check for specific error about rejected manuscripts
-				if (
-					error.response?.status === 403 &&
-					error.response?.data?.message?.includes("rejected")
-				) {
-					addToast(
-						"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
-						"error"
-					);
-				} else {
-					addToast("Failed to update manuscript", "error");
-				}
+			if (
+				error.response?.status === 403 &&
+				error.response?.data?.message?.includes("rejected")
+			) {
+				addToast(
+					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
+					"error"
+				);
+			} else {
+				addToast("Failed to update manuscript", "error");
+			}
 		}
 	};
 
@@ -335,8 +333,7 @@ console.log("EditorDashboard user:", user);
 			);
 
 			const response = await axios.patch(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${manuscriptId}/status`,
 				{ status: newStatus },
 				{
@@ -352,26 +349,26 @@ console.log("EditorDashboard user:", user);
 			const updatedManuscripts = manuscripts.map((m) =>
 				m._id === manuscriptId
 					? {
-							...m,
-							status: updatedData?.status || newStatus,
-							revisionLocked:
-								typeof updatedData?.revisionLocked === "boolean"
-									? updatedData.revisionLocked
-									: m.revisionLocked,
-							revisionAttempts:
-								updatedData?.revisionAttempts ??
-								m.revisionAttempts,
-							maxRevisionAttempts:
-								updatedData?.maxRevisionAttempts ??
-								m.maxRevisionAttempts,
-						}
+						...m,
+						status: updatedData?.status || newStatus,
+						revisionLocked:
+							typeof updatedData?.revisionLocked === "boolean"
+								? updatedData.revisionLocked
+								: m.revisionLocked,
+						revisionAttempts:
+							updatedData?.revisionAttempts ??
+							m.revisionAttempts,
+						maxRevisionAttempts:
+							updatedData?.maxRevisionAttempts ??
+							m.maxRevisionAttempts,
+					}
 					: m
 			);
 			setManuscripts(updatedManuscripts);
 
 			addToast(
 				response.data?.message ||
-					`Manuscript status updated to "${newStatus}" successfully!`,
+				`Manuscript status updated to "${newStatus}" successfully!`,
 				"success"
 			);
 
@@ -385,17 +382,17 @@ console.log("EditorDashboard user:", user);
 			console.error("Error updating manuscript status:", error);
 
 			// Check for specific error about rejected manuscripts
-				if (
-					error.response?.status === 403 &&
-					error.response?.data?.message?.includes("rejected")
-				) {
-					addToast(
-						"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
-						"error"
-					);
-				} else {
-					addToast(`Failed to update manuscript status to "${newStatus}"`, "error");
-				}
+			if (
+				error.response?.status === 403 &&
+				error.response?.data?.message?.includes("rejected")
+			) {
+				addToast(
+					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
+					"error"
+				);
+			} else {
+				addToast(`Failed to update manuscript status to "${newStatus}"`, "error");
+			}
 		}
 	};
 
@@ -411,8 +408,7 @@ console.log("EditorDashboard user:", user);
 			);
 
 			await axios.patch(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/bulk-update-status`,
 				{
 					manuscriptIds,
@@ -448,17 +444,17 @@ console.log("EditorDashboard user:", user);
 			console.error("Error bulk updating manuscript status:", error);
 
 			// Check for specific error about rejected manuscripts
-				if (
-					error.response?.status === 403 ||
-					error.response?.data?.message?.includes("rejected")
-				) {
-					addToast(
-						"Some manuscripts could not be updated because they are rejected. Rejected manuscripts cannot be modified.",
-						"error"
-					);
-				} else {
-					addToast(`Failed to bulk update manuscripts to "${newStatus}"`, "error");
-				}
+			if (
+				error.response?.status === 403 ||
+				error.response?.data?.message?.includes("rejected")
+			) {
+				addToast(
+					"Some manuscripts could not be updated because they are rejected. Rejected manuscripts cannot be modified.",
+					"error"
+				);
+			} else {
+				addToast(`Failed to bulk update manuscripts to "${newStatus}"`, "error");
+			}
 		}
 	};
 
@@ -480,8 +476,7 @@ console.log("EditorDashboard user:", user);
 			}
 
 			const response = await axios.post(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${manuscriptId}/revision-required`,
 				{ text: revisionNoteText },
 				{
@@ -497,19 +492,19 @@ console.log("EditorDashboard user:", user);
 			const updatedManuscripts = manuscripts.map((m) =>
 				m._id === manuscriptId
 					? {
-							...m,
-							status: updatedData?.status || "Revision Required",
-							revisionAttempts:
-								updatedData?.revisionAttempts ??
-								m.revisionAttempts,
-							maxRevisionAttempts:
-								updatedData?.maxRevisionAttempts ??
-								m.maxRevisionAttempts,
-							revisionLocked:
-								typeof updatedData?.revisionLocked === "boolean"
-									? updatedData.revisionLocked
-									: m.revisionLocked,
-						}
+						...m,
+						status: updatedData?.status || "Revision Required",
+						revisionAttempts:
+							updatedData?.revisionAttempts ??
+							m.revisionAttempts,
+						maxRevisionAttempts:
+							updatedData?.maxRevisionAttempts ??
+							m.maxRevisionAttempts,
+						revisionLocked:
+							typeof updatedData?.revisionLocked === "boolean"
+								? updatedData.revisionLocked
+								: m.revisionLocked,
+					}
 					: m
 			);
 			setManuscripts(updatedManuscripts);
@@ -554,8 +549,7 @@ console.log("EditorDashboard user:", user);
 		try {
 			// Use the editor controller endpoint that properly handles notes
 			await axios.patch(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${selectedManuscript._id}/status`,
 				{
 					status: "Accepted",
@@ -603,77 +597,76 @@ console.log("EditorDashboard user:", user);
 	};
 
 	// Handle send invitations
-const handleSendInvitations = async () => {
-  setIsSendingInvitations(true); // Start loading
-  try {
-	// Filter out empty emails and trim whitespace
-	const emailArray = inviteEmails
-	  .map((email) => email.trim())
-	  .filter((email) => email.length > 0);
+	const handleSendInvitations = async () => {
+		setIsSendingInvitations(true); // Start loading
+		try {
+			// Filter out empty emails and trim whitespace
+			const emailArray = inviteEmails
+				.map((email) => email.trim())
+				.filter((email) => email.length > 0);
 
-	// Minimum 3, maximum 6 emails check
-	if (emailArray.length < 3 || emailArray.length > 6) {
-	  addToast("Please enter between 3 and 6 email addresses", "error");
-	  setIsSendingInvitations(false);
-	  return;
-	}
+			// Minimum 3, maximum 6 emails check
+			if (emailArray.length < 3 || emailArray.length > 6) {
+				addToast("Please enter between 3 and 6 email addresses", "error");
+				setIsSendingInvitations(false);
+				return;
+			}
 
-	// Validate email format
-	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-	const invalidEmails = emailArray.filter(
-	  (email) => !emailRegex.test(email)
-	);
+			// Validate email format
+			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+			const invalidEmails = emailArray.filter(
+				(email) => !emailRegex.test(email)
+			);
 
-	if (invalidEmails.length > 0) {
-	  addToast(
-		`Invalid email addresses: ${invalidEmails.join(", ")}`,
-		"error"
-	  );
-	  setIsSendingInvitations(false);
-	  return;
-	}
+			if (invalidEmails.length > 0) {
+				addToast(
+					`Invalid email addresses: ${invalidEmails.join(", ")}`,
+					"error"
+				);
+				setIsSendingInvitations(false);
+				return;
+			}
 
-	const requestData = {
-	  emails: emailArray,
+			const requestData = {
+				emails: emailArray,
+			};
+
+			// Add editor note if provided
+			if (editorNote.trim()) {
+				requestData.editorNote = editorNote.trim();
+				requestData.id = user._id;
+				requestData.fullName = formatFullName(
+					`${user.firstName} ${user.lastName}`
+				);
+				requestData.edittorEmail = user.email;
+			}
+
+			await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${inviteManuscript._id
+				}/invite-reviewers`,
+				requestData,
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			addToast(
+				`Invitations sent successfully to ${emailArray.length} reviewers!`,
+				"success"
+			);
+			setShowInviteDialog(false);
+			setInviteEmails([""]);
+			setEditorNote("");
+			setInviteManuscript(null);
+		} catch (error) {
+			console.error("Error sending invitations:", error);
+			addToast("Failed to send invitations", "error");
+		} finally {
+			setIsSendingInvitations(false); // Stop loading
+		}
 	};
-
-	// Add editor note if provided
-	if (editorNote.trim()) {
-	  requestData.editorNote = editorNote.trim();
-	  requestData.id = user._id;
-	  requestData.fullName = formatFullName(
-		`${user.firstName} ${user.lastName}`
-	  );
-	  requestData.edittorEmail = user.email;
-	}
-
-	await axios.post(
-	  `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${
-		inviteManuscript._id
-	  }/invite-reviewers`,
-	  requestData,
-	  {
-		headers: {
-		  Authorization: `Bearer ${user.token}`,
-		},
-	  }
-	);
-
-	addToast(
-	  `Invitations sent successfully to ${emailArray.length} reviewers!`,
-	  "success"
-	);
-	setShowInviteDialog(false);
-	setInviteEmails([""]);
-	setEditorNote("");
-	setInviteManuscript(null);
-  } catch (error) {
-	console.error("Error sending invitations:", error);
-	addToast("Failed to send invitations", "error");
-  } finally {
-	setIsSendingInvitations(false); // Stop loading
-  }
-};
 
 	// Add a new email input field
 	const addEmailField = () => {
@@ -724,8 +717,8 @@ const handleSendInvitations = async () => {
 	// Filter manuscripts based on current filter
 	const getFilteredManuscripts = () => {
 		// If no user is selected, show all manuscripts from all users
-		const allManuscripts = selectedUser 
-			? manuscripts 
+		const allManuscripts = selectedUser
+			? manuscripts
 			: users.flatMap(user => user.manuscripts || []);
 
 		if (filterType === "all") {
@@ -800,13 +793,12 @@ const handleSendInvitations = async () => {
 					<div
 						key={t.id}
 						onClick={() => removeToast(t.id)}
-						className={`max-w-sm px-4 py-2 rounded shadow cursor-pointer transform transition-all duration-150 hover:scale-105 break-words ${
-							t.type === "success"
-								? "bg-green-500 text-white"
+						className={`max-w-sm px-4 py-2 rounded shadow cursor-pointer transform transition-all duration-150 hover:scale-105 break-words ${t.type === "success"
+							? "bg-green-500 text-white"
 							: t.type === "error"
-							? "bg-red-500 text-white"
-							: "bg-gray-800 text-white"
-						}`}
+								? "bg-red-500 text-white"
+								: "bg-gray-800 text-white"
+							}`}
 					>
 						{t.message}
 					</div>
@@ -878,14 +870,12 @@ const handleSendInvitations = async () => {
 												onClick={() =>
 													handleStatusFilter(status)
 												}
-												className={`${
-													statusColors[status]
-												} text-white p-4 rounded-lg text-center transition-all duration-200 transform hover:scale-105 hover:shadow-lg cursor-pointer ${
-													filterType === "status" &&
-													filterValue === status
+												className={`${statusColors[status]
+													} text-white p-4 rounded-lg text-center transition-all duration-200 transform hover:scale-105 hover:shadow-lg cursor-pointer ${filterType === "status" &&
+														filterValue === status
 														? "ring-4 ring-white ring-opacity-50 shadow-xl"
 														: ""
-												}`}
+													}`}
 											>
 												<div className="text-2xl font-bold">
 													{statusCounts[status] || 0}
@@ -915,20 +905,19 @@ const handleSendInvitations = async () => {
 														"todaySubmissions"
 													)
 												}
-												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-blue-50 text-left ${
-													filterType === "activity" &&
+												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-blue-50 text-left ${filterType === "activity" &&
 													filterValue ===
-														"todaySubmissions"
-														? "ring-2 ring-blue-400 bg-blue-50 shadow-md"
-														: ""
-												}`}
+													"todaySubmissions"
+													? "ring-2 ring-blue-400 bg-blue-50 shadow-md"
+													: ""
+													}`}
 											>
 												<div className="font-semibold text-blue-600">
 													📥 Today&apos;s Submissions
 													{filterType ===
 														"activity" &&
 														filterValue ===
-															"todaySubmissions" && (
+														"todaySubmissions" && (
 															<span className="ml-2 text-xs">
 																📌
 															</span>
@@ -959,20 +948,19 @@ const handleSendInvitations = async () => {
 														"weeklyUpdates"
 													)
 												}
-												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-yellow-50 text-left ${
-													filterType === "activity" &&
+												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-yellow-50 text-left ${filterType === "activity" &&
 													filterValue ===
-														"weeklyUpdates"
-														? "ring-2 ring-yellow-400 bg-yellow-50 shadow-md"
-														: ""
-												}`}
+													"weeklyUpdates"
+													? "ring-2 ring-yellow-400 bg-yellow-50 shadow-md"
+													: ""
+													}`}
 											>
 												<div className="font-semibold text-yellow-600">
 													🔄 Updated This Week
 													{filterType ===
 														"activity" &&
 														filterValue ===
-															"weeklyUpdates" && (
+														"weeklyUpdates" && (
 															<span className="ml-2 text-xs">
 																📌
 															</span>
@@ -986,7 +974,7 @@ const handleSendInvitations = async () => {
 																	new Date();
 																weekAgo.setDate(
 																	weekAgo.getDate() -
-																		7
+																	7
 																);
 																const updatedDate =
 																	new Date(
@@ -1007,20 +995,19 @@ const handleSendInvitations = async () => {
 														"pendingAction"
 													)
 												}
-												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-green-50 text-left ${
-													filterType === "activity" &&
+												className={`bg-white p-3 rounded border transition-all duration-200 hover:shadow-md hover:bg-green-50 text-left ${filterType === "activity" &&
 													filterValue ===
-														"pendingAction"
-														? "ring-2 ring-green-400 bg-green-50 shadow-md"
-														: ""
-												}`}
+													"pendingAction"
+													? "ring-2 ring-green-400 bg-green-50 shadow-md"
+													: ""
+													}`}
 											>
 												<div className="font-semibold text-green-600">
 													⚡ Pending Action
 													{filterType ===
 														"activity" &&
 														filterValue ===
-															"pendingAction" && (
+														"pendingAction" && (
 															<span className="ml-2 text-xs">
 																📌
 															</span>
@@ -1031,11 +1018,11 @@ const handleSendInvitations = async () => {
 														allManuscripts.filter(
 															(m) =>
 																m.status ===
-																	"Pending" ||
+																"Pending" ||
 																m.status ===
-																	"Reviewed" ||
+																"Reviewed" ||
 																m.status ===
-																	"Revision Required"
+																"Revision Required"
 														).length
 													}
 												</div>
@@ -1056,28 +1043,25 @@ const handleSendInvitations = async () => {
 							{/* Show All Manuscripts Button */}
 							<button
 								onClick={handleShowAllManuscripts}
-								className={`w-full text-left p-3 rounded-lg transition-all font-medium ${
-									!selectedUser
-										? "bg-[#496580] text-white"
-										: "bg-[#e3f2fd] text-[#1976d2] hover:bg-[#bbdefb] border border-[#1976d2]"
-								}`}
+								className={`w-full text-left p-3 rounded-lg transition-all font-medium ${!selectedUser
+									? "bg-[#496580] text-white"
+									: "bg-[#e3f2fd] text-[#1976d2] hover:bg-[#bbdefb] border border-[#1976d2]"
+									}`}
 							>
 								📋 Show All Manuscripts
 							</button>
-							
+
 							{users.map((user, index) => (
 								<button
 									key={index}
 									onClick={() => handleUserClick(user)}
-									className={`w-full text-left p-3 rounded-lg transition-all ${
-										selectedUser === user
-											? "bg-[#496580] text-white"
-											: "bg-[#f8fafc] text-[#1a365d] hover:bg-gray-100"
-									}`}
+									className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser === user
+										? "bg-[#496580] text-white"
+										: "bg-[#f8fafc] text-[#1a365d] hover:bg-gray-100"
+										}`}
 								>
-									{`${user.firstName} ${
-										user.middleName || ""
-									} ${user.lastName}`}{" "}
+									{`${user.firstName} ${user.middleName || ""
+										} ${user.lastName}`}{" "}
 									- {user.email}
 								</button>
 							))}
@@ -1091,8 +1075,8 @@ const handleSendInvitations = async () => {
 								<h2 className="text-2xl font-semibold text-[#496580]">
 									{selectedUser
 										? `Manuscripts by ${formatFullName(
-												selectedUser
-										  )}`
+											selectedUser
+										)}`
 										: "Select a User"}
 								</h2>
 								{filterType !== "all" && selectedUser && (
@@ -1104,19 +1088,18 @@ const handleSendInvitations = async () => {
 											{filterType === "status"
 												? `Status: ${filterValue}`
 												: filterType === "activity"
-												? `Activity: ${
-														filterValue ===
+													? `Activity: ${filterValue ===
 														"todaySubmissions"
-															? "Today's Submissions"
-															: filterValue ===
-															  "weeklyUpdates"
+														? "Today's Submissions"
+														: filterValue ===
+															"weeklyUpdates"
 															? "Updated This Week"
 															: filterValue ===
-															  "pendingAction"
-															? "Pending Action"
-															: filterValue
-												  }`
-												: filterValue}
+																"pendingAction"
+																? "Pending Action"
+																: filterValue
+													}`
+													: filterValue}
 										</span>
 										<button
 											onClick={clearFilter}
@@ -1140,11 +1123,10 @@ const handleSendInvitations = async () => {
 										onClick={() =>
 											setShowBulkActions(!showBulkActions)
 										}
-										className={`px-3 py-1 text-sm rounded ${
-											showBulkActions
-												? "bg-red-500 text-white hover:bg-red-600"
-												: "bg-blue-500 text-white hover:bg-blue-600"
-										}`}
+										className={`px-3 py-1 text-sm rounded ${showBulkActions
+											? "bg-red-500 text-white hover:bg-red-600"
+											: "bg-blue-500 text-white hover:bg-blue-600"
+											}`}
 									>
 										{showBulkActions
 											? "❌ Cancel Bulk"
@@ -1288,7 +1270,7 @@ const handleSendInvitations = async () => {
 													<div className="mb-2">
 														<p className="text-[#496580] text-sm">
 															Author: {(() => {
-																const author = users.find(user => 
+																const author = users.find(user =>
 																	user.manuscripts?.some(m => m._id === manuscript._id)
 																);
 																return author ? formatFullName(author) : "Unknown Author";
@@ -1301,39 +1283,38 @@ const handleSendInvitations = async () => {
 														Status:
 													</p>
 													<span
-														className={`px-2 py-1 rounded text-xs font-semibold ${
-															manuscript.status ===
+														className={`px-2 py-1 rounded text-xs font-semibold ${manuscript.status ===
 															"Pending"
-																? "bg-blue-100 text-blue-800"
-																: manuscript.status ===
-																  "Under Review"
+															? "bg-blue-100 text-blue-800"
+															: manuscript.status ===
+																"Under Review"
 																? "bg-yellow-100 text-yellow-800"
 																: manuscript.status ===
-																  "Reviewed"
-																? "bg-purple-100 text-purple-800"
-																: manuscript.status ===
-																  "Revision Required"
-																? "bg-orange-100 text-orange-800"
-																: manuscript.status ===
-																  "Accepted"
-																? "bg-green-100 text-green-800"
-																: manuscript.status ===
-																  "Rejected"
-																? "bg-red-100 text-red-800"
-																: "bg-gray-100 text-gray-800"
-														}`}
+																	"Reviewed"
+																	? "bg-purple-100 text-purple-800"
+																	: manuscript.status ===
+																		"Revision Required"
+																		? "bg-orange-100 text-orange-800"
+																		: manuscript.status ===
+																			"Accepted"
+																			? "bg-green-100 text-green-800"
+																			: manuscript.status ===
+																				"Rejected"
+																				? "bg-red-100 text-red-800"
+																				: "bg-gray-100 text-gray-800"
+															}`}
 													>
 														{manuscript.status}
 													</span>
 													{typeof manuscript.revisionAttempts ===
 														"number" && (
-														<span className="text-xs text-[#496580]">
-															Attempts:{" "}
-															{manuscript.revisionAttempts}/
-															{manuscript.maxRevisionAttempts ||
-																3}
-														</span>
-													)}
+															<span className="text-xs text-[#496580]">
+																Attempts:{" "}
+																{manuscript.revisionAttempts}/
+																{manuscript.maxRevisionAttempts ||
+																	3}
+															</span>
+														)}
 												</div>
 												{manuscript.revisionLocked && (
 													<p className="text-xs text-red-600 font-semibold mb-2">
@@ -1433,15 +1414,14 @@ const handleSendInvitations = async () => {
 																				key={
 																					index
 																				}
-																				className={`text-xs p-2 rounded border ${
-																					invitation.status ===
+																				className={`text-xs p-2 rounded border ${invitation.status ===
 																					"accepted"
-																						? "bg-green-50 border-green-200"
-																						: invitation.status ===
-																						  "rejected"
+																					? "bg-green-50 border-green-200"
+																					: invitation.status ===
+																						"rejected"
 																						? "bg-red-50 border-red-200"
 																						: "bg-yellow-50 border-yellow-200"
-																				}`}
+																					}`}
 																			>
 																				<div className="flex items-center justify-between">
 																					<span className="font-medium">
@@ -1450,15 +1430,14 @@ const handleSendInvitations = async () => {
 																						}
 																					</span>
 																					<span
-																						className={`px-2 py-1 rounded text-xs font-semibold ${
-																							invitation.status ===
+																						className={`px-2 py-1 rounded text-xs font-semibold ${invitation.status ===
 																							"accepted"
-																								? "bg-green-100 text-green-800"
-																								: invitation.status ===
-																								  "rejected"
+																							? "bg-green-100 text-green-800"
+																							: invitation.status ===
+																								"rejected"
 																								? "bg-red-100 text-red-800"
 																								: "bg-yellow-100 text-yellow-800"
-																						}`}
+																							}`}
 																					>
 																						{invitation.status
 																							.charAt(
@@ -1520,38 +1499,70 @@ const handleSendInvitations = async () => {
 										{/* Action Buttons */}
 										<div className="flex flex-col space-y-2">
 											{/* View PDF Button - Always Available */}
-											  {manuscript.mergedFileUrl && (
-	<button
-	  onClick={() => window.open(manuscript.mergedFileUrl, "_blank")}
-	  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-	>
-	  📄 View Original PDF
-	</button>
-  )}
+											{manuscript.mergedFileUrl && (
+												<button
+													onClick={() => window.open(manuscript.mergedFileUrl, "_blank")}
+													className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors flex items-center justify-center space-x-2"
+												>
+													<span>📄</span>
+													<span>Original PDF</span>
+												</button>
+											)}
 
-  {/* Highlighted Revision (Word Doc) */}
-  {manuscript.highlightedRevisionFileUrl && (
-	<button
-	  onClick={() => {
-		const url = manuscript.highlightedRevisionFileUrl;
-		const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-		window.open(viewerUrl, "_blank");
-	  }}
-	  className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-	>
-	  ✏️ View Highlighted Revision
-	</button>
-  )}
+											{/* Response Sheet (PDF) */}
+											{manuscript.authorResponse?.docxUrl && (
+												<button
+													onClick={() => window.open(manuscript.authorResponse.docxUrl, "_blank")}
+													className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2"
+												>
+													<span>📝</span>
+													<span>Response Sheet</span>
+												</button>
+											)}
 
-  {/* Combined Revision PDF */}
-  {manuscript.revisionCombinedPdfUrl && (
-	<button
-	  onClick={() => window.open(manuscript.revisionCombinedPdfUrl, "_blank")}
-	  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-	>
-	  📑 View Combined Revision PDF
-	</button>
-  )}
+											{/* Highlighted Document (PDF) */}
+											{manuscript.authorResponse?.highlightedFileUrl && (
+												<button
+													onClick={() => window.open(manuscript.authorResponse.highlightedFileUrl, "_blank")}
+													className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors flex items-center justify-center space-x-2"
+												>
+													<span>✏️</span>
+													<span>Highlighted Doc</span>
+												</button>
+											)}
+
+											{/* Without Highlighted Document (DOCX/LaTeX) */}
+											{manuscript.authorResponse?.withoutHighlightedFileUrl && (
+												<button
+													onClick={() => {
+														const url = manuscript.authorResponse.withoutHighlightedFileUrl;
+														const isZip = url.toLowerCase().includes('.zip');
+
+														if (isZip) {
+															
+															const link = document.createElement('a');
+															link.href = url;
+															link.download = 'clean-document.zip'; 
+															link.target = '_blank';
+															document.body.appendChild(link);
+															link.click();
+															document.body.removeChild(link);
+														} else {
+															// Existing logic for other file types
+															const isPdf = url.toLowerCase().includes('.pdf');
+															if (isPdf) {
+																window.open(url, "_blank");
+															} else {
+																const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+																window.open(viewerUrl, "_blank");
+															}
+														}
+													}}
+													className="px-2 py-1 text-xs border border-green-600 text-green-600 rounded hover:bg-green-50 transition-colors"
+												>
+													without highlighted Doc
+												</button>
+											)}
 
 											{/* Invite Reviewers Button */}
 											<button
@@ -1572,47 +1583,46 @@ const handleSendInvitations = async () => {
 													?.length > 0 ||
 												manuscript.reviewerNotes
 													?.length > 0) && (
-												<button
-													className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-													title={`View ${
-														(manuscript.editorNotes
+													<button
+														className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+														title={`View ${(manuscript.editorNotes
 															?.length || 0) +
-														(manuscript
-															.editorNotesForAuthor
+															(manuscript
+																.editorNotesForAuthor
+																?.length || 0) +
+															(manuscript
+																.reviewerNotes
+																?.length || 0)
+															} notes`}
+														onClick={() => {
+															// Scroll to notes section
+															const element =
+																document.querySelector(
+																	`[data-manuscript-id="${manuscript._id}"] .notes-section`
+																);
+															if (element) {
+																element.scrollIntoView(
+																	{
+																		behavior:
+																			"smooth",
+																		block: "center",
+																	}
+																);
+															}
+														}}
+													>
+														📝 Notes (
+														{(manuscript.editorNotes
 															?.length || 0) +
-														(manuscript
-															.reviewerNotes
-															?.length || 0)
-													} notes`}
-													onClick={() => {
-														// Scroll to notes section
-														const element =
-															document.querySelector(
-																`[data-manuscript-id="${manuscript._id}"] .notes-section`
-															);
-														if (element) {
-															element.scrollIntoView(
-																{
-																	behavior:
-																		"smooth",
-																	block: "center",
-																}
-															);
-														}
-													}}
-												>
-													📝 Notes (
-													{(manuscript.editorNotes
-														?.length || 0) +
-														(manuscript
-															.editorNotesForAuthor
-															?.length || 0) +
-														(manuscript
-															.reviewerNotes
-															?.length || 0)}
-													)
-												</button>
-											)}
+															(manuscript
+																.editorNotesForAuthor
+																?.length || 0) +
+															(manuscript
+																.reviewerNotes
+																?.length || 0)}
+														)
+													</button>
+												)}
 
 											{/* Manual Status Control Buttons */}
 											<div className="bg-gray-50 p-3 rounded border">
@@ -1628,19 +1638,18 @@ const handleSendInvitations = async () => {
 																"Pending"
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
 															"Pending"
-																? "bg-gray-400 text-white cursor-not-allowed"
-																: "bg-blue-500 text-white hover:bg-blue-600"
-														}`}
+															? "bg-gray-400 text-white cursor-not-allowed"
+															: "bg-blue-500 text-white hover:bg-blue-600"
+															}`}
 														disabled={
 															manuscript.status ===
 															"Pending"
 														}
 													>
 														{manuscript.status ===
-														"Pending"
+															"Pending"
 															? "✓ Currently Pending"
 															: "🔄 Set to Pending"}
 													</button>
@@ -1653,19 +1662,18 @@ const handleSendInvitations = async () => {
 																"Reviewed"
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
 															"Reviewed"
-																? "bg-gray-400 text-white cursor-not-allowed"
-																: "bg-purple-500 text-white hover:bg-purple-600"
-														}`}
+															? "bg-gray-400 text-white cursor-not-allowed"
+															: "bg-purple-500 text-white hover:bg-purple-600"
+															}`}
 														disabled={
 															manuscript.status ===
 															"Reviewed"
 														}
 													>
 														{manuscript.status ===
-														"Reviewed"
+															"Reviewed"
 															? "✓ Reviewed"
 															: "✅ Mark as Reviewed"}
 													</button>
@@ -1677,19 +1685,18 @@ const handleSendInvitations = async () => {
 																manuscript
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
 															"Accepted"
-																? "bg-gray-400 text-white cursor-not-allowed"
-																: "bg-green-500 text-white hover:bg-green-600"
-														}`}
+															? "bg-gray-400 text-white cursor-not-allowed"
+															: "bg-green-500 text-white hover:bg-green-600"
+															}`}
 														disabled={
 															manuscript.status ===
 															"Accepted"
 														}
 													>
 														{manuscript.status ===
-														"Accepted"
+															"Accepted"
 															? "✓ Accepted"
 															: "🎉 Accept"}
 													</button>
@@ -1702,19 +1709,18 @@ const handleSendInvitations = async () => {
 																"reject"
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
 															"Rejected"
-																? "bg-gray-400 text-white cursor-not-allowed"
-																: "bg-red-500 text-white hover:bg-red-600"
-														}`}
+															? "bg-gray-400 text-white cursor-not-allowed"
+															: "bg-red-500 text-white hover:bg-red-600"
+															}`}
 														disabled={
 															manuscript.status ===
 															"Rejected"
 														}
 													>
 														{manuscript.status ===
-														"Rejected"
+															"Rejected"
 															? "✓ Rejected"
 															: "❌ Reject"}
 													</button>
@@ -1727,19 +1733,18 @@ const handleSendInvitations = async () => {
 																"revision"
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
 															"Revision Required"
-																? "bg-gray-400 text-white cursor-not-allowed"
-																: "bg-orange-500 text-white hover:bg-orange-600"
-														}`}
+															? "bg-gray-400 text-white cursor-not-allowed"
+															: "bg-orange-500 text-white hover:bg-orange-600"
+															}`}
 														disabled={
 															manuscript.status ===
 															"Revision Required"
 														}
 													>
 														{manuscript.status ===
-														"Revision Required"
+															"Revision Required"
 															? "✓ Revision Required"
 															: "📝 Revision Required"}
 													</button>
@@ -1749,11 +1754,11 @@ const handleSendInvitations = async () => {
 											{/* Quick Actions Section */}
 											<div className="bg-yellow-50 p-3 rounded border">
 												<button
-  className="px-4 py-2 bg-blue-600 text-white rounded"
-  onClick={() => exportNotesToWord(manuscript, user)}
->
-  📄 Export Notes to Word
-</button>
+													className="px-4 py-2 bg-blue-600 text-white rounded"
+													onClick={() => exportNotesToWord(manuscript, user)}
+												>
+													📄 Export Notes to Word
+												</button>
 												<h4 className="text-sm font-semibold text-yellow-700 mb-2">
 													⚡ Quick Actions
 												</h4>
@@ -1761,80 +1766,80 @@ const handleSendInvitations = async () => {
 													{/* Auto-workflow buttons */}
 													{manuscript.status ===
 														"Under Review" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Pending"
-																)
-															}
-															className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-														>
-															🔙 Reset to Pending
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Pending"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+															>
+																🔙 Reset to Pending
+															</button>
+														)}
 
 													{manuscript.status ===
 														"Pending" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Under Review"
-																)
-															}
-															className="px-3 py-1 text-sm bg-[#496580] text-white rounded hover:bg-[#3a5269]"
-														>
-															🚀 Quick Send to
-															Review
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Under Review"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-[#496580] text-white rounded hover:bg-[#3a5269]"
+															>
+																🚀 Quick Send to
+																Review
+															</button>
+														)}
 
 													{manuscript.status ===
 														"Under Review" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Reviewed"
-																)
-															}
-															className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
-														>
-															✅ Auto-Mark
-															Reviewed
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Reviewed"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
+															>
+																✅ Auto-Mark
+																Reviewed
+															</button>
+														)}
 
 													{manuscript.status ===
 														"Reviewed" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Accepted"
-																)
-															}
-															className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
-														>
-															🎯 Auto-Accept
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Accepted"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+															>
+																🎯 Auto-Accept
+															</button>
+														)}
 
 													{manuscript.status ===
 														"Revision Required" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Pending"
-																)
-															}
-															className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-														>
-															🔄 Reset to Pending
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Pending"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+															>
+																🔄 Reset to Pending
+															</button>
+														)}
 												</div>
 											</div>
 										</div>
@@ -1845,379 +1850,378 @@ const handleSendInvitations = async () => {
 										manuscript.editorNotesForAuthor
 											?.length > 0 ||
 										manuscript.reviewerNotes?.length >
-											0) && (
-										<div className="notes-section mt-4 border-t border-[#e2e8f0] pt-4">
-											<h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-												📝 Notes & Reviews History
-											</h4>
+										0) && (
+											<div className="notes-section mt-4 border-t border-[#e2e8f0] pt-4">
+												<h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+													📝 Notes & Reviews History
+												</h4>
 
-											<div className="space-y-3 max-h-60 overflow-y-auto">
-												{/* Show limited or all notes based on expanded state */}
-												{(() => {
-													const isExpanded =
-														expandedNotes[
+												<div className="space-y-3 max-h-60 overflow-y-auto">
+													{/* Show limited or all notes based on expanded state */}
+													{(() => {
+														const isExpanded =
+															expandedNotes[
 															manuscript._id
-														];
-													const allNotes = [
-														...(
-															manuscript.editorNotes ||
-															[]
-														)
-															.filter((note) => {
-																// Filter out notes that contain schema definitions or invalid content
-																const text =
-																	note.text ||
-																	"";
-																return (
-																	!text.includes(
-																		"rejectionReason: { type: String"
-																	) &&
-																	!text.includes(
-																		"required: function"
-																	) &&
-																	!text.includes(
-																		"type: String"
-																	) &&
-																	text.trim()
-																		.length >
+															];
+														const allNotes = [
+															...(
+																manuscript.editorNotes ||
+																[]
+															)
+																.filter((note) => {
+																	// Filter out notes that contain schema definitions or invalid content
+																	const text =
+																		note.text ||
+																		"";
+																	return (
+																		!text.includes(
+																			"rejectionReason: { type: String"
+																		) &&
+																		!text.includes(
+																			"required: function"
+																		) &&
+																		!text.includes(
+																			"type: String"
+																		) &&
+																		text.trim()
+																			.length >
 																		0
-																);
-															})
-															.map((note) => ({
-																...note,
-																type: "editor",
-															})),
-														...(
-															manuscript.editorNotesForAuthor ||
-															[]
-														)
-															.filter((note) => {
-																// Filter out notes that contain schema definitions or invalid content
-																const text =
-																	note.text ||
-																	"";
-																return (
-																	!text.includes(
-																		"rejectionReason: { type: String"
-																	) &&
-																	!text.includes(
-																		"required: function"
-																	) &&
-																	!text.includes(
-																		"type: String"
-																	) &&
-																	text.trim()
-																		.length >
+																	);
+																})
+																.map((note) => ({
+																	...note,
+																	type: "editor",
+																})),
+															...(
+																manuscript.editorNotesForAuthor ||
+																[]
+															)
+																.filter((note) => {
+																	// Filter out notes that contain schema definitions or invalid content
+																	const text =
+																		note.text ||
+																		"";
+																	return (
+																		!text.includes(
+																			"rejectionReason: { type: String"
+																		) &&
+																		!text.includes(
+																			"required: function"
+																		) &&
+																		!text.includes(
+																			"type: String"
+																		) &&
+																		text.trim()
+																			.length >
 																		0
-																);
-															})
-															.map((note) => ({
-																...note,
-																type: "editorForAuthor",
-															})),
-														...(
-															manuscript.reviewerNotes ||
-															[]
-														)
-															.filter((note) => {
-																// Filter out notes that contain schema definitions or invalid content
-																const text =
-																	note.text ||
-																	"";
-																return (
-																	!text.includes(
-																		"rejectionReason: { type: String"
-																	) &&
-																	!text.includes(
-																		"required: function"
-																	) &&
-																	!text.includes(
-																		"type: String"
-																	) &&
-																	text.trim()
-																		.length >
+																	);
+																})
+																.map((note) => ({
+																	...note,
+																	type: "editorForAuthor",
+																})),
+															...(
+																manuscript.reviewerNotes ||
+																[]
+															)
+																.filter((note) => {
+																	// Filter out notes that contain schema definitions or invalid content
+																	const text =
+																		note.text ||
+																		"";
+																	return (
+																		!text.includes(
+																			"rejectionReason: { type: String"
+																		) &&
+																		!text.includes(
+																			"required: function"
+																		) &&
+																		!text.includes(
+																			"type: String"
+																		) &&
+																		text.trim()
+																			.length >
 																		0
-																);
-															})
-															.map((note) => ({
-																...note,
-																type: "reviewer",
-															})),
-													].sort(
-														(a, b) =>
-															new Date(
-																a.addedAt
-															) -
-															new Date(b.addedAt)
-													);
+																	);
+																})
+																.map((note) => ({
+																	...note,
+																	type: "reviewer",
+																})),
+														].sort(
+															(a, b) =>
+																new Date(
+																	a.addedAt
+																) -
+																new Date(b.addedAt)
+														);
 
-													const displayNotes =
-														isExpanded
-															? allNotes
-															: allNotes.slice(
+														const displayNotes =
+															isExpanded
+																? allNotes
+																: allNotes.slice(
 																	0,
 																	3
-															  );
+																);
 
-													return displayNotes.map(
-														(item, index) => {
-															if (
-																item.type ===
-																"editor"
-															) {
-																return (
-																	<div
-																		key={`editor-${index}`}
-																		className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400"
-																	>
-																		<div className="flex items-center justify-between mb-1">
-																			<div className="flex items-center space-x-2">
-																				<span className="text-sm font-semibold text-blue-700">
-																					👨‍💼
-																					Editor:{" "}
-																					{item
-																						.addedBy
-																						?.name ||
-																						"Unknown"}
-																				</span>
-																				{item.action && (
-																					<span className="px-2 py-1 text-xs bg-blue-200 text-blue-800 rounded">
-																						{
-																							item.action
-																						}
+														return displayNotes.map(
+															(item, index) => {
+																if (
+																	item.type ===
+																	"editor"
+																) {
+																	return (
+																		<div
+																			key={`editor-${index}`}
+																			className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400"
+																		>
+																			<div className="flex items-center justify-between mb-1">
+																				<div className="flex items-center space-x-2">
+																					<span className="text-sm font-semibold text-blue-700">
+																						👨‍💼
+																						Editor:{" "}
+																						{item
+																							.addedBy
+																							?.name ||
+																							"Unknown"}
 																					</span>
-																				)}
-																			</div>
-																			<span className="text-xs text-blue-600">
-																				{new Date(
-																					item.addedAt
-																				).toLocaleDateString(
-																					"en-US",
-																					{
-																						month: "short",
-																						day: "numeric",
-																						hour: "2-digit",
-																						minute: "2-digit",
-																					}
-																				)}
-																			</span>
-																		</div>
-																		<p className="text-sm text-gray-700">
-																			{
-																				item.text
-																			}
-																		</p>
-																	</div>
-																);
-															} else if (
-																item.type ===
-																"editorForAuthor"
-															) {
-																return (
-																	<div
-																		key={`editorForAuthor-${index}`}
-																		className="bg-orange-50 p-3 rounded-lg border-l-4 border-orange-400"
-																	>
-																		<div className="flex items-center justify-between mb-1">
-																			<div className="flex items-center space-x-2">
-																				<span className="text-sm font-semibold text-orange-700">
-																					📝
-																					Editor
-																					Note
-																					for
-																					Author:{" "}
-																					{item
-																						.addedBy
-																						?.name ||
-																						"Unknown"}
-																				</span>
-																				{item.action && (
-																					<span className="px-2 py-1 text-xs bg-orange-200 text-orange-800 rounded">
+																					{item.action && (
+																						<span className="px-2 py-1 text-xs bg-blue-200 text-blue-800 rounded">
+																							{
+																								item.action
+																							}
+																						</span>
+																					)}
+																				</div>
+																				<span className="text-xs text-blue-600">
+																					{new Date(
+																						item.addedAt
+																					).toLocaleDateString(
+																						"en-US",
 																						{
-																							item.action
+																							month: "short",
+																							day: "numeric",
+																							hour: "2-digit",
+																							minute: "2-digit",
 																						}
-																					</span>
-																				)}
-																			</div>
-																			<span className="text-xs text-orange-600">
-																				{new Date(
-																					item.addedAt
-																				).toLocaleDateString(
-																					"en-US",
-																					{
-																						month: "short",
-																						day: "numeric",
-																						hour: "2-digit",
-																						minute: "2-digit",
-																					}
-																				)}
-																			</span>
-																		</div>
-																		<p className="text-sm text-gray-700">
-																			{
-																				item.text
-																			}
-																		</p>
-																	</div>
-																);
-															} else if (
-																item.type ===
-																"reviewer"
-															) {
-																return (
-																	<div
-																		key={`reviewer-note-${index}`}
-																		className="bg-purple-50 p-3 rounded-lg border-l-4 border-purple-400"
-																	>
-																		<div className="flex items-center justify-between mb-1">
-																			<div className="flex items-center space-x-2">
-																				<span className="text-sm font-semibold text-purple-700">
-																					👥
-																					Reviewer:{" "}
-																					{item
-																						.addedBy
-																						?.name ||
-																						"Anonymous"}
+																					)}
 																				</span>
-																				{item.action && (
-																					<span className="px-2 py-1 text-xs bg-purple-200 text-purple-800 rounded">
+																			</div>
+																			<p className="text-sm text-gray-700">
+																				{
+																					item.text
+																				}
+																			</p>
+																		</div>
+																	);
+																} else if (
+																	item.type ===
+																	"editorForAuthor"
+																) {
+																	return (
+																		<div
+																			key={`editorForAuthor-${index}`}
+																			className="bg-orange-50 p-3 rounded-lg border-l-4 border-orange-400"
+																		>
+																			<div className="flex items-center justify-between mb-1">
+																				<div className="flex items-center space-x-2">
+																					<span className="text-sm font-semibold text-orange-700">
+																						📝
+																						Editor
+																						Note
+																						for
+																						Author:{" "}
+																						{item
+																							.addedBy
+																							?.name ||
+																							"Unknown"}
+																					</span>
+																					{item.action && (
+																						<span className="px-2 py-1 text-xs bg-orange-200 text-orange-800 rounded">
+																							{
+																								item.action
+																							}
+																						</span>
+																					)}
+																				</div>
+																				<span className="text-xs text-orange-600">
+																					{new Date(
+																						item.addedAt
+																					).toLocaleDateString(
+																						"en-US",
 																						{
-																							item.action
+																							month: "short",
+																							day: "numeric",
+																							hour: "2-digit",
+																							minute: "2-digit",
 																						}
-																					</span>
-																				)}
-																			</div>
-																			<span className="text-xs text-purple-600">
-																				{new Date(
-																					item.addedAt
-																				).toLocaleDateString(
-																					"en-US",
-																					{
-																						month: "short",
-																						day: "numeric",
-																						hour: "2-digit",
-																						minute: "2-digit",
-																					}
-																				)}
-																			</span>
-																		</div>
-																		<p className="text-sm text-gray-700">
-																			{
-																				item.text
-																			}
-																		</p>
-																	</div>
-																);
-															} else if (
-																item.type ===
-																"review"
-															) {
-																return (
-																	<div
-																		key={`review-${index}`}
-																		className="bg-green-50 p-3 rounded-lg border-l-4 border-green-400"
-																	>
-																		<div className="flex items-center justify-between mb-1">
-																			<div className="flex items-center space-x-2">
-																				<span className="text-sm font-semibold text-green-700">
-																					📋
-																					Review
-																					by
-																					Reviewer
+																					)}
 																				</span>
-																				<span
-																					className={`px-2 py-1 text-xs rounded ${
-																						item.recommendation ===
-																						"Accept"
+																			</div>
+																			<p className="text-sm text-gray-700">
+																				{
+																					item.text
+																				}
+																			</p>
+																		</div>
+																	);
+																} else if (
+																	item.type ===
+																	"reviewer"
+																) {
+																	return (
+																		<div
+																			key={`reviewer-note-${index}`}
+																			className="bg-purple-50 p-3 rounded-lg border-l-4 border-purple-400"
+																		>
+																			<div className="flex items-center justify-between mb-1">
+																				<div className="flex items-center space-x-2">
+																					<span className="text-sm font-semibold text-purple-700">
+																						👥
+																						Reviewer:{" "}
+																						{item
+																							.addedBy
+																							?.name ||
+																							"Anonymous"}
+																					</span>
+																					{item.action && (
+																						<span className="px-2 py-1 text-xs bg-purple-200 text-purple-800 rounded">
+																							{
+																								item.action
+																							}
+																						</span>
+																					)}
+																				</div>
+																				<span className="text-xs text-purple-600">
+																					{new Date(
+																						item.addedAt
+																					).toLocaleDateString(
+																						"en-US",
+																						{
+																							month: "short",
+																							day: "numeric",
+																							hour: "2-digit",
+																							minute: "2-digit",
+																						}
+																					)}
+																				</span>
+																			</div>
+																			<p className="text-sm text-gray-700">
+																				{
+																					item.text
+																				}
+																			</p>
+																		</div>
+																	);
+																} else if (
+																	item.type ===
+																	"review"
+																) {
+																	return (
+																		<div
+																			key={`review-${index}`}
+																			className="bg-green-50 p-3 rounded-lg border-l-4 border-green-400"
+																		>
+																			<div className="flex items-center justify-between mb-1">
+																				<div className="flex items-center space-x-2">
+																					<span className="text-sm font-semibold text-green-700">
+																						📋
+																						Review
+																						by
+																						Reviewer
+																					</span>
+																					<span
+																						className={`px-2 py-1 text-xs rounded ${item.recommendation ===
+																							"Accept"
 																							? "bg-green-200 text-green-800"
 																							: item.recommendation ===
-																							  "Minor Revision"
-																							? "bg-yellow-200 text-yellow-800"
-																							: item.recommendation ===
-																							  "Major Revision"
-																							? "bg-orange-200 text-orange-800"
-																							: "bg-red-200 text-red-800"
-																					}`}
-																				>
-																					{
-																						item.recommendation
-																					}
+																								"Minor Revision"
+																								? "bg-yellow-200 text-yellow-800"
+																								: item.recommendation ===
+																									"Major Revision"
+																									? "bg-orange-200 text-orange-800"
+																									: "bg-red-200 text-red-800"
+																							}`}
+																					>
+																						{
+																							item.recommendation
+																						}
+																					</span>
+																				</div>
+																				<span className="text-xs text-green-600">
+																					{new Date(
+																						item.submittedAt
+																					).toLocaleDateString(
+																						"en-US",
+																						{
+																							month: "short",
+																							day: "numeric",
+																							hour: "2-digit",
+																							minute: "2-digit",
+																						}
+																					)}
 																				</span>
 																			</div>
-																			<span className="text-xs text-green-600">
-																				{new Date(
-																					item.submittedAt
-																				).toLocaleDateString(
-																					"en-US",
-																					{
-																						month: "short",
-																						day: "numeric",
-																						hour: "2-digit",
-																						minute: "2-digit",
-																					}
-																				)}
-																			</span>
+																			<p className="text-sm text-gray-700">
+																				{
+																					item.comments
+																				}
+																			</p>
 																		</div>
-																		<p className="text-sm text-gray-700">
-																			{
-																				item.comments
-																			}
-																		</p>
-																	</div>
-																);
+																	);
+																}
 															}
-														}
-													);
-												})()}
-											</div>
+														);
+													})()}
+												</div>
 
-											{/* Toggle View All Notes Button */}
-											{(() => {
-												const totalNotes =
-													(manuscript.editorNotes
-														?.length || 0) +
-													(manuscript
-														.editorNotesForAuthor
-														?.length || 0) +
-													(manuscript.reviewerNotes
-														?.length || 0);
-												const isExpanded =
-													expandedNotes[
+												{/* Toggle View All Notes Button */}
+												{(() => {
+													const totalNotes =
+														(manuscript.editorNotes
+															?.length || 0) +
+														(manuscript
+															.editorNotesForAuthor
+															?.length || 0) +
+														(manuscript.reviewerNotes
+															?.length || 0);
+													const isExpanded =
+														expandedNotes[
 														manuscript._id
-													];
+														];
 
-												if (totalNotes > 3) {
-													return (
-														<button
-															className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-															onClick={() => {
-																setExpandedNotes(
-																	(prev) => ({
-																		...prev,
-																		[manuscript._id]:
-																			!prev[
+													if (totalNotes > 3) {
+														return (
+															<button
+																className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+																onClick={() => {
+																	setExpandedNotes(
+																		(prev) => ({
+																			...prev,
+																			[manuscript._id]:
+																				!prev[
 																				manuscript
 																					._id
-																			],
-																	})
-																);
-															}}
-														>
-															{isExpanded
-																? "📋 Show Less"
-																: `📋 View All Notes (${totalNotes} total)`}
-														</button>
-													);
-												}
-												return null;
-											})()}
-										</div>
-									)}
+																				],
+																		})
+																	);
+																}}
+															>
+																{isExpanded
+																	? "📋 Show Less"
+																	: `📋 View All Notes (${totalNotes} total)`}
+															</button>
+														);
+													}
+													return null;
+												})()}
+											</div>
+										)}
 
 									{/* Note Input Section */}
 									{showNoteInput &&
 										selectedManuscript?._id ===
-											manuscript._id && (
+										manuscript._id && (
 											<div className="mt-4 border-t border-[#e2e8f0] pt-4">
 												{showNoteInput === "reject" && (
 													<>
@@ -2270,53 +2274,53 @@ const handleSendInvitations = async () => {
 
 												{showNoteInput ===
 													"revision" && (
-													<>
-														<div className="mb-4">
-															<label className="block text-[#1a365d] mb-2 font-semibold">
-																Add a revision
-																required note:
-															</label>
-															<textarea
-																value={
-																	revisionNoteText
-																}
-																onChange={(e) =>
-																	setRevisionNoteText(
-																		e.target
-																			.value
-																	)
-																}
-																className="w-full h-32 p-2 rounded bg-white text-[#1a365d] border border-[#e2e8f0]"
-																placeholder="Enter revision requirements and feedback for the author..."
-																required
-															/>
-														</div>
+														<>
+															<div className="mb-4">
+																<label className="block text-[#1a365d] mb-2 font-semibold">
+																	Add a revision
+																	required note:
+																</label>
+																<textarea
+																	value={
+																		revisionNoteText
+																	}
+																	onChange={(e) =>
+																		setRevisionNoteText(
+																			e.target
+																				.value
+																		)
+																	}
+																	className="w-full h-32 p-2 rounded bg-white text-[#1a365d] border border-[#e2e8f0]"
+																	placeholder="Enter revision requirements and feedback for the author..."
+																	required
+																/>
+															</div>
 
-														<div className="flex justify-end space-x-2">
-															<button
-																onClick={
-																	handleCancel
-																}
-																className="px-4 py-2 bg-gray-300 text-[#1a365d] rounded hover:bg-gray-400"
-															>
-																Cancel
-															</button>
-															<button
-																onClick={() =>
-																	handleRevisionRequired(
-																		manuscript._id
-																	)
-																}
-																disabled={
-																	!revisionNoteText.trim()
-																}
-																className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
-															>
-																Request Revision
-															</button>
-														</div>
-													</>
-												)}
+															<div className="flex justify-end space-x-2">
+																<button
+																	onClick={
+																		handleCancel
+																	}
+																	className="px-4 py-2 bg-gray-300 text-[#1a365d] rounded hover:bg-gray-400"
+																>
+																	Cancel
+																</button>
+																<button
+																	onClick={() =>
+																		handleRevisionRequired(
+																			manuscript._id
+																		)
+																	}
+																	disabled={
+																		!revisionNoteText.trim()
+																	}
+																	className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+																>
+																	Request Revision
+																</button>
+															</div>
+														</>
+													)}
 											</div>
 										)}
 								</div>
@@ -2431,14 +2435,12 @@ const handleSendInvitations = async () => {
 																e.target.value
 															)
 														}
-														className={`w-full bg-white text-[#1a365d] rounded p-2 border focus:ring-2 focus:ring-[#496580]/20 outline-none transition-colors ${
-															isValidEmail
-																? "border-[#e2e8f0] focus:border-[#496580]"
-																: "border-red-300 focus:border-red-500"
-														}`}
-														placeholder={`Reviewer ${
-															index + 1
-														} email address...`}
+														className={`w-full bg-white text-[#1a365d] rounded p-2 border focus:ring-2 focus:ring-[#496580]/20 outline-none transition-colors ${isValidEmail
+															? "border-[#e2e8f0] focus:border-[#496580]"
+															: "border-red-300 focus:border-red-500"
+															}`}
+														placeholder={`Reviewer ${index + 1
+															} email address...`}
 													/>
 													{email.length > 0 && (
 														<div className="absolute right-2 top-1/2 transform -translate-y-1/2">
@@ -2506,15 +2508,15 @@ const handleSendInvitations = async () => {
 									{inviteEmails.filter(
 										(email) => email.trim().length > 0
 									).length > 0 && (
-										<button
-											type="button"
-											onClick={clearAllEmails}
-											className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-											title="Clear all email fields"
-										>
-											🗑️ Clear All
-										</button>
-									)}
+											<button
+												type="button"
+												onClick={clearAllEmails}
+												className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+												title="Clear all email fields"
+											>
+												🗑️ Clear All
+											</button>
+										)}
 								</div>
 							</div>
 
@@ -2586,21 +2588,19 @@ const handleSendInvitations = async () => {
 										{inviteEmails.filter(
 											(email) => email.trim().length > 0
 										).length > 0
-											? `${
-													inviteEmails.filter(
-														(email) =>
-															email.trim()
-																.length > 0
-													).length
-											  } Invitation${
-													inviteEmails.filter(
-														(email) =>
-															email.trim()
-																.length > 0
-													).length !== 1
-														? "s"
-														: ""
-											  }`
+											? `${inviteEmails.filter(
+												(email) =>
+													email.trim()
+														.length > 0
+											).length
+											} Invitation${inviteEmails.filter(
+												(email) =>
+													email.trim()
+														.length > 0
+											).length !== 1
+												? "s"
+												: ""
+											}`
 											: "Invitations"}
 									</>
 								)}
