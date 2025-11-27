@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../App";
@@ -20,7 +20,10 @@ function ReviewerDashboard() {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [manuscripts, setManuscripts] = useState([]);
+  const [forceRender, setForceRender] = useState(false);
   const navigate = useNavigate();
+  console.log("users", users);
+  console.log("ReviewerDashboard user:", user);
   // Store review inputs per-manuscript so text doesn't mirror across rows
   const [reviewTexts, setReviewTexts] = useState({}); // { [manuscriptId]: string }
   const [recommendations, setRecommendations] = useState({}); // { [manuscriptId]: string }
@@ -28,117 +31,141 @@ function ReviewerDashboard() {
   const [showRejectForm, setShowRejectForm] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
 
-  useEffect(() => {
-    const fetchManuscripts = async () => {
-      try {
-        if (!user || !user.token) {
-          console.error("No token found");
-          navigate("/login");
+  const fetchManuscripts = useCallback(async () => {
+    try {
+      if (!user || !user.token) {
+        console.error("No token found");
+        navigate("/login");
+        return;
+      }
+
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/assigned-manuscripts`,
+        {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }
+      );
+
+      const userManuscripts = {};
+      response.data.forEach((manuscript) => {
+        const seen = new Set();
+        const authorsArray = Array.isArray(manuscript.allAuthors)
+          ? manuscript.allAuthors
+          : Array.isArray(manuscript.authors)
+            ? manuscript.authors
+            : [];
+        const candidateAuthors = [];
+
+        authorsArray.forEach((a) => {
+          if (a && a._id && !seen.has(String(a._id))) {
+            seen.add(String(a._id));
+            candidateAuthors.push(a);
+          }
+        });
+
+        if (manuscript.author && manuscript.author._id && !seen.has(String(manuscript.author._id))) {
+          seen.add(String(manuscript.author._id));
+          candidateAuthors.push(manuscript.author);
+        }
+
+        if (candidateAuthors.length === 0) {
+          const fallbackId = manuscript._id;
+          const groupKey = fallbackId;
+          if (!userManuscripts[groupKey]) {
+            userManuscripts[groupKey] = {
+              _id: fallbackId,
+              firstName: "",
+              lastName: "",
+              fullName: "Unknown Author",
+              manuscripts: [],
+            };
+          }
+          userManuscripts[groupKey].manuscripts.push(manuscript);
           return;
         }
 
-        const response = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/auth/reviewer/assigned-manuscripts`,
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-
-        const userManuscripts = {};
-        response.data.forEach((manuscript) => {
-          let authorFullName = "Unknown Author";
-          let firstName = "";
-          let lastName = "";
-          let authorId = "";
-
-          if (manuscript.author && typeof manuscript.author === "object") {
-            firstName = manuscript.author.firstName || "";
-            lastName = manuscript.author.lastName || "";
-            authorFullName = `${firstName} ${lastName}`.trim();
-            authorId = manuscript.author._id || "";
-          } else {
-            authorId = manuscript._id;
-          }
-
-          if (!authorFullName || authorFullName.trim() === "") {
-            authorFullName = "Unknown Author";
-          }
-          if (!authorId) {
-            authorId = manuscript._id;
-          }
-
+        candidateAuthors.forEach((au) => {
+          const firstName = au.firstName || "";
+          const lastName = au.lastName || "";
+          const fullName = `${firstName} ${lastName}`.trim() || "Unknown Author";
+          const authorId = au._id || manuscript._id;
           const groupKey = authorId;
           if (!userManuscripts[groupKey]) {
             userManuscripts[groupKey] = {
               _id: authorId,
               firstName,
               lastName,
-              fullName: authorFullName,
+              fullName,
               manuscripts: [],
             };
           }
           userManuscripts[groupKey].manuscripts.push(manuscript);
         });
+      });
 
-        // Sort each author's manuscripts so latest submissions appear first
-        Object.values(userManuscripts).forEach((u) => {
-          u.manuscripts.sort((a, b) => {
-            const dateB =
-              new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
-            const dateA =
-              new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
-            return dateB - dateA;
-          });
+      Object.values(userManuscripts).forEach((u) => {
+        u.manuscripts.sort((a, b) => {
+          const dateB = new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
+          const dateA = new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
+          return dateB - dateA;
         });
+      });
 
-        const usersList = Object.values(userManuscripts);
-        setUsers(usersList);
-        if (usersList.length > 0) {
-          setSelectedUser(usersList[0]);
-          setManuscripts(usersList[0].manuscripts);
-        }
-      } catch (error) {
-        console.error("Error fetching manuscripts:", error);
-        if (error.response?.status === 401) {
-          navigate("/login");
-        }
+      const usersList = Object.values(userManuscripts);
+      setUsers(usersList);
+      if (usersList.length > 0) {
+        setSelectedUser(usersList[0]);
+        setManuscripts(usersList[0].manuscripts);
+      } else {
+        setSelectedUser(null);
+        setManuscripts([]);
       }
-    };
-
-    const fetchInvitations = async () => {
-      try {
-        if (!user || !user.token) {
-          return;
-        }
-        const response = await axios.get(
-          `${
-            import.meta.env.VITE_BACKEND_URL
-          }/api/auth/reviewer/pending-invitations`,
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-        setPendingInvitations(response.data);
-      } catch (error) {
-        console.error("Error fetching invitations:", error);
+      return usersList;
+    } catch (error) {
+      console.error("Error fetching manuscripts:", error);
+      if (error.response?.status === 401) {
+        navigate("/login");
       }
-    };
+    }
+  }, [user, navigate]);
 
+  const fetchInvitations = useCallback(async () => {
+    try {
+      if (!user || !user.token) {
+        return;
+      }
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/pending-invitations`,
+        {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }
+      );
+      setPendingInvitations(response.data);
+    } catch (error) {
+      console.error("Error fetching invitations:", error);
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (user && user.token) {
       fetchManuscripts();
       fetchInvitations();
     }
-  }, [user, navigate]);
+  }, [user, fetchManuscripts, fetchInvitations]);
 
   const handleUserClick = (user) => {
+    console.log("=== Reviewer Dashboard Debug ===");
+    console.log("Clicked user:", user);
+    console.log("User manuscripts count:", user.manuscripts?.length || 0);
+
     setSelectedUser(user);
     setManuscripts(user.manuscripts || []);
+
+    // Force re-render
+    setForceRender(prev => !prev);
+
+    console.log("Selected user manuscripts:", user.manuscripts?.length || 0);
+    console.log("=== End Debug ===");
   };
 
   const handleViewPDF = (manuscriptUrl) => {
@@ -177,8 +204,7 @@ function ReviewerDashboard() {
       };
 
       const response = await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/review`,
         {
           comments: currentReviewText,
@@ -193,8 +219,7 @@ function ReviewerDashboard() {
       );
 
       const statusResponse = await axios.put(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/manuscripts/${manuscriptId}/status`,
         { status: "Reviewed" },
         {
@@ -228,8 +253,7 @@ function ReviewerDashboard() {
         return;
       }
       await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/reject-invitation`,
         {
           rejectionReason: rejectionReason.trim(),
@@ -259,9 +283,11 @@ function ReviewerDashboard() {
         navigate("/login");
         return;
       }
+
+      console.log("Accepting invitation for manuscript:", manuscriptId);
+
       await axios.post(
-        `${
-          import.meta.env.VITE_BACKEND_URL
+        `${import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/accept-invitation`,
         {},
         {
@@ -270,11 +296,29 @@ function ReviewerDashboard() {
           },
         }
       );
+
+      // Remove from pending invitations
       setPendingInvitations((prev) =>
         prev.filter((inv) => inv._id !== manuscriptId)
       );
+
       alert("Invitation accepted successfully!");
-      window.location.reload();
+
+      console.log("Fetching fresh manuscripts after acceptance...");
+      const refreshedUsers = await fetchManuscripts();
+      await fetchInvitations();
+      setForceRender(prev => !prev);
+
+      if (Array.isArray(refreshedUsers) && refreshedUsers.length > 0) {
+        const targetUser = refreshedUsers.find((u) =>
+          (u.manuscripts || []).some((m) => m._id === manuscriptId)
+        );
+        if (targetUser) {
+          setSelectedUser(targetUser);
+          setManuscripts(targetUser.manuscripts || []);
+        }
+      }
+
     } catch (error) {
       console.error("Error accepting invitation:", error);
       alert("Failed to accept invitation");
@@ -390,11 +434,10 @@ function ReviewerDashboard() {
                 <button
                   key={user._id}
                   onClick={() => handleUserClick(user)}
-                  className={`w-full text-left p-3 rounded-lg transition-all ${
-                    selectedUser === user
-                      ? "bg-[#496580] text-white"
-                      : "bg-[#f8fafc] text-[#1a365d] hover:bg-[#e2e8f0]"
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser === user
+                    ? "bg-[#496580] text-white"
+                    : "bg-[#f8fafc] text-[#1a365d] hover:bg-[#e2e8f0]"
+                    }`}
                 >
                   {user.fullName}
                 </button>
@@ -409,10 +452,10 @@ function ReviewerDashboard() {
                 ? `Manuscripts Under Review by ${selectedUser.firstName} ${selectedUser.lastName}`
                 : "Select an Author"}
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-4" key={`${selectedUser?._id || 'all'}-${forceRender}`}>
               {manuscripts.map((manuscript) => (
                 <div
-                  key={manuscript._id}
+                  key={`${manuscript._id}-${forceRender}`}
                   className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0]"
                 >
                   <div className="flex justify-between items-start">
@@ -431,38 +474,68 @@ function ReviewerDashboard() {
                       </p>
                     </div>
                     <div className="flex flex-col space-y-2">
-                      <button
-                        onClick={() => handleViewPDF(manuscript.mergedFileUrl)}
-                        className="px-4 py-2 bg-[#496580] text-white rounded hover:bg-[#3a5269]"
-                      >
-                        View PDF
-                      </button>
-                      {manuscript.highlightedRevisionFileUrl && (
+                      {manuscript.mergedFileUrl && (
                         <button
-                          onClick={() => {
-                            const url = manuscript.highlightedRevisionFileUrl;
-                            if (url) {
-                              const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(
-                                url
-                              )}&embedded=true`;
-                              window.open(viewerUrl, "_blank");
-                            } else {
-                              alert("File not available");
-                            }
-                          }}
-                          className="px-4 py-2 bg-[#f59e0b] text-white rounded hover:bg-[#d97706]"
+                          onClick={() => handleViewPDF(manuscript.mergedFileUrl)}
+                          className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                         >
-                          View Highlighted Revision
+                          <span>📄</span>
+                          <span>Original PDF</span>
                         </button>
                       )}
-                      {manuscript.revisionCombinedPdfUrl && (
+
+                      {/* Response Sheet (PDF) */}
+                      {manuscript.authorResponse?.docxUrl && (
                         <button
-                          onClick={() =>
-                            handleViewPDF(manuscript.revisionCombinedPdfUrl)
-                          }
-                          className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669]"
+                          onClick={() => window.open(manuscript.authorResponse.docxUrl, "_blank")}
+                          className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                         >
-                          View Combined Revision PDF
+                          <span>📝</span>
+                          <span>Response Sheet</span>
+                        </button>
+                      )}
+
+                      {/* Highlighted Document (PDF) */}
+                      {manuscript.authorResponse?.highlightedFileUrl && (
+                        <button
+                          onClick={() => window.open(manuscript.authorResponse.highlightedFileUrl, "_blank")}
+                          className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors mb-1 flex items-center justify-center space-x-2"
+                        >
+                          <span>✏️</span>
+                          <span>Highlighted Doc</span>
+                        </button>
+                      )}
+
+                      {/* Without Highlighted Document (DOCX/LaTeX) */}
+                      {manuscript.authorResponse?.withoutHighlightedFileUrl && (
+                        <button
+                          onClick={() => {
+                            const url = manuscript.authorResponse.withoutHighlightedFileUrl;
+                            const isZip = url.toLowerCase().includes('.zip');
+
+                            if (isZip) {
+
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = 'clean-document.zip';
+                              link.target = '_blank';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            } else {
+                              // Existing logic for other file types
+                              const isPdf = url.toLowerCase().includes('.pdf');
+                              if (isPdf) {
+                                window.open(url, "_blank");
+                              } else {
+                                const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+                                window.open(viewerUrl, "_blank");
+                              }
+                            }
+                          }}
+                          className="px-2 py-1 text-xs border border-green-600 text-green-600 rounded hover:bg-green-50 transition-colors"
+                        >
+                          without highlighted Doc
                         </button>
                       )}
                     </div>
@@ -487,15 +560,14 @@ function ReviewerDashboard() {
                               <p className="text-[#1a365d]">{note.text}</p>
                               {note.action && (
                                 <span
-                                  className={`inline-block mt-2 px-2 py-1 text-xs rounded ${
-                                    note.action === "Under Review"
-                                      ? "bg-[#f59e0b]"
-                                      : note.action === "Reviewed"
+                                  className={`inline-block mt-2 px-2 py-1 text-xs rounded ${note.action === "Under Review"
+                                    ? "bg-[#f59e0b]"
+                                    : note.action === "Reviewed"
                                       ? "bg-[#3b82f6]"
                                       : note.action === "Accepted"
-                                      ? "bg-[#10b981]"
-                                      : "bg-[#ef4444]"
-                                  } text-white`}
+                                        ? "bg-[#10b981]"
+                                        : "bg-[#ef4444]"
+                                    } text-white`}
                                 >
                                   {note.action}
                                 </span>

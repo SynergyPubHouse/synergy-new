@@ -427,10 +427,10 @@ const ManuscriptPage = () => {
 	// Handle adding items in step 4
 	const handleAddItem = () => {
 		if (itemInput.trim() === "") {
-			toast.warning("Please enter an item before adding", {
-				position: "top-center",
-				autoClose: 2000,
-			});
+			// toast.warning("Please enter an item before adding", {
+			// 	position: "top-center",
+			// 	autoClose: 2000,
+			// });
 			return;
 		}
 
@@ -450,7 +450,7 @@ const ManuscriptPage = () => {
 	};
 
 	// Handle billing info nested fields
-const handleBillingInfoChange = (e) => {
+	const handleBillingInfoChange = (e) => {
 		const { name, value } = e.target;
 		console.log('Billing field change:', { name, value });
 		setFormData((prevData) => {
@@ -598,10 +598,10 @@ const handleBillingInfoChange = (e) => {
 					autoClose: 5000,
 				});
 			} else {
-				toast.warning("Could not extract information automatically. Please enter details manually.", {
-					position: "top-center",
-					autoClose: 4000,
-				});
+				// toast.warning("Could not extract information automatically. Please enter details manually.", {
+				// 	position: "top-center",
+				// 	autoClose: 4000,
+				// });
 			}
 			// Mark as done so user can proceed manually
 			setExtractionDone(true);
@@ -646,13 +646,13 @@ const handleBillingInfoChange = (e) => {
 		) {
 			setCurrentSection(step);
 		} else {
-			toast.warning(
-				`Please complete the current section before proceeding to step ${step}`,
-				{
-					position: "top-center",
-					autoClose: 3000,
-				}
-			);
+			// toast.warning(
+			// 	`Please complete the current section before proceeding to step ${step}`,
+			// 	{
+			// 		position: "top-center",
+			// 		autoClose: 3000,
+			// 	}
+			// );
 		}
 	};
 
@@ -1093,10 +1093,10 @@ const handleBillingInfoChange = (e) => {
 				});
 			} else {
 				console.log('No authors found to send emails');
-				toast.warning('No authors found to send email notifications', {
-					position: "top-center",
-					autoClose: 3000,
-				});
+				// toast.warning('No authors found to send email notifications', {
+				// 	position: "top-center",
+				// 	autoClose: 3000,
+				// });
 			}
 
 			setAcceptOrRejectPdf(false);
@@ -1332,11 +1332,28 @@ const handleBillingInfoChange = (e) => {
 
 	const handleNewAuthorChange = async (e) => {
 		const { name, value, type, checked } = e.target;
+		if (name === "isCorresponding" && checked) {
+			// Check if there's already a corresponding author (excluding main user)
+			const existingCorresponding = authors.find(
+				a => a._id !== user._id && a._id !== editingAuthorId && a.isCorresponding
+			);
+
+			if (existingCorresponding) {
+				toast.warning(
+					`${existingCorresponding.firstName} ${existingCorresponding.lastName} is already the corresponding author. Only one corresponding author is allowed.`,
+					{
+						position: "top-center",
+						autoClose: 4000,
+					}
+				);
+				return; // Don't allow checking
+			}
+		}
+
 		setNewAuthor((prev) => ({
 			...prev,
 			[name]: type === "checkbox" ? checked : value,
 		}));
-
 		// Institution autocomplete: debounce search
 		if (name === "institution") {
 			setInstQuery(value);
@@ -1443,9 +1460,7 @@ const handleBillingInfoChange = (e) => {
 
 		if (missingFields.length > 0) {
 			toast.error(
-				`Please fill in all required fields: ${missingFields.join(
-					", "
-				)}`,
+				`Please fill in all required fields: ${missingFields.join(", ")}`,
 				{
 					position: "top-center",
 					autoClose: 3000,
@@ -1454,7 +1469,7 @@ const handleBillingInfoChange = (e) => {
 			return;
 		}
 
-		// Check if trying to add self (only for new co-authors, not when editing)
+		// Check if trying to add self
 		if (!editingAuthorId && newAuthor.email.toLowerCase() === user.email.toLowerCase()) {
 			toast.error("You cannot add yourself as a co-author.", {
 				position: "top-center",
@@ -1463,7 +1478,7 @@ const handleBillingInfoChange = (e) => {
 			return;
 		}
 
-		// Check if author is already in the list (ignore the one being edited)
+		// Check if author already exists
 		const isAlreadyAdded = authors.some((author) => {
 			if (editingAuthorId && author._id === editingAuthorId) {
 				return false;
@@ -1476,15 +1491,15 @@ const handleBillingInfoChange = (e) => {
 		});
 
 		if (isAlreadyAdded) {
-			toast.warning("This author is already in the list.", {
-				position: "top-center",
-				autoClose: 3000,
-			});
+			// toast.warning("This author is already in the list.", {
+			// 	position: "top-center",
+			// 	autoClose: 3000,
+			// });
 			return;
 		}
 
 		try {
-			// If editing an existing author, just update local data and skip email/invitation logic
+			// If editing an existing author
 			if (editingAuthorId) {
 				const updatedAuthor = {
 					_id: editingAuthorId,
@@ -1492,11 +1507,15 @@ const handleBillingInfoChange = (e) => {
 				};
 
 				setAuthors((prev) =>
-					prev.map((a) => (a._id === editingAuthorId ? { ...a, ...updatedAuthor } : a)),
+					prev.map((a) => (a._id === editingAuthorId ? { ...a, ...updatedAuthor } : a))
 				);
-				// IDs stay the same when editing
-				if (correspondingAuthorId === editingAuthorId && newAuthor.isCorresponding) {
+
+				// 🔥 UPDATE: Set corresponding author if checkbox is checked
+				if (newAuthor.isCorresponding) {
 					setCorrespondingAuthorId(editingAuthorId);
+				} else if (correspondingAuthorId === editingAuthorId) {
+					// If unchecked and this was the corresponding author, remove it
+					setCorrespondingAuthorId(null);
 				}
 
 				setNewAuthor({
@@ -1514,6 +1533,15 @@ const handleBillingInfoChange = (e) => {
 				setIsEditAuthorModalOpen(false);
 				setEditingAuthorId(null);
 				setIsEmailVerified(false);
+
+				// Show success message with role
+				toast.success(
+					`Author updated as ${newAuthor.isCorresponding ? 'Corresponding Author' : 'Author'}`,
+					{
+						position: "top-center",
+						autoClose: 2000,
+					}
+				);
 				return;
 			}
 
@@ -1527,7 +1555,7 @@ const handleBillingInfoChange = (e) => {
 						headers: {
 							Authorization: `Bearer ${user.token}`,
 						},
-					},
+					}
 				);
 			} catch (verifyError) {
 				console.error("Error verifying email:", verifyError);
@@ -1550,34 +1578,34 @@ const handleBillingInfoChange = (e) => {
 							subject:
 								"You have been added as a corresponding author on a manuscript at SynergyWorldPress",
 							html: `
-								<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; line-height: 1.6;">
-									<p style="font-size: 16px;">Dear Colleague,</p>
-									<p style="font-size: 16px;">
-										You have been added as a corresponding author on a manuscript at <strong>SynergyWorldPress</strong>.
-									</p>
-									<p style="font-size: 16px;">
-										To review your details, manage submissions, and complete your profile, please register on our platform using the link below:
-									</p>
-									<p style="font-size: 16px;">
-										<a href="${frontendUrl}/register" target="_blank" rel="noopener noreferrer">${frontendUrl}/register</a>
-									</p>
-									<p style="font-size: 14px; color: #555;">
-										If you did not expect this email, you may safely ignore it.
-									</p>
-									<p style="margin-top: 24px; font-size: 14px;">
-										Best regards,<br />
-										SynergyWorldPress Editorial Office
-									</p>
-								</div>
-							`,
-						},
+                            <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+                                <p style="font-size: 16px;">Dear Colleague,</p>
+                                <p style="font-size: 16px;">
+                                    You have been added as a corresponding author on a manuscript at <strong>SynergyWorldPress</strong>.
+                                </p>
+                                <p style="font-size: 16px;">
+                                    To review your details, manage submissions, and complete your profile, please register on our platform using the link below:
+                                </p>
+                                <p style="font-size: 16px;">
+                                    <a href="${frontendUrl}/register" target="_blank" rel="noopener noreferrer">${frontendUrl}/register</a>
+                                </p>
+                                <p style="font-size: 14px; color: #555;">
+                                    If you did not expect this email, you may safely ignore it.
+                                </p>
+                                <p style="margin-top: 24px; font-size: 14px;">
+                                    Best regards,<br />
+                                    SynergyWorldPress Editorial Office
+                                </p>
+                            </div>
+                        `,
+						}
 					);
 					toast.info(
 						`Invitation email sent to ${newAuthor.email}. They will need to register to access the platform.`,
 						{
 							position: "top-center",
 							autoClose: 4000,
-						},
+						}
 					);
 				} catch (inviteError) {
 					console.error("Error sending invitation email:", inviteError);
@@ -1589,15 +1617,12 @@ const handleBillingInfoChange = (e) => {
 				...newAuthor,
 				...(authorFromDb
 					? {
-						// Prefer data from DB where available
 						title: authorFromDb.title || newAuthor.title,
 						firstName: authorFromDb.firstName || newAuthor.firstName,
 						middleName: authorFromDb.middleName || newAuthor.middleName,
 						lastName: authorFromDb.lastName || newAuthor.lastName,
-						academicDegree:
-							authorFromDb.academicDegree || newAuthor.academicDegree,
-						institution:
-							authorFromDb.institution || newAuthor.institution,
+						academicDegree: authorFromDb.academicDegree || newAuthor.academicDegree,
+						institution: authorFromDb.institution || newAuthor.institution,
 						country: authorFromDb.country || newAuthor.country,
 						email: authorFromDb.email || newAuthor.email,
 					}
@@ -1607,8 +1632,24 @@ const handleBillingInfoChange = (e) => {
 			setAuthors((prev) => [...prev, author]);
 			setSelectedAuthors((prev) => [...prev, author._id]);
 
+			// 🔥 UPDATE: Set corresponding author based on checkbox
 			if (newAuthor.isCorresponding) {
 				setCorrespondingAuthorId(author._id);
+				toast.success(
+					`${author.firstName} ${author.lastName} added as Corresponding Author`,
+					{
+						position: "top-center",
+						autoClose: 2000,
+					}
+				);
+			} else {
+				toast.success(
+					`${author.firstName} ${author.lastName} added as Author`,
+					{
+						position: "top-center",
+						autoClose: 2000,
+					}
+				);
 			}
 
 			setNewAuthor({
@@ -2507,12 +2548,26 @@ const handleBillingInfoChange = (e) => {
 																				</td>
 																				<td className="px-4 py-3">
 																					<div className="text-sm">
-																						<div>
-																							Author
-																						</div>
-																						{isCorrespondingAuthor && authorId !== user._id && (
-																							<div className="text-[#00796b] text-xs mt-1">
-																								Corresponding
+																						{/* 🔥 NEW LOGIC: Check if this is the first author (index 0) */}
+																						{index === 0 ? (
+																							// First author = Primary Author
+																							<div className="font-medium text-[#00796b]">
+																								<div className="flex items-center gap-2">
+																									<span>Primary Author</span>
+
+																								</div>
+																							</div>
+																						) : isCorrespondingAuthor ? (
+																							// Other authors who are corresponding
+																							<div className="font-medium text-[#00796b]">
+																								<div className="flex items-center gap-2">
+																									<span>Corresponding Author</span>
+
+																								</div>
+																							</div>
+																						) : (
+																							// Regular authors
+																							<div className="font-medium text-[#00796b]">
 																								Author
 																							</div>
 																						)}
@@ -2527,6 +2582,7 @@ const handleBillingInfoChange = (e) => {
 																						>
 																							✏️
 																						</button>
+
 																						{selectedAuthors.length > 1 && (
 																							<button
 																								onClick={() => handleRemoveAuthor(authorId)}
@@ -2536,22 +2592,39 @@ const handleBillingInfoChange = (e) => {
 																								🗑
 																							</button>
 																						)}
-																						{authorId !== user._id && (
+
+																						{/* Show "Make Corresponding" button only for non-main-user authors */}
+																						{/* {authorId !== user._id && (
 																							<button
-																								onClick={() =>
-																									setCorrespondingAuthorId(authorId)
-																								}
+																								onClick={() => {
+																									if (!isCorrespondingAuthor) {
+																										setCorrespondingAuthorId(authorId);
+																										// Update the author's isCorresponding flag in authors array
+																										setAuthors(prev =>
+																											prev.map(a =>
+																												a._id === authorId
+																													? { ...a, isCorresponding: true }
+																													: { ...a, isCorresponding: false }
+																											)
+																										);
+																										toast.success("Corresponding author updated", {
+																											position: "top-center",
+																											autoClose: 2000,
+																										});
+																									}
+																								}}
 																								className={`px-3 py-1 rounded text-sm transition-colors ${isCorrespondingAuthor
-																										? "bg-[#BAFFF5] text-[#00796b] cursor-default"
-																										: "bg-[#00796b] hover:bg-[#3a5269] text-white"}
-																								`}
+																									? "bg-[#BAFFF5] text-[#00796b] cursor-default font-semibold"
+																									: "bg-[#00796b] hover:bg-[#3a5269] text-white"
+																									}`}
 																								disabled={isCorrespondingAuthor}
+																								title={isCorrespondingAuthor ? "Already corresponding author" : "Make this author corresponding"}
 																							>
 																								{isCorrespondingAuthor
-																										? "Current Corresponding"
-																										: "Make Corresponding"}
+																									? "✓ Corresponding"
+																									: "Make Corresponding"}
 																							</button>
-																						)}
+																						)} */}
 																					</div>
 																				</td>
 																			</tr>
@@ -2578,13 +2651,12 @@ const handleBillingInfoChange = (e) => {
 												{editingAuthorId ? "Edit Author" : "Add New Author"}
 											</h3>
 											<button
-												onClick={() =>
-													{
-														setIsAuthorModalOpen(false);
-														setIsEditAuthorModalOpen(false);
-														setEditingAuthorId(null);
-														setIsEmailVerified(false);
-													}
+												onClick={() => {
+													setIsAuthorModalOpen(false);
+													setIsEditAuthorModalOpen(false);
+													setEditingAuthorId(null);
+													setIsEmailVerified(false);
+												}
 												}
 												className="text-[#9e9e9e] hover:text-[#212121]"
 											>
@@ -2858,7 +2930,8 @@ const handleBillingInfoChange = (e) => {
 													onClick={handleAddNewAuthor}
 													className="px-3 py-1 bg-[#00796b] text-white rounded text-sm hover:bg-[#3a5269]"
 												>
-													Add Author
+													{/* 🔥 CONDITIONAL TEXT */}
+													{editingAuthorId ? 'Save' : 'Add Author'}
 												</button>
 											</div>
 										</div>
@@ -2896,7 +2969,7 @@ const handleBillingInfoChange = (e) => {
 								</div>
 							</div>
 
-						{formData.funding === "Yes" && (
+							{formData.funding === "Yes" && (
 								<div className="mb-4 mt-4 p-4 border border-[#e0e0e0] rounded-lg bg-gray-50">
 									<h3 className="font-semibold mb-3 text-[#00796b]">
 										Billing Information

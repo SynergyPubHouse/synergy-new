@@ -82,4 +82,11 @@ router.post(
     manuscriptController.uploadHighlightedFile
 );
 
+// manuscriptRoutes.js mein
+router.post(
+    '/manuscripts/:manuscriptId/upload-revision-files',
+    auth,
+    manuscriptController.uploadRevisionFiles
+);
+
 module.exports = router;
