@@ -310,248 +310,280 @@ async function createMergedPDFWithTable(manuscriptPath, coverLetterPath, declara
 }
 
 // Helper: Create table PDF with form data
-async function createTablePdf(formData, manuscriptId = null) {
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([612, 792]); // US Letter size
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const margin = 50;
-    let currentY = page.getHeight() - margin;
-console.log('[createTablePdf] Creating table PDF with form data:', formData);
-    // Draw title
-    page.drawText("Manuscript Submission Details", {
-        x: margin,
-        y: currentY,
-        size: 18,
-        font: boldFont,
-        color: rgb(0, 0, 0),
-    });
-    currentY -= 50;
+    async function createTablePdf(formData, manuscriptId = null) {
+        const pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage([612, 792]); // US Letter size
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        const margin = 50;
+        let currentY = page.getHeight() - margin;
+        
+        console.log('[createTablePdf] Creating table PDF with form data...');
+        console.log('[createTablePdf] authorNamesForPdf:', formData.authorNamesForPdf);
+        console.log('[createTablePdf] correspondingNamesForPdf:', formData.correspondingNamesForPdf);
 
-    // Table configuration
-    const tableWidth = page.getWidth() - 2 * margin;
-    const labelWidth = tableWidth * 0.3; // 30% for labels
-    const valueWidth = tableWidth * 0.7; // 70% for values
-    const rowHeight = 25;
-    const cellPadding = 8;
-
-    // Helper function to draw a table row with better height management
-    const drawTableRow = (label, value, isHeader = false) => {
-        const displayValue = Array.isArray(value) ? value.join(", ") : (value || "");
-        const useFont = isHeader ? boldFont : font;
-        const fontSize = isHeader ? 14 : 11;
-        
-        // Calculate dynamic row height based on content
-        const maxValueWidth = valueWidth - 2 * cellPadding;
-        let valueText = displayValue.toString();
-        let actualRowHeight = rowHeight;
-        
-        // Check if text needs wrapping and calculate required height
-        if (font.widthOfTextAtSize(valueText, fontSize) > maxValueWidth) {
-            const words = valueText.split(' ');
-            let lines = 1;
-            let line = '';
-            
-            for (const word of words) {
-                const testLine = line + (line ? ' ' : '') + word;
-                if (font.widthOfTextAtSize(testLine, fontSize) > maxValueWidth && line) {
-                    lines++;
-                    line = word;
-                } else {
-                    line = testLine;
-                }
-            }
-            // Limit to maximum 3 lines and calculate height accordingly
-            const maxLines = Math.min(lines, 3);
-            actualRowHeight = Math.max(rowHeight, maxLines * 14 + 10); // 14px per line + padding
-        }
-        
-        // Check if we have enough space on the page
-        if (currentY - actualRowHeight < 50) { // 50px bottom margin
-            console.log(`[createTablePdf] Truncating content for ${label} to fit on page`);
-            // Truncate the value to fit in standard row height
-            const maxChars = Math.floor(maxValueWidth / (fontSize * 0.6)); // Approximate chars per line
-            if (valueText.length > maxChars) {
-                valueText = valueText.substring(0, maxChars - 3) + '...';
-            }
-            actualRowHeight = rowHeight;
-        }
-        
-        // Draw row background
-        const bgColor = isHeader ? rgb(0.9, 0.9, 0.9) : rgb(0.98, 0.98, 0.98);
-        page.drawRectangle({
+        // Draw title
+        page.drawText("Manuscript Submission Details", {
             x: margin,
-            y: currentY - actualRowHeight + 5,
-            width: tableWidth,
-            height: actualRowHeight,
-            color: bgColor,
-        });
-
-        // Draw borders
-        page.drawRectangle({
-            x: margin,
-            y: currentY - actualRowHeight + 5,
-            width: tableWidth,
-            height: actualRowHeight,
-            borderColor: rgb(0.7, 0.7, 0.7),
-            borderWidth: 1,
-        });
-
-        // Draw vertical separator
-        page.drawLine({
-            start: { x: margin + labelWidth, y: currentY - actualRowHeight + 5 },
-            end: { x: margin + labelWidth, y: currentY + 5 },
-            thickness: 1,
-            color: rgb(0.7, 0.7, 0.7),
-        });
-
-        // Draw label (left column)
-        page.drawText(label, {
-            x: margin + cellPadding,
-            y: currentY - actualRowHeight / 2 - 3,
-            size: fontSize,
-            font: useFont,
+            y: currentY,
+            size: 18,
+            font: boldFont,
             color: rgb(0, 0, 0),
         });
+        currentY -= 50;
 
-        // Draw value (right column) with proper text wrapping
-        
-        if (font.widthOfTextAtSize(valueText, fontSize) > maxValueWidth) {
-            // Text needs wrapping
-            const words = valueText.split(' ');
-            let lines = [];
-            let currentLine = '';
+        // Table configuration
+        const tableWidth = page.getWidth() - 2 * margin;
+        const labelWidth = tableWidth * 0.3;
+        const valueWidth = tableWidth * 0.7;
+        const rowHeight = 25;
+        const cellPadding = 8;
+
+        // Helper function to draw a table row with better height management
+        const drawTableRow = (label, value, isHeader = false) => {
+            const displayValue = Array.isArray(value) ? value.join(", ") : (value || "");
+            const useFont = isHeader ? boldFont : font;
+            const fontSize = isHeader ? 14 : 11;
             
-            for (const word of words) {
-                const testLine = currentLine + (currentLine ? ' ' : '') + word;
-                if (font.widthOfTextAtSize(testLine, fontSize) > maxValueWidth && currentLine) {
-                    lines.push(currentLine);
-                    currentLine = word;
-                } else {
-                    currentLine = testLine;
+            const maxValueWidth = valueWidth - 2 * cellPadding;
+            let valueText = displayValue.toString();
+            let actualRowHeight = rowHeight;
+            
+            if (font.widthOfTextAtSize(valueText, fontSize) > maxValueWidth) {
+                const words = valueText.split(' ');
+                let lines = 1;
+                let line = '';
+                
+                for (const word of words) {
+                    const testLine = line + (line ? ' ' : '') + word;
+                    if (font.widthOfTextAtSize(testLine, fontSize) > maxValueWidth && line) {
+                        lines++;
+                        line = word;
+                    } else {
+                        line = testLine;
+                    }
                 }
-            }
-            if (currentLine) {
-                lines.push(currentLine);
-            }
-            
-            // Limit to maximum 3 lines to prevent overflow
-            if (lines.length > 3) {
-                lines = lines.slice(0, 2);
-                lines.push(lines[1].substring(0, Math.floor(maxValueWidth / (fontSize * 0.6)) - 3) + '...');
+                const maxLines = Math.min(lines, 3);
+                actualRowHeight = Math.max(rowHeight, maxLines * 14 + 10);
             }
             
-            // Draw each line
-            lines.forEach((line, index) => {
-                page.drawText(line, {
+            if (currentY - actualRowHeight < 50) {
+                console.log(`[createTablePdf] Truncating content for ${label} to fit on page`);
+                const maxChars = Math.floor(maxValueWidth / (fontSize * 0.6));
+                if (valueText.length > maxChars) {
+                    valueText = valueText.substring(0, maxChars - 3) + '...';
+                }
+                actualRowHeight = rowHeight;
+            }
+            
+            const bgColor = isHeader ? rgb(0.9, 0.9, 0.9) : rgb(0.98, 0.98, 0.98);
+            page.drawRectangle({
+                x: margin,
+                y: currentY - actualRowHeight + 5,
+                width: tableWidth,
+                height: actualRowHeight,
+                color: bgColor,
+            });
+
+            page.drawRectangle({
+                x: margin,
+                y: currentY - actualRowHeight + 5,
+                width: tableWidth,
+                height: actualRowHeight,
+                borderColor: rgb(0.7, 0.7, 0.7),
+                borderWidth: 1,
+            });
+
+            page.drawLine({
+                start: { x: margin + labelWidth, y: currentY - actualRowHeight + 5 },
+                end: { x: margin + labelWidth, y: currentY + 5 },
+                thickness: 1,
+                color: rgb(0.7, 0.7, 0.7),
+            });
+
+            page.drawText(label, {
+                x: margin + cellPadding,
+                y: currentY - actualRowHeight / 2 - 3,
+                size: fontSize,
+                font: useFont,
+                color: rgb(0, 0, 0),
+            });
+
+            if (font.widthOfTextAtSize(valueText, fontSize) > maxValueWidth) {
+                const words = valueText.split(' ');
+                let lines = [];
+                let currentLine = '';
+                
+                for (const word of words) {
+                    const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                    if (font.widthOfTextAtSize(testLine, fontSize) > maxValueWidth && currentLine) {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                if (currentLine) {
+                    lines.push(currentLine);
+                }
+                
+                if (lines.length > 3) {
+                    lines = lines.slice(0, 2);
+                    lines.push(lines[1].substring(0, Math.floor(maxValueWidth / (fontSize * 0.6)) - 3) + '...');
+                }
+                
+                lines.forEach((line, index) => {
+                    page.drawText(line, {
+                        x: margin + labelWidth + cellPadding,
+                        y: currentY - actualRowHeight / 2 - 3 + (lines.length - 1 - index) * 12,
+                        size: fontSize,
+                        font: font,
+                        color: rgb(0, 0, 0),
+                    });
+                });
+            } else {
+                page.drawText(valueText, {
                     x: margin + labelWidth + cellPadding,
-                    y: currentY - actualRowHeight / 2 - 3 + (lines.length - 1 - index) * 12,
+                    y: currentY - actualRowHeight / 2 - 3,
                     size: fontSize,
                     font: font,
                     color: rgb(0, 0, 0),
                 });
-            });
-        } else {
-            // Text fits in one line
-            page.drawText(valueText, {
-                x: margin + labelWidth + cellPadding,
-                y: currentY - actualRowHeight / 2 - 3,
-                size: fontSize,
-                font: font,
-                color: rgb(0, 0, 0),
-            });
-        }
+            }
 
-        currentY -= actualRowHeight;
-    };
+            currentY -= actualRowHeight;
+        };
 
-    // Draw table rows with content truncation to fit on one page
-    drawTableRow("Article Type", formData.type);
-    drawTableRow("Title", formData.title ? formData.title.substring(0, 200) : ''); // Limit title length
-    drawTableRow("Keywords", formData.keywords ? formData.keywords.substring(0, 150) : ''); // Limit keywords length
-    
-    // Truncate abstract to ensure it fits on page 1
-    let abstractText = formData.abstract || '';
-    if (abstractText.length > 300) {
-        abstractText = abstractText.substring(0, 300) + '...';
-    }
-    drawTableRow("Abstract", abstractText);
-    
-    drawTableRow("Classification", formData.classification);
-    drawTableRow("Additional Information", formData.additionalInfo ? formData.additionalInfo.substring(0, 100) : '');
-    drawTableRow("Comments", formData.comments ? formData.comments.substring(0, 100) : '');
-    drawTableRow("Funding", formData.funding);
-    
-    // Add billing information if funding is "Yes"
-    if (formData.funding === "Yes" && formData?.billingInfo) {
-        drawTableRow("Find a Funder", formData?.billingInfo?.findFunder || 'Not provided');
-        drawTableRow("Award Number", formData?.billingInfo?.awardNumber || 'Not provided');
-        drawTableRow("Grant Recipient", formData?.billingInfo?.grantRecipient || 'Not provided');
-    }
-    
-drawTableRow("Submission Date", new Date().toLocaleString());
-
-// Add author information to the PDF
-if (formData.authorsData) {
-    try {
-        const authors = JSON.parse(formData.authorsData);
-        console.log('[createTablePdf] All authors:', authors);
-        console.log('[createTablePdf] Corresponding Author ID:', formData.correspondingAuthorId);
+        // Draw table rows
+        drawTableRow("Article Type", formData.type);
+        drawTableRow("Title", formData.title ? formData.title.substring(0, 200) : '');
+        drawTableRow("Keywords", formData.keywords ? formData.keywords.substring(0, 150) : '');
         
-        // Show all authors (main author + co-authors) in Authors list
-        const authorNames = authors.map(author => {
-            const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-            const email = author.email ? ` (${author.email})` : '';
-            const orcid = author.orcid ? ` [ORCID: ${author.orcid}]` : '';
-            return `${name}${email}${orcid}`;
-        }).join(', '); // Use comma instead of newline to avoid PDF encoding issues
-        drawTableRow("Authors", authorNames);
-
-        // Show corresponding author only if it's different from main author OR if user explicitly changed it
-        const correspondingAuthor = authors.find(a => a._id?.toString() === formData.correspondingAuthorId?.toString());
-        console.log('[createTablePdf] Found corresponding author:', correspondingAuthor);
+        let abstractText = formData.abstract || '';
+        if (abstractText.length > 300) {
+            abstractText = abstractText.substring(0, 300) + '...';
+        }
+        drawTableRow("Abstract", abstractText);
         
-        if (correspondingAuthor) {
-            const corrName = `${correspondingAuthor.firstName || ''} ${correspondingAuthor.lastName || ''}`.trim();
-            const corrEmail = correspondingAuthor.email ? ` (${correspondingAuthor.email})` : '';
-            drawTableRow("Corresponding Author", `${corrName}${corrEmail}`);
+        drawTableRow("Classification", formData.classification);
+        drawTableRow("Additional Information", formData.additionalInfo ? formData.additionalInfo.substring(0, 100) : '');
+        drawTableRow("Comments", formData.comments ? formData.comments.substring(0, 100) : '');
+        drawTableRow("Funding", formData.funding);
+        
+        if (formData.funding === "Yes" && formData?.billingInfo) {
+            drawTableRow("Find a Funder", formData?.billingInfo?.findFunder || 'Not provided');
+            drawTableRow("Award Number", formData?.billingInfo?.awardNumber || 'Not provided');
+            drawTableRow("Grant Recipient", formData?.billingInfo?.grantRecipient || 'Not provided');
         }
-    } catch (error) {
-        console.error("Error processing author data:", error);
-        // Better fallback: try to extract names from available data
-        if (formData.authors && Array.isArray(formData.authors)) {
-            // If authors array contains IDs, try to find them in the authors array
-            const authorNames = formData.authors.map(authorId => {
-                const author = authors.find(a => a._id?.toString() === authorId.toString());
-                if (author) {
-                    const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-                    return author.email ? `${name} (${author.email})` : name;
-                }
-                return authorId; // Fallback to ID if not found
-            }).join(', ');
-            drawTableRow("Authors", authorNames);
-        }
-        if (formData.correspondingAuthorId) {
-            // Try to find corresponding author by ID
-            const corrAuthor = authors.find(a => a._id?.toString() === formData.correspondingAuthorId.toString());
-            if (corrAuthor) {
-                const corrName = `${corrAuthor.firstName || ''} ${corrAuthor.lastName || ''}`.trim();
-                const corrEmail = corrAuthor.email ? ` (${corrAuthor.email})` : '';
-                drawTableRow("Corresponding Author", `${corrName}${corrEmail}`);
-            } else {
-                drawTableRow("Corresponding Author ID", formData.correspondingAuthorId);
+        
+        drawTableRow("Submission Date", new Date().toLocaleString());
+
+        // ===================================
+        // 🔥 FIXED AUTHOR LOGIC START
+        // ===================================
+
+        // Priority 1: Use new frontend fields (authorNamesForPdf, correspondingNamesForPdf)
+        if (formData.authorNamesForPdf) {
+            console.log('[createTablePdf] Using authorNamesForPdf:', formData.authorNamesForPdf);
+            drawTableRow("Authors", formData.authorNamesForPdf);
+        } 
+        // Priority 2: Use authorsForPdf array
+        else if (formData.authorsForPdf) {
+            try {
+                const authorsForPdf = typeof formData.authorsForPdf === 'string' 
+                    ? JSON.parse(formData.authorsForPdf) 
+                    : formData.authorsForPdf;
+                
+                console.log('[createTablePdf] Using authorsForPdf array:', authorsForPdf);
+                
+                const authorNames = authorsForPdf.map(author => {
+                    return author.fullName || `${author.firstName || ''} ${author.lastName || ''}`.trim();
+                }).join(', ');
+                
+                drawTableRow("Authors", authorNames);
+            } catch (e) {
+                console.error('[createTablePdf] Error parsing authorsForPdf:', e);
             }
         }
+        // Priority 3: Fallback to old authorsData (for backward compatibility)
+        else if (formData.authorsData) {
+            try {
+                const authors = typeof formData.authorsData === 'string'
+                    ? JSON.parse(formData.authorsData)
+                    : formData.authorsData;
+                
+                console.log('[createTablePdf] Fallback: Using authorsData');
+                
+                // 🔥 NO EMAILS - Only names
+                const authorNames = authors.map(author => {
+                    const name = `${author.firstName || ''} ${author.lastName || ''}`.trim();
+                    return name;
+                }).join(', ');
+                
+                drawTableRow("Authors", authorNames);
+            } catch (error) {
+                console.error("[createTablePdf] Error processing authorsData:", error);
+            }
+        }
+
+        // Corresponding Author(s)
+        // Priority 1: Use correspondingNamesForPdf (multiple corresponding authors with emails)
+        if (formData.correspondingNamesForPdf) {
+            console.log('[createTablePdf] Using correspondingNamesForPdf:', formData.correspondingNamesForPdf);
+            drawTableRow("Corresponding Author(s)", formData.correspondingNamesForPdf);
+        }
+        // Priority 2: Use correspondingAuthorsForPdf array
+        else if (formData.correspondingAuthorsForPdf) {
+            try {
+                const correspondingAuthors = typeof formData.correspondingAuthorsForPdf === 'string'
+                    ? JSON.parse(formData.correspondingAuthorsForPdf)
+                    : formData.correspondingAuthorsForPdf;
+                
+                console.log('[createTablePdf] Using correspondingAuthorsForPdf array:', correspondingAuthors);
+                
+                const correspondingNames = correspondingAuthors.map(author => {
+                    const name = author.fullName || `${author.firstName || ''} ${author.lastName || ''}`.trim();
+                    const email = author.email ? ` (${author.email})` : '';
+                    return `${name}${email}`;
+                }).join(', ');
+                
+                drawTableRow("Corresponding Author(s)", correspondingNames);
+            } catch (e) {
+                console.error('[createTablePdf] Error parsing correspondingAuthorsForPdf:', e);
+            }
+        }
+        // Priority 3: Fallback to single correspondingAuthorId
+        else if (formData.authorsData && formData.correspondingAuthorId) {
+            try {
+                const authors = typeof formData.authorsData === 'string'
+                    ? JSON.parse(formData.authorsData)
+                    : formData.authorsData;
+                
+                const correspondingAuthor = authors.find(a => 
+                    a._id?.toString() === formData.correspondingAuthorId?.toString()
+                );
+                
+                if (correspondingAuthor) {
+                    const corrName = `${correspondingAuthor.firstName || ''} ${correspondingAuthor.lastName || ''}`.trim();
+                    const corrEmail = correspondingAuthor.email ? ` (${correspondingAuthor.email})` : '';
+                    drawTableRow("Corresponding Author", `${corrName}${corrEmail}`);
+                }
+            } catch (error) {
+                console.error("[createTablePdf] Error finding corresponding author:", error);
+            }
+        }
+
+        // ===================================
+        // 🔥 FIXED AUTHOR LOGIC END
+        // ===================================
+
+        const tableFileName = manuscriptId ? `table_${manuscriptId}.pdf` : `table_${Date.now()}.pdf`;
+        const tablePdfPath = path.join(os.tmpdir(), tableFileName);
+        const pdfBytes = await pdfDoc.save();
+        await fs.writeFile(tablePdfPath, pdfBytes);
+
+        return tablePdfPath;
     }
-}
-
-const tableFileName = manuscriptId ? `table_${manuscriptId}.pdf` : `table_${Date.now()}.pdf`;
-    const tablePdfPath = path.join(os.tmpdir(), tableFileName);
-    const pdfBytes = await pdfDoc.save();
-    await fs.writeFile(tablePdfPath, pdfBytes);
-
-    return tablePdfPath;
-}
 
 // Helper: Merge multiple PDFs (using pdf-lib)
 async function mergePdfs(pdfPaths, outputPath) {
