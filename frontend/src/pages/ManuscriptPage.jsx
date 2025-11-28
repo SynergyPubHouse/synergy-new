@@ -523,10 +523,10 @@ const ManuscriptPage = () => {
 				if (formData.funding !== "Yes" && formData.funding !== "No") errors.push("Funding information");
 
 				if (errors.length > 0) {
-					toast.error(`Please provide the following required information: ${errors.join(", ")}`, {
-						position: "top-center",
-						autoClose: 4000,
-					});
+					// toast.error(`Please provide the following required information: ${errors.join(", ")}`, {
+					// 	position: "top-center",
+					// 	autoClose: 4000,
+					// });
 					return false;
 				}
 				return true;
@@ -797,6 +797,8 @@ const ManuscriptPage = () => {
 	// In ManuscriptPage.js, find the proceedbeforebuildpdf function
 	// Replace the ENTIRE authors section with this:
 
+const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
+
 	const proceedbeforebuildpdf = async (e) => {
 		e.preventDefault();
 
@@ -811,91 +813,252 @@ const ManuscriptPage = () => {
 		// Validate all sections
 		for (let section = 1; section <= 6; section++) {
 			if (!validateSection(section)) {
-				toast.error(
-					`Please complete all required fields in Section ${section}`,
-					{
-						position: "top-center",
-						autoClose: 3000,
-					}
-				);
+				// toast.error(`Please complete all required fields in Section ${section}`, {
+				// 	position: "top-center",
+				// 	autoClose: 3000,
+				// });
 				setCurrentSection(section);
 				return;
 			}
 		}
 
-		// Check if all required files are present
+		// Check required files
 		if (!files.manuscript || !files.coverLetter || !files.declaration) {
-			toast.error(
-				"Please upload all required files: manuscript, cover letter, and declaration",
-				{
-					position: "top-center",
-					autoClose: 4000,
-				}
-			);
+			toast.error("Please upload all required files: manuscript, cover letter, and declaration", {
+				position: "top-center",
+				autoClose: 4000,
+			});
 			setCurrentSection(2);
 			return;
 		}
 
 		const data = new FormData();
+
+		// Add form fields
 		Object.keys(formData).forEach((key) => {
-			if (key === "additionalInfo" || key === "billingInfo") {
-				data.append(key, JSON.stringify(formData[key]));
-			} else if (key === "classification") {
+			if (["additionalInfo", "billingInfo", "classification"].includes(key)) {
 				data.append(key, JSON.stringify(formData[key]));
 			} else {
 				data.append(key, formData[key]);
 			}
 		});
 
-		// Append files
-		if (files.manuscript) {
-			data.append("manuscript", files.manuscript);
-		}
-		if (files.coverLetter) {
-			data.append("coverLetter", files.coverLetter);
-		}
-		if (files.declaration) {
-			data.append("declaration", files.declaration);
-		}
-		// 🔥 FIXED: Handle authors data properly
-		const authorsData = authors.filter(author => selectedAuthors.includes(author._id));
-		const primaryAuthorId = selectedAuthors[0]; // First author is always primary
+		// Add files
+		if (files.manuscript) data.append("manuscript", files.manuscript);
+		if (files.coverLetter) data.append("coverLetter", files.coverLetter);
+		if (files.declaration) data.append("declaration", files.declaration);
 
-		// 🔥 NEW LOGIC: 
-		// - Single author = NO corresponding author
-		// - Multiple authors = Jo corresponding assign hai wohi
-		let correspondingAuthor = null;
-		let finalCorrespondingAuthorId = null;
+		// ===================================
+		// 🔥 FIXED AUTHOR LOGIC START
+		// ===================================
 
-		// Agar multiple authors hain AUR corresponding author assign hai
-		if (authorsData.length > 1 && correspondingAuthorId) {
-			correspondingAuthor = authorsData.find(author => author._id === correspondingAuthorId);
-			finalCorrespondingAuthorId = correspondingAuthorId;
+		const submittingUserId = user?._id;
+		console.log("👤 Submitting User ID:", submittingUserId);
+
+		// Step 1: Get ALL selected authors with full details
+		let authorsData = selectedAuthors
+			.map(authorId => {
+				const author = authors.find(a => a._id === authorId);
+				if (!author) {
+					console.log("❌ Author not found for ID:", authorId);
+					return null;
+				}
+
+				return {
+					_id: author._id,
+					title: author.title || "",
+					firstName: author.firstName || "",
+					middleName: author.middleName || "",
+					lastName: author.lastName || "",
+					academicDegree: author.academicDegree || "",
+					email: author.email || "",
+					institution: author.institution || "",
+					country: author.country || "",
+					isCorresponding: author.isCorresponding || false,
+					isTempUser: !isValidObjectId(author._id)
+				};
+			})
+			.filter(Boolean);
+
+		console.log("📋 Total authors collected:", authorsData.length);
+
+		// Step 2: Ensure submitting user is in authors list
+		const submittingUserInList = authorsData.find(a => a._id === submittingUserId);
+
+		if (!submittingUserInList && submittingUserId && isValidObjectId(submittingUserId)) {
+			console.log("➕ Adding submitting user to authors list");
+			authorsData.unshift({
+				_id: submittingUserId,
+				title: user.title || "",
+				firstName: user.firstName || "",
+				middleName: user.middleName || "",
+				lastName: user.lastName || "",
+				academicDegree: user.academicDegree || "",
+				email: user.email,
+				institution: user.institution || "",
+				country: user.country || "",
+				isCorresponding: true, // 🔥 Submitting user is ALWAYS corresponding
+				isTempUser: false
+			});
+		} else if (submittingUserInList) {
+			// 🔥 Mark submitting user as corresponding
+			authorsData = authorsData.map(a =>
+				a._id === submittingUserId
+					? { ...a, isCorresponding: true }
+					: a
+			);
 		}
 
-		// Regular authors: exclude primary author AND corresponding author (if exists)
-		const regularAuthors = authorsData.filter(author => {
-			// Primary author ko exclude karo
-			if (author._id === primaryAuthorId) return false;
-			// Agar corresponding author hai, use bhi exclude karo
-			if (finalCorrespondingAuthorId && author._id === finalCorrespondingAuthorId) return false;
-			// Baaki sab regular authors hain
-			return true;
+		// Step 3: Also mark the user-selected corresponding author
+		if (correspondingAuthorId && correspondingAuthorId !== submittingUserId) {
+			authorsData = authorsData.map(a =>
+				a._id === correspondingAuthorId
+					? { ...a, isCorresponding: true }
+					: a
+			);
+		}
+
+		// Step 4: Build MULTIPLE corresponding authors array
+		// 🔥 NEW: Both submitting user AND marked corresponding author
+		const correspondingAuthorsArray = [];
+
+		authorsData.forEach(author => {
+			const isSubmittingUser = author._id === submittingUserId;
+			const isMarkedCorresponding = author._id === correspondingAuthorId;
+			const hasCorrespondingFlag = author.isCorresponding === true;
+
+			if (isSubmittingUser || isMarkedCorresponding || hasCorrespondingFlag) {
+				const fullName = [
+					author.title,
+					author.firstName,
+					author.middleName,
+					author.lastName
+				].filter(Boolean).join(" ").trim();
+
+				correspondingAuthorsArray.push({
+					_id: author._id,
+					fullName: fullName,
+					title: author.title || "",
+					firstName: author.firstName || "",
+					middleName: author.middleName || "",
+					lastName: author.lastName || "",
+					academicDegree: author.academicDegree || "",
+					email: author.email || "",
+					institution: author.institution || "",
+					country: author.country || "",
+					isCorresponding: true,
+					isTempUser: author.isTempUser || false,
+					isSubmittingUser: isSubmittingUser
+				});
+			}
 		});
 
-		console.log('=== Authors Debug ===');
-		console.log('Total authors:', authorsData.length);
-		console.log('All authors:', authorsData);
-		console.log('Primary author ID:', primaryAuthorId);
-		console.log('Corresponding Author ID:', finalCorrespondingAuthorId || 'None');
-		console.log('Regular authors:', regularAuthors);
-		console.log('Corresponding author:', correspondingAuthor);
+		console.log("📧 Corresponding Authors Count:", correspondingAuthorsArray.length);
 
-		data.append("authorsData", JSON.stringify(authorsData));
-		data.append("authors", JSON.stringify(selectedAuthors));
-		data.append("regularAuthors", JSON.stringify(regularAuthors));
-		data.append("correspondingAuthor", JSON.stringify(correspondingAuthor));
-		data.append("correspondingAuthorId", finalCorrespondingAuthorId || "");
+		// Step 5: Build authors list for PDF (ALL authors, names only)
+		const authorsForPdf = authorsData.map(author => {
+			const fullName = [
+				author.title,
+				author.firstName,
+				author.middleName,
+				author.lastName
+			].filter(Boolean).join(" ").trim();
+
+			return {
+				_id: author._id,
+				fullName: fullName,
+				title: author.title || "",
+				firstName: author.firstName || "",
+				middleName: author.middleName || "",
+				lastName: author.lastName || "",
+				academicDegree: author.academicDegree || "",
+				email: author.email || "",
+				institution: author.institution || "",
+				country: author.country || "",
+				isCorresponding: author.isCorresponding,
+				isTempUser: author.isTempUser || false
+			};
+		});
+
+		// Step 6: Create strings for PDF
+		// 🔥 Author names (no emails)
+		const authorNamesString = authorsForPdf.map(a => a.fullName).join(", ");
+
+		// 🔥 Corresponding authors with emails (MULTIPLE)
+		const correspondingNamesString = correspondingAuthorsArray
+			.map(a => `${a.fullName} `)
+			.join(", ");
+
+		// 🔥 Corresponding authors names only
+		const correspondingNamesOnlyString = correspondingAuthorsArray
+			.map(a => a.fullName)
+			.join(", ");
+
+		// Step 7: Filter for database storage
+		const cleanAuthorsDataForDb = authorsData.filter(a => isValidObjectId(a._id));
+		const cleanSelectedAuthorsForDb = selectedAuthors.filter(id => isValidObjectId(id));
+		const cleanCorrespondingAuthorsForDb = correspondingAuthorsArray.filter(a => isValidObjectId(a._id));
+
+		// Debug console logs
+		console.log("\n=== FINAL AUTHOR DATA DEBUG ===");
+		console.log("📤 Data being sent to backend:");
+		console.log("───────────────────────────────");
+		console.log("Submitting User ID:", submittingUserId);
+
+		console.log("\n👥 ALL AUTHORS FOR PDF (Total):", authorsForPdf.length);
+		authorsForPdf.forEach((author, index) => {
+			console.log(`   ${index + 1}. ${author.fullName}`);
+			console.log(`      Email: ${author.email}`);
+			console.log(`      Corresponding: ${author.isCorresponding ? 'YES ✓' : 'No'}`);
+			console.log(`      Temp User: ${author.isTempUser ? 'YES' : 'No'}`);
+		});
+
+		console.log("\n📧 CORRESPONDING AUTHORS FOR PDF (Total):", correspondingAuthorsArray.length);
+		correspondingAuthorsArray.forEach((author, index) => {
+			console.log(`   ${index + 1}. ${author.fullName} (${author.email})`);
+			console.log(`      Submitting User: ${author.isSubmittingUser ? 'YES ✓' : 'No'}`);
+		});
+
+		console.log("\n📝 STRINGS FOR PDF:");
+		console.log(`   Authors: ${authorNamesString}`);
+		console.log(`   Corresponding (with email): ${correspondingNamesString}`);
+		console.log(`   Corresponding (names only): ${correspondingNamesOnlyString}`);
+
+		console.log("\n💾 AUTHORS FOR DATABASE (Valid IDs only):", cleanAuthorsDataForDb.length);
+		console.log("═══════════════════════════════\n");
+
+		// Step 8: Append to FormData
+
+		// 🔥 For PDF generation - ALL authors including temp
+		data.append("authorsForPdf", JSON.stringify(authorsForPdf));
+		data.append("authorNamesForPdf", authorNamesString);
+
+		// 🔥 MULTIPLE Corresponding Authors
+		data.append("correspondingAuthorsForPdf", JSON.stringify(correspondingAuthorsArray));
+		data.append("correspondingNamesForPdf", correspondingNamesString);  // With emails
+		data.append("correspondingNamesOnlyForPdf", correspondingNamesOnlyString);  // Without emails
+
+		// For backward compatibility - first corresponding author
+		data.append("correspondingAuthorForPdf", JSON.stringify(correspondingAuthorsArray[0] || null));
+		data.append("correspondingNameForPdf", correspondingAuthorsArray[0]?.fullName || "");
+
+		// For database storage - only valid MongoDB IDs
+		data.append("authorsData", JSON.stringify(cleanAuthorsDataForDb));
+		data.append("authors", JSON.stringify(cleanSelectedAuthorsForDb));
+
+		// Corresponding author IDs for database
+		const correspondingAuthorIds = cleanCorrespondingAuthorsForDb.map(a => a._id);
+		data.append("correspondingAuthorIds", JSON.stringify(correspondingAuthorIds));
+		data.append("correspondingAuthorId", correspondingAuthorIds[0] || "");
+		data.append("correspondingAuthor", JSON.stringify(cleanCorrespondingAuthorsForDb[0] || null));
+		data.append("allCorrespondingAuthors", JSON.stringify(cleanCorrespondingAuthorsForDb));
+
+		// 🔥 All authors with details for email purposes
+		data.append("allAuthorsWithDetails", JSON.stringify(authorsData));
+
+		// ===================================
+		// 🔥 FIXED AUTHOR LOGIC END
+		// ===================================
 
 		try {
 			const response = await axios.post(
@@ -910,7 +1073,7 @@ const ManuscriptPage = () => {
 				}
 			);
 
-			if (response.data.success && response.data.data && response.data.data._id) {
+			if (response.data.success && response.data.data?._id) {
 				const id = response.data.data._id;
 				setManuscriptId(id);
 
@@ -918,14 +1081,12 @@ const ManuscriptPage = () => {
 					`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${id}/status`,
 					{ status: "Under Review" },
 					{
-						headers: {
-							Authorization: `Bearer ${user.token}`,
-						},
+						headers: { Authorization: `Bearer ${user.token}` },
 					}
 				);
 
 				return {
-					manuscriptId: response.data.data._id,
+					manuscriptId: id,
 					mergedFileUrl: response.data.mergedPdfUrl,
 				};
 			} else {
@@ -935,8 +1096,8 @@ const ManuscriptPage = () => {
 			console.error("Error saving manuscript:", error);
 			setIsBuildingPdf(false);
 
-			if (error.code === 'ECONNABORTED') {
-				toast.error("Request timed out. Please check your connection and try again.", {
+			if (error.code === "ECONNABORTED") {
+				toast.error("Request timed out. Please try again.", {
 					position: "top-center",
 					autoClose: 5000,
 				});
@@ -945,18 +1106,14 @@ const ManuscriptPage = () => {
 					position: "top-center",
 					autoClose: 4000,
 				});
-				navigate("/login", {
-					state: { from: location.pathname },
-				});
+				navigate("/login", { state: { from: location.pathname } });
 			} else {
-				toast.error(
-					"Save failed: " + (error.response?.data?.message || error.message),
-					{
-						position: "top-center",
-						autoClose: 4000,
-					}
-				);
+				toast.error("Save failed: " + (error.response?.data?.message || error.message), {
+					position: "top-center",
+					autoClose: 4000,
+				});
 			}
+
 			return null;
 		}
 	};
