@@ -794,6 +794,9 @@ const ManuscriptPage = () => {
 	const [manuscriptId, setManuscriptId] = useState(null);
 
 	// Add a new function to handle save and submit later
+	// In ManuscriptPage.js, find the proceedbeforebuildpdf function
+	// Replace the ENTIRE authors section with this:
+
 	const proceedbeforebuildpdf = async (e) => {
 		e.preventDefault();
 
@@ -829,7 +832,7 @@ const ManuscriptPage = () => {
 					autoClose: 4000,
 				}
 			);
-			setCurrentSection(2); // Navigate to the files section
+			setCurrentSection(2);
 			return;
 		}
 
@@ -854,13 +857,45 @@ const ManuscriptPage = () => {
 		if (files.declaration) {
 			data.append("declaration", files.declaration);
 		}
-
-		// Add authors data
-		// Add authors data with full author details
+		// 🔥 FIXED: Handle authors data properly
 		const authorsData = authors.filter(author => selectedAuthors.includes(author._id));
+		const primaryAuthorId = selectedAuthors[0]; // First author is always primary
+
+		// 🔥 NEW LOGIC: 
+		// - Single author = NO corresponding author
+		// - Multiple authors = Jo corresponding assign hai wohi
+		let correspondingAuthor = null;
+		let finalCorrespondingAuthorId = null;
+
+		// Agar multiple authors hain AUR corresponding author assign hai
+		if (authorsData.length > 1 && correspondingAuthorId) {
+			correspondingAuthor = authorsData.find(author => author._id === correspondingAuthorId);
+			finalCorrespondingAuthorId = correspondingAuthorId;
+		}
+
+		// Regular authors: exclude primary author AND corresponding author (if exists)
+		const regularAuthors = authorsData.filter(author => {
+			// Primary author ko exclude karo
+			if (author._id === primaryAuthorId) return false;
+			// Agar corresponding author hai, use bhi exclude karo
+			if (finalCorrespondingAuthorId && author._id === finalCorrespondingAuthorId) return false;
+			// Baaki sab regular authors hain
+			return true;
+		});
+
+		console.log('=== Authors Debug ===');
+		console.log('Total authors:', authorsData.length);
+		console.log('All authors:', authorsData);
+		console.log('Primary author ID:', primaryAuthorId);
+		console.log('Corresponding Author ID:', finalCorrespondingAuthorId || 'None');
+		console.log('Regular authors:', regularAuthors);
+		console.log('Corresponding author:', correspondingAuthor);
+
 		data.append("authorsData", JSON.stringify(authorsData));
 		data.append("authors", JSON.stringify(selectedAuthors));
-		data.append("correspondingAuthorId", correspondingAuthorId);
+		data.append("regularAuthors", JSON.stringify(regularAuthors));
+		data.append("correspondingAuthor", JSON.stringify(correspondingAuthor));
+		data.append("correspondingAuthorId", finalCorrespondingAuthorId || "");
 
 		try {
 			const response = await axios.post(
@@ -871,22 +906,16 @@ const ManuscriptPage = () => {
 						"Content-Type": "multipart/form-data",
 						Authorization: `Bearer ${user.token}`,
 					},
-					timeout: 60000, // 60 second timeout
+					timeout: 60000,
 				}
 			);
 
-			if (
-				response.data.success &&
-				response.data.data &&
-				response.data.data._id
-			) {
+			if (response.data.success && response.data.data && response.data.data._id) {
 				const id = response.data.data._id;
 				setManuscriptId(id);
 
-				// Update status to "Under Review"
 				await axios.put(
-					`${import.meta.env.VITE_BACKEND_URL
-					}/api/manuscripts/${id}/status`,
+					`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${id}/status`,
 					{ status: "Under Review" },
 					{
 						headers: {
@@ -894,7 +923,7 @@ const ManuscriptPage = () => {
 						},
 					}
 				);
-				// Don't show toast here, let handleProceedAndBuildPdf handle it
+
 				return {
 					manuscriptId: response.data.data._id,
 					mergedFileUrl: response.data.mergedPdfUrl,
@@ -921,8 +950,7 @@ const ManuscriptPage = () => {
 				});
 			} else {
 				toast.error(
-					"Save failed: " +
-					(error.response?.data?.message || error.message),
+					"Save failed: " + (error.response?.data?.message || error.message),
 					{
 						position: "top-center",
 						autoClose: 4000,
