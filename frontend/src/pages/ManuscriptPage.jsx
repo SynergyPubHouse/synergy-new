@@ -503,10 +503,10 @@ const ManuscriptPage = () => {
 				return true;
 			case 4:
 				if (formData.additionalInfo.length < 3) {
-					toast.error("Please add at least 3 items to proceed", {
-						position: "top-center",
-						autoClose: 3000,
-					});
+					// toast.error("Please add at least 3 items to proceed", {
+					// 	position: "top-center",
+					// 	autoClose: 3000,
+					// });
 					return false;
 				}
 				return true;
@@ -1163,10 +1163,10 @@ const ManuscriptPage = () => {
 			window.open(mergedFileUrl, "_blank");
 			setPdfBuiltManuscripts((prev) => new Set([...prev, manuscriptId]));
 		} else {
-			toast.warning("PDF is not available yet.", {
-				position: "top-center",
-				autoClose: 3000,
-			});
+			// toast.warning("PDF is not available yet.", {
+			// 	position: "top-center",
+			// 	autoClose: 3000,
+			// });
 		}
 	};
 	const [pdfBuiltManuscripts, setPdfBuiltManuscripts] = useState(new Set());
@@ -1235,10 +1235,10 @@ const ManuscriptPage = () => {
 			});
 		} else {
 			setBuildError("PDF generation is taking longer than expected. Please check 'My Submissions' later.");
-			toast.warning("PDF generation is taking longer than expected. You can check your submission later.", {
-				position: "top-center",
-				autoClose: 5000,
-			});
+			// toast.warning("PDF generation is taking longer than expected. You can check your submission later.", {
+			// 	position: "top-center",
+			// 	autoClose: 5000,
+			// });
 		}
 	};
 
@@ -2297,11 +2297,11 @@ const ManuscriptPage = () => {
 									type="text"
 									value={itemInput}
 									onChange={(e) => setItemInput(e.target.value)}
-									onKeyPress={(e) => {
-										if (e.key === "Enter") {
-											handleAddItem();
-										}
-									}}
+									// onKeyPress={(e) => {
+									// 	if (e.key === "Enter") {
+									// 		handleAddItem();
+									// 	}
+									// }}
 									placeholder="Enter specification..."
 									className="flex-1 border border-[#e0e0e0] rounded-lg p-3 text-[#00796b] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
 								/>
