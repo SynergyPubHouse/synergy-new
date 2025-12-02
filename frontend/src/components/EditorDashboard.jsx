@@ -3,7 +3,8 @@ import { useAuth } from "../App";
 import axios from "axios";
 
 import { exportNotesToWord } from '../components/exportNotesToWord.jsx';
-
+import PdfUploadModal from '../components/PdfUploadModal';
+// import { calcGeneratorDuration } from "framer-motion";
 function EditorDashboard() {
 	const { user } = useAuth();
 	console.log("EditorDashboard user:", user);
@@ -46,7 +47,8 @@ function EditorDashboard() {
 	const [isSendingInvitations, setIsSendingInvitations] = useState(false);
 	const [filterType, setFilterType] = useState("all"); // "all", "status", "activity"
 	const [filterValue, setFilterValue] = useState(""); // The specific status or activity to filter by
-
+	const [showPdfUploadDialog, setShowPdfUploadDialog] = useState(false);
+	const [uploadManuscript, setUploadManuscript] = useState(null);
 	// Simple toast system to replace browser alerts
 	const [toasts, setToasts] = useState([]);
 
@@ -1762,15 +1764,11 @@ function EditorDashboard() {
 																manuscript
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
-															"Accepted"
+														className={`px-3 py-1 text-sm rounded ${manuscript.status === "Accepted" || manuscript.status === "Published"
 															? "bg-gray-400 text-white cursor-not-allowed"
 															: "bg-green-500 text-white hover:bg-green-600"
 															}`}
-														disabled={
-															manuscript.status ===
-															"Accepted"
-														}
+														disabled={manuscript.status === "Accepted" || manuscript.status === "Published"}
 													>
 														{manuscript.status ===
 															"Accepted"
@@ -1805,26 +1803,31 @@ function EditorDashboard() {
 													{/* Revision Required */}
 													<button
 														onClick={() =>
-															handleActionClick(
-																manuscript,
-																"revision"
-															)
+															handleActionClick(manuscript, "revision")
 														}
-														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
-															"Revision Required"
+														className={`px-3 py-1 text-sm rounded ${manuscript.revisionAttempts >= (manuscript.maxRevisionAttempts || 3)
 															? "bg-gray-400 text-white cursor-not-allowed"
 															: "bg-orange-500 text-white hover:bg-orange-600"
 															}`}
-														disabled={
-															manuscript.status ===
-															"Revision Required"
-														}
+														disabled={manuscript.revisionAttempts >= (manuscript.maxRevisionAttempts || 3)}
 													>
-														{manuscript.status ===
-															"Revision Required"
-															? "✓ Revision Required"
-															: "📝 Revision Required"}
+														📝 Revision Required
 													</button>
+
+													<button
+														onClick={() => {
+															setUploadManuscript(manuscript);
+															setShowPdfUploadDialog(true);
+														}}
+														className={`px-3 py-1 text-sm rounded text-white 
+    ${manuscript.status === "Published"
+																? "bg-gray-500 cursor-not-allowed"
+																: "bg-indigo-500 hover:bg-indigo-600"}`}
+														disabled={manuscript.status === "Published"}
+													>
+														{manuscript.status === "Published" ? "✓ Published" : "Publish"}
+													</button>
+
 												</div>
 											</div>
 
@@ -2722,6 +2725,21 @@ function EditorDashboard() {
 					</div>
 				</div>
 			)}
+
+			{/* PDF Upload Modal */}
+			<PdfUploadModal
+				isOpen={showPdfUploadDialog}
+				onClose={() => {
+					setShowPdfUploadDialog(false);
+					setUploadManuscript(null);
+				}}
+				manuscript={uploadManuscript}
+				userToken={user?.token}
+				onSuccess={(data) => {
+					addToast("PDF has been successfully uploaded!", "success");
+					fetchUsers(); // Data refresh karo
+				}}
+			/>
 		</div>
 	);
 }

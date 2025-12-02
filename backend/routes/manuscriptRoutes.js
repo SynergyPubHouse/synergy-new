@@ -29,6 +29,7 @@ router.get(
 	auth,
 	manuscriptController.getMySubmissions
 );
+router.get("/manuscripts/published", auth, manuscriptController.getPublishedManuscripts);
 router.get(
 	"/manuscripts/:manuscriptId",
 	auth,
@@ -87,6 +88,13 @@ router.post(
     '/manuscripts/:manuscriptId/upload-revision-files',
     auth,
     manuscriptController.uploadRevisionFiles
+);
+
+
+router.post(
+    "/manuscript/publish/:manuscriptId",
+    upload.single("pdfFile"), 
+    manuscriptController.uploadPublishedPdf
 );
 
 module.exports = router;

@@ -407,7 +407,7 @@ const MySubmissions = () => {
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-32">Updated</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-24">Type</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-28">Status</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-32">Notes</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-32">Review comments</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-28">Files</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-36">Actions</th>
                   </tr>
@@ -578,12 +578,12 @@ const MySubmissions = () => {
                                   Send to Editor
                                 </button>
                               )}
-                              <button
+                              {/* <button
                                 onClick={() => handleNotesClick(manuscript._id)}
                                 className="px-2 py-1 text-xs border border-indigo-600 text-indigo-600 rounded hover:bg-indigo-50 transition-colors"
                               >
                                 Notes
-                              </button>
+                              </button> */}
                             </div>
                           </td>
 
@@ -638,16 +638,16 @@ const MySubmissions = () => {
                                     const isZip = url.toLowerCase().includes('.zip');
 
                                     if (isZip) {
-                                      
+
                                       const link = document.createElement('a');
                                       link.href = url;
-                                      link.download = 'clean-document.zip'; 
+                                      link.download = 'clean-document.zip';
                                       link.target = '_blank';
                                       document.body.appendChild(link);
                                       link.click();
                                       document.body.removeChild(link);
                                     } else {
-                                      
+
                                       const isPdf = url.toLowerCase().includes('.pdf');
                                       if (isPdf) {
                                         window.open(url, "_blank");
@@ -721,7 +721,7 @@ const MySubmissions = () => {
 
                           {/* Response Column */}
                           <td className="px-4 py-3">
-                            {!["Accepted", "Rejected", "Withdrawn", "Under Review"].includes(manuscript.status) && !attemptsExhausted && (
+                            {!["Accepted", "Rejected", "Withdrawn", "Under Review", "Published"].includes(manuscript.status) && !attemptsExhausted && (
                               <div className="space-y-2 min-w-[140px]">
                                 {/* <div className="text-xs font-medium text-gray-700 border-b border-gray-200 pb-1">Response Upload</div> */}
                                 {/* <input
