@@ -407,9 +407,8 @@ const UploadModal = ({ manuscriptId, onClose, onSuccess }) => {
                         </div>
 
                         <p className="text-gray-600 mb-6">
-                            Kya aap sure hain? Ye files editor ke paas jayengi aur review ke liye submit ho jayengi.
-                        </p>
-
+                          Are you sure? These files will go to the editor and will be submitted for review.
+</p>
                         <div className="bg-gray-50 rounded-lg p-3 mb-6">
                             <p className="text-sm text-gray-700 font-medium mb-2">Files to be uploaded:</p>
                             <ul className="text-sm text-gray-600 space-y-1">
