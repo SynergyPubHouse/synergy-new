@@ -207,7 +207,7 @@ const ArticleDetail = () => {
   return (
     <div className="min-h-screen bg-[#f9f9f9] text-[#212121] py-12">
       <div className="container mx-auto px-6 md:px-20">
-        <div className="bg-white rounded-xl shadow-md p-6 border border-[#e0e0e0]">
+        <div className="bg-white rounded-xl shadow-md p-6 border border-[#e0e0e0] mt-[50px]">
           <div className="mb-6">
             <h1 className="text-2xl font-extrabold text-[#00796b]">{article.title}</h1>
             <p className="mt-2 text-sm text-[#757575]">
