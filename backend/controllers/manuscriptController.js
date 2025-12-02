@@ -310,6 +310,7 @@ async function createMergedPDFWithTable(manuscriptPath, coverLetterPath, declara
 }
 
 // Helper: Create table PDF with form data
+// Helper: Create table PDF with form data
     async function createTablePdf(formData, manuscriptId = null) {
         const pdfDoc = await PDFDocument.create();
         const page = pdfDoc.addPage([612, 792]); // US Letter size
@@ -2206,6 +2207,138 @@ exports.uploadRevisionFiles = async (req, res) => {
 
             console.log(`[uploadRevisionFiles] All revision files uploaded successfully for manuscript: ${customId}`);
 
+            // ===================================
+            // 🔥 EMAIL NOTIFICATION TO EDITORS
+            // ===================================
+            try {
+                // Import Editor model if not already imported at top
+                
+                
+                // Get all active editors
+                   const editors = await User.find({ roles: "editor" }).select(
+                    "firstName middleName lastName email title"
+                );
+                
+                if (editors && editors.length > 0) {
+                    // Get author information
+                    const authorName = manuscript.correspondingAuthor 
+                        ? `${manuscript.correspondingAuthor.firstName || ''} ${manuscript.correspondingAuthor.lastName || ''}`.trim()
+                        : (manuscript.authors && manuscript.authors[0] 
+                            ? `${manuscript.authors[0].firstName || ''} ${manuscript.authors[0].lastName || ''}`.trim()
+                            : 'Author');
+                    
+                    const authorEmail = manuscript.correspondingAuthor?.email 
+                        || (manuscript.authors && manuscript.authors[0]?.email) 
+                        || 'Not provided';
+
+                    const submissionDate = new Date().toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZoneName: 'short'
+                    });
+
+                    const revisionNumber = manuscript.authorResponse.submissionCount || 1;
+                    const fileTypeDisplay = (fileType || 'docx').toUpperCase();
+                    const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
+
+                    // Create email content for editors
+                    const emailSubject = `Revision Submitted - ${customId}: ${manuscript.title}`;
+                    
+                    const emailHtml = `
+                         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">
+                
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 25px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 22px;">📄 Revision Submitted</h1>
+                </div>
+
+                <!-- Content -->
+                <div style="padding: 25px;">
+                    <p style="color: #374151; font-size: 15px; margin-bottom: 20px;">
+                        Dear Editor,
+                    </p>
+                    
+                    <p style="color: #374151; font-size: 15px; margin-bottom: 20px;">
+                        <strong>${authorName}</strong> has submitted <strong>Revision </strong> for the manuscript.
+                    </p>
+
+                    <!-- Manuscript Info -->
+                    <div style="background-color: #F0FDFA; padding: 15px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 20px;">
+                        <p style="margin: 0 0 8px 0; font-size: 14px;"><strong>ID:</strong> ${customId}</p>
+                        <p style="margin: 0; font-size: 14px;"><strong>Title:</strong> ${manuscript.title || 'Untitled'}</p>
+                    </div>
+
+                    <!-- Files -->
+                    <div style="margin-bottom: 20px;">
+                        <p style="font-weight: 600; color: #374151; margin-bottom: 10px;">📁 Submitted Files:</p>
+                        <ul style="color: #374151; font-size: 14px; padding-left: 20px; margin: 0;">
+                            <li style="margin-bottom: 5px;">
+                                <a href="${manuscript.authorResponse.pdfUrl}" style="color: #00796B;">Response Sheet (PDF)</a>
+                            </li>
+                            <li style="margin-bottom: 5px;">
+                                <a href="${manuscript.authorResponse.highlightedFileUrl}" style="color: #00796B;">Highlighted Document (PDF)</a>
+                            </li>
+                            <li>
+                                <a href="${manuscript.authorResponse.withoutHighlightedFileUrl}" style="color: #00796B;">Clean Document (${(fileType || 'docx').toUpperCase()})</a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Action Button -->
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a href="${frontendUrl}/journal/jics/editor/manuscripts/${manuscript._id}" 
+                           style="display: inline-block; background-color: #00796B; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                            Review Manuscript
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div style="background-color: #F3F4F6; padding: 15px; text-align: center; border-top: 1px solid #E5E7EB;">
+                    <p style="color: #6B7280; font-size: 12px; margin: 0;">
+                        Synergy World Press | <a href="mailto:support@synergyworldpress.com" style="color: #00796B;">support@synergyworldpress.com</a>
+                    </p>
+                </div>
+            </div>
+                    `;
+
+                    // Send email to all editors
+                    const emailPromises = editors.map(async (editor) => {
+                        try {
+                            await sendEmail({
+                                to: editor.email,
+                                subject: emailSubject,
+                                html: emailHtml,
+                            });
+                            console.log(`[uploadRevisionFiles] Revision notification sent to editor: ${editor.email}`);
+                            return { success: true, email: editor.email };
+                        } catch (emailError) {
+                            console.error(`[uploadRevisionFiles] Failed to send email to ${editor.email}:`, emailError);
+                            return { success: false, email: editor.email, error: emailError.message };
+                        }
+                    });
+
+                    const emailResults = await Promise.all(emailPromises);
+                    const successfulEmails = emailResults.filter(r => r.success).length;
+                    const failedEmails = emailResults.filter(r => !r.success).length;
+
+                    console.log(`[uploadRevisionFiles] Email notifications: ${successfulEmails} sent, ${failedEmails} failed`);
+
+                } else {
+                    console.log("[uploadRevisionFiles] No active editors found to notify");
+                }
+
+            } catch (emailError) {
+                // Don't fail the upload if email fails - just log the error
+                console.error("[uploadRevisionFiles] Error sending email notifications:", emailError);
+            }
+            // ===================================
+            // END EMAIL NOTIFICATION
+            // ===================================
+
             // Send success response
             return res.json({ 
                 success: true, 
@@ -2238,6 +2371,215 @@ exports.uploadRevisionFiles = async (req, res) => {
         }
     });
 };
+
+exports.uploadPublishedPdf = async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        const { manuscriptId } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Published PDF file is required",
+            });
+        }
+
+        tempFiles = [req.file.path];
+
+        // Find manuscript
+        const manuscript = await Manuscript.findById(manuscriptId)
+            .populate("authors", "firstName lastName email")
+            .populate("correspondingAuthor", "firstName lastName email");
+
+        if (!manuscript) {
+            return res.status(404).json({
+                success: false,
+                message: "Manuscript not found",
+            });
+        }
+
+        const customId = manuscript.customId || manuscript._id.toString();
+        const timestamp = Date.now();
+        const fileName = 'published_' + customId + '_' + timestamp + '.pdf';
+
+        // Upload PDF to Cloudinary
+        const uploadedPdf = await uploadToCloudinary(
+            req.file.path,
+            "published_manuscripts",
+            "raw",
+            fileName
+        );
+
+        if (!uploadedPdf?.secure_url) throw new Error("Cloudinary upload failed");
+
+        // 🔥 Save published date in database
+        const publishedDate = new Date();
+        
+        manuscript.publishedFileUrl = uploadedPdf.secure_url;
+        manuscript.status = "Published";
+        manuscript.publishedAt = publishedDate;  // ✅ Saved to database
+        await manuscript.save();
+
+        // Cleanup temp file
+        await cleanupFiles(tempFiles);
+        tempFiles = [];
+
+        // ===================================
+        // EMAIL NOTIFICATION TO AUTHORS
+        // ===================================
+        const authorEmails = new Set();
+
+        if (manuscript.correspondingAuthor?.email) {
+            authorEmails.add(manuscript.correspondingAuthor.email.toLowerCase());
+        }
+
+        if (manuscript.authors?.length) {
+            manuscript.authors.forEach(author => {
+                if (author?.email) {
+                    authorEmails.add(author.email.toLowerCase());
+                }
+            });
+        }
+
+        if (authorEmails.size > 0) {
+            const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
+            
+            // Format date for email display
+            const formattedDate = publishedDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+          const emailSubject = 'Congratulations! Your Manuscript Has Been Published - ' + customId;
+
+const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">' +
+    
+    // Header
+    '<div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 30px; text-align: center;">' +
+    '<h1 style="margin: 0; font-size: 24px; color: #1c1c1cff;">Congratulations!</h1>' +
+    '<p style="margin: 10px 0 0 0; font-size: 16px; color: #1c1c1cff;">Your Manuscript Has Been Published</p>' +
+    '</div>' +
+
+    // Content
+    '<div style="padding: 30px;">' +
+    
+    '<p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Dear Author,</p>' +
+    
+    '<p style="color: #374151; font-size: 16px; margin-bottom: 20px; line-height: 1.6;">' +
+    'We are pleased to inform you that your manuscript has been <strong>successfully published</strong> in the Journal of Innovative Computer Science (JICS).' +
+    '</p>' +
+
+    // Manuscript Details
+    '<div style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 25px;">' +
+    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Manuscript ID:</strong></p>' +
+    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + customId + '</p>' +
+    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Title:</strong></p>' +
+    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + (manuscript.title || 'Untitled') + '</p>' +
+    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published Date:</strong></p>' +
+    '<p style="margin: 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + formattedDate + '</p>' +
+    '</div>' +
+
+    // Download Button
+    '<div style="text-align: center; margin: 30px 0;">' +
+    '<a href="' + manuscript.publishedFileUrl + '" style="display: inline-block; background-color: #00796B; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Download Published PDF</a>' +
+    '</div>' +
+
+    '<p style="color: #374151; font-size: 15px; line-height: 1.6;">' +
+    'Thank you for choosing <strong>Synergy World Press</strong> for publishing your research.' +
+    '</p>' +
+
+    '<p style="color: #374151; font-size: 15px; margin-top: 25px;">Best regards,<br><strong>Synergy World Press Editorial Team</strong></p>' +
+
+    '</div>' +
+
+    // Footer
+    '<div style="background-color: #F3F4F6; padding: 20px; text-align: center; border-top: 1px solid #E5E7EB;">' +
+    '<p style="color: #6B7280; font-size: 12px; margin: 0 0 5px 0;">Journal of Innovative Computer Science (JICS)</p>' +
+    '<p style="color: #6B7280; font-size: 12px; margin: 0;">' +
+    '<a href="' + frontendUrl + '" style="color: #00796B; text-decoration: none;">synergyworldpress.com</a> | ' +
+    '<a href="mailto:support@synergyworldpress.com" style="color: #00796B; text-decoration: none;">support@synergyworldpress.com</a>' +
+    '</p>' +
+    '</div>' +
+
+    '</div>';
+            // Send email to all authors
+            const emailPromises = Array.from(authorEmails).map(email => {
+                return sendEmail({
+                    to: email,
+                    subject: emailSubject,
+                    html: emailHtml
+                }).catch(err => console.error('[uploadPublishedPdf] Failed to send email to ' + email + ':', err));
+            });
+
+            await Promise.all(emailPromises);
+            console.log('[uploadPublishedPdf] Emails sent to ' + authorEmails.size + ' author(s)');
+        }
+
+        // 🔥 Return published date in response
+        return res.json({
+            success: true,
+            message: "Published PDF uploaded and emails sent successfully",
+            data: {
+                manuscriptId: manuscript._id,
+                customId: customId,
+                publishedFileUrl: manuscript.publishedFileUrl,
+                publishedAt: manuscript.publishedAt,  // ✅ Return in response
+                status: manuscript.status
+            }
+        });
+
+    } catch (error) {
+        console.error("[uploadPublishedPdf] Error:", error);
+
+        if (tempFiles.length > 0) {
+            await cleanupFiles(tempFiles).catch(err =>
+                console.error("[uploadPublishedPdf] Cleanup failed:", err)
+            );
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to process published PDF",
+            error: process.env.NODE_ENV === "development" ? error.message : "Internal server error"
+        });
+    }
+};
+
+
+// Controller
+exports.getPublishedManuscripts = async (req, res) => {
+  try {
+    const manuscripts = await Manuscript.find({ status: "Published" })
+      .populate("authors", "firstName middleName lastName email")
+      .populate("correspondingAuthor", "firstName middleName lastName email")
+      .populate("assignedReviewers", "firstName middleName lastName email")
+      .select("-reviewerNotes");
+
+    if (!manuscripts || manuscripts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No published manuscripts found",
+      });
+    }
+
+    res.json({
+      success: true,
+      count: manuscripts.length,
+      data: manuscripts,
+    });
+  } catch (error) {
+    console.error("Error fetching published manuscripts:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+
 
 module.exports.convertDocxToPdf = convertDocxToPdf;
 module.exports.isValidPdf = isValidPdf;

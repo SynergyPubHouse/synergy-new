@@ -57,5 +57,16 @@ router.post(
 	auth,
 	editorController.assignReviewersFromInvitations
 );
+router.post(
+    "/notify-new-manuscript",
+    auth,
+    editorController.notifyEditorsOnNewManuscript
+);
 
+
+router.get(
+    "/all",
+    auth,
+    editorController.getAllEditors
+);
 module.exports = router;

@@ -174,12 +174,7 @@ exports.getProfile = async (req, res) => {
 // Fetch manuscripts assigned to the reviewer
 exports.getAssignedManuscripts = async (req, res) => {
     try {
-        console.log("Fetching manuscripts for reviewer (assigned only):", {
-            id: req.user._id,
-            email: req.user.email,
-        });
-
-        // Resolve reviewer from ID or Email
+        // Find reviewer
         let reviewer = await Reviewer.findById(req.user._id);
         if (!reviewer && req.user?.email) {
             reviewer = await Reviewer.findOne({ email: req.user.email });
@@ -188,7 +183,7 @@ exports.getAssignedManuscripts = async (req, res) => {
             return res.status(404).json({ message: "Reviewer not found" });
         }
 
-        const reviewerEmail = reviewer.email;
+        const reviewerEmail = reviewer.email.toLowerCase();
         const assignedIds = reviewer.assignedManuscripts || [];
 
         if (!assignedIds || assignedIds.length === 0) {
@@ -197,28 +192,75 @@ exports.getAssignedManuscripts = async (req, res) => {
 
         const manuscripts = await Manuscript.find({
             _id: { $in: assignedIds },
-            invitations: { $elemMatch: { email: reviewerEmail, status: "accepted" } },
+            invitations: { 
+                $elemMatch: { 
+                    email: reviewerEmail, 
+                    status: "accepted" 
+                } 
+            },
         })
-            .select(
-                "customId title correspondingAuthor authors submissionDate status mergedFileUrl reviewerNotes editorNotes invitations revisionCombinedPdfUrl highlightedRevisionFileUrl"
-            )
-            .populate({
-                path: "correspondingAuthor",
-                select: "firstName middleName lastName email",
-            })
-            .populate({
-                path: "authors",
-                select: "firstName middleName lastName email",
+        .select(`
+            customId 
+            title 
+            correspondingAuthor 
+            authors 
+            submissionDate 
+            status 
+            mergedFileUrl 
+            reviewerNotes 
+            editorNotes 
+            invitations 
+            authorResponse
+            revisionCombinedPdfUrl 
+            highlightedRevisionFileUrl
+            currentRevisionRound
+        `)
+        .populate({
+            path: "correspondingAuthor",
+            select: "firstName middleName lastName email",
+        })
+        .populate({
+            path: "authors",
+            select: "firstName middleName lastName email",
+        });
+
+        const formattedManuscripts = manuscripts.map((manuscript) => {
+            // ═══════════════════════════════════════════════════════════════════
+            // 👇 FIND LATEST ACCEPTED INVITATION
+            // ═══════════════════════════════════════════════════════════════════
+            const acceptedInvitations = manuscript.invitations.filter(
+                inv => inv.email.toLowerCase() === reviewerEmail && 
+                       inv.status === "accepted"
+            );
+            
+            const latestAcceptedInvitation = acceptedInvitations.sort((a, b) => {
+                const dateA = new Date(a.acceptedAt || a.invitedAt || 0);
+                const dateB = new Date(b.acceptedAt || b.invitedAt || 0);
+                return dateB - dateA;
+            })[0];
+
+            // ═══════════════════════════════════════════════════════════════════
+            // 👇 CHECK REVISION ACCESS
+            // ═══════════════════════════════════════════════════════════════════
+            const currentRevisionRound = manuscript.currentRevisionRound || 0;
+            const invitationRevisionRound = latestAcceptedInvitation?.revisionRound || 0;
+            const isRevisionReview = latestAcceptedInvitation?.isRevisionReview || false;
+            
+            // Can see revision files if:
+            // 1. isRevisionReview = true (explicitly marked)
+            // 2. OR invitation's revisionRound >= manuscript's currentRevisionRound
+            const canSeeRevisionFiles = isRevisionReview || 
+                (currentRevisionRound > 0 && invitationRevisionRound >= currentRevisionRound);
+
+            // Debug log
+            console.log(`Manuscript ${manuscript._id}:`, {
+                currentRevisionRound,
+                invitationRevisionRound,
+                isRevisionReview,
+                canSeeRevisionFiles,
             });
 
-        // Format the manuscripts data
-        const formattedManuscripts = manuscripts.map((manuscript) => {
-            console.log(
-                "Populated manuscript correspondingAuthor:",
-                manuscript.correspondingAuthor
-            );
-
-            // Use correspondingAuthor for main author info
+            // Author data
             let authorData = {
                 _id: manuscript.correspondingAuthor?._id || null,
                 firstName: manuscript.correspondingAuthor?.firstName || "",
@@ -229,58 +271,50 @@ exports.getAssignedManuscripts = async (req, res) => {
                     : "Unknown Author",
             };
 
-            // Fix PDF URL formatting
+            // Fix PDF URL
             let pdfUrl = manuscript.mergedFileUrl || "";
             if (pdfUrl && !pdfUrl.startsWith("http")) {
                 pdfUrl = `https://paper-sphere.vercel.app${pdfUrl}`;
             }
 
-            // Filter reviewer notes for only this reviewer
+            // Filter notes
             const filteredReviewerNotes = manuscript.reviewerNotes.filter(
-                (note) => {
-                    if (!note.addedBy?._id) return false;
-                    return note.addedBy._id.toString() === reviewer._id.toString();
-                }
+                (note) => note.addedBy?._id?.toString() === reviewer._id.toString()
             );
 
-            // Editor notes visible to reviewers only
             const visibleEditorNotes = manuscript.editorNotes.filter(
-                (note) =>
-                    note.visibility && note.visibility.includes("reviewer")
+                (note) => note.visibility && note.visibility.includes("reviewer")
             );
 
-            // Collect unique authors (authors + correspondingAuthor)
-            const allAuthorsSet = new Set();
-            const allAuthorsRaw = [];
-
-            if (Array.isArray(manuscript.authors)) {
-                manuscript.authors.forEach((au) => {
-                    if (au && au._id && !allAuthorsSet.has(String(au._id))) {
-                        allAuthorsSet.add(String(au._id));
-                        allAuthorsRaw.push(au);
-                    }
-                });
+            // ═══════════════════════════════════════════════════════════════════
+            // 👇 CONDITIONAL: Only include authorResponse if allowed
+            // ═══════════════════════════════════════════════════════════════════
+            let authorResponseData = null;
+            
+            if (canSeeRevisionFiles && manuscript.authorResponse) {
+                const ar = manuscript.authorResponse;
+                
+                if (ar.pdfUrl || ar.docxUrl || ar.highlightedFileUrl || ar.withoutHighlightedFileUrl) {
+                    authorResponseData = {
+                        responseSheet: {
+                            pdfUrl: ar.pdfUrl || null,
+                            docxUrl: ar.docxUrl || null,
+                            uploadedAt: ar.uploadedAt || null,
+                        },
+                        highlightedDocument: {
+                            url: ar.highlightedFileUrl || null,
+                            uploadedAt: ar.highlightedUploadedAt || null,
+                        },
+                        cleanDocument: {
+                            url: ar.withoutHighlightedFileUrl || null,
+                            uploadedAt: ar.withoutHighlightedUploadedAt || null,
+                        },
+                        submissionCount: ar.submissionCount || 1,
+                        lastUpdated: ar.lastUpdated || null,
+                    };
+                }
             }
 
-            if (
-                manuscript.correspondingAuthor &&
-                manuscript.correspondingAuthor._id &&
-                !allAuthorsSet.has(String(manuscript.correspondingAuthor._id))
-            ) {
-                allAuthorsSet.add(String(manuscript.correspondingAuthor._id));
-                allAuthorsRaw.push(manuscript.correspondingAuthor);
-            }
-
-            const allAuthors = allAuthorsRaw.map((au) => ({
-                _id: au._id,
-                firstName: au.firstName || "",
-                middleName: au.middleName || "",
-                lastName: au.lastName || "",
-                email: au.email || "",
-                fullName: formatFullName(au),
-            }));
-
-            // ADD: Full authors list separately
             const authorsFull = (manuscript.authors || []).map((au) => ({
                 _id: au._id,
                 firstName: au.firstName || "",
@@ -293,17 +327,25 @@ exports.getAssignedManuscripts = async (req, res) => {
             return {
                 ...manuscript.toObject(),
                 author: authorData,
-                authors: authorsFull,  // <-- AUTHOR LIST ADDED HERE
+                authors: authorsFull,
                 mergedFileUrl: pdfUrl,
                 reviewerNotes: filteredReviewerNotes,
                 editorNotes: visibleEditorNotes,
-                allAuthors,
-                authorsDetailed: allAuthors,
+                
+                reviewRound: latestAcceptedInvitation?.reviewRound || 1,
+                isRevisionReview: isRevisionReview,
+                canSeeRevisionFiles: canSeeRevisionFiles,
+                currentRevisionRound: currentRevisionRound,
+                
+                // 👇 Only if allowed
+                authorResponse: authorResponseData,
+                revisionCombinedPdfUrl: canSeeRevisionFiles ? (manuscript.revisionCombinedPdfUrl || null) : null,
+                highlightedRevisionFileUrl: canSeeRevisionFiles ? (manuscript.highlightedRevisionFileUrl || null) : null,
             };
         });
 
-        console.log("Found manuscripts:", formattedManuscripts.length);
         res.json(formattedManuscripts);
+
     } catch (error) {
         console.error("Error fetching manuscripts:", error);
         res.status(500).json({
@@ -530,8 +572,10 @@ exports.resetPassword = async (req, res) => {
 // Get pending invitations for logged-in reviewer
 exports.getPendingInvitations = async (req, res) => {
     try {
-        const reviewerEmail = req.user.email;
-        // Correct query using elemMatch
+        const reviewerEmail = req.user.email.toLowerCase().trim();
+        
+        console.log("Fetching pending invitations for:", reviewerEmail);
+
         const manuscriptsWithInvitations = await Manuscript.find({
             invitations: {
                 $elemMatch: {
@@ -540,38 +584,115 @@ exports.getPendingInvitations = async (req, res) => {
                 }
             }
         })
-        .select(
-            "customId title type abstract keywords submissionDate invitations editorNotes"
-        )
+        .select(`
+            customId 
+            title 
+            type 
+            abstract 
+            keywords 
+            submissionDate 
+            status
+            invitations 
+            editorNotes 
+            mergedFileUrl
+            authorResponse
+            revisionCombinedPdfUrl
+            highlightedRevisionFileUrl
+            currentRevisionRound
+        `)
         .lean();
-        // Build response
+
+        console.log("Found manuscripts:", manuscriptsWithInvitations.length);
+
         const invitations = manuscriptsWithInvitations.map((manuscript) => {
-            // Find the exact pending invitation for this reviewer
+            // Find the pending invitation for this reviewer
             const relevantInvitation = manuscript.invitations.find(
-                (inv) =>
-                    inv.email === reviewerEmail &&
-                    inv.status === "pending"
+                (inv) => inv.email.toLowerCase() === reviewerEmail && inv.status === "pending"
             );
-            // Filter editor notes visible to reviewers
-            const visibleEditorNotes = manuscript.editorNotes
-                ? manuscript.editorNotes.filter(
-                      (note) =>
-                          note.visibility &&
-                          note.visibility.includes("reviewer")
-                  )
-                : [];
+
+            // Filter visible editor notes
+            const visibleEditorNotes = (manuscript.editorNotes || []).filter((note) => {
+                return note.visibility && 
+                    Array.isArray(note.visibility) && 
+                    note.visibility.includes("reviewer");
+            });
+
+            // ═══════════════════════════════════════════════════════════════════
+            // 👇 CHECK IF THIS IS A REVISION REVIEW
+            // ═══════════════════════════════════════════════════════════════════
+            const currentRevisionRound = manuscript.currentRevisionRound || 0;
+            const invitationRevisionRound = relevantInvitation?.revisionRound || 0;
+            const isRevisionReview = relevantInvitation?.isRevisionReview || 
+                                     relevantInvitation?.reviewRound > 1 ||
+                                     currentRevisionRound > 0;
+
+            console.log(`Pending invitation for ${manuscript._id}:`, {
+                currentRevisionRound,
+                invitationRevisionRound,
+                isRevisionReview,
+            });
+
+            // ═══════════════════════════════════════════════════════════════════
+            // 👇 INCLUDE AUTHOR RESPONSE ONLY FOR REVISION REVIEWS
+            // ═══════════════════════════════════════════════════════════════════
+            let authorResponseData = null;
+            
+            if (isRevisionReview && manuscript.authorResponse) {
+                const ar = manuscript.authorResponse;
+                
+                if (ar.pdfUrl || ar.docxUrl || ar.highlightedFileUrl || ar.withoutHighlightedFileUrl) {
+                    authorResponseData = {
+                        responseSheetUrl: ar.pdfUrl || ar.docxUrl || null,
+                        responseSheetUploadedAt: ar.uploadedAt || null,
+                        
+                        highlightedFileUrl: ar.highlightedFileUrl || null,
+                        highlightedUploadedAt: ar.highlightedUploadedAt || null,
+                        
+                        withoutHighlightedFileUrl: ar.withoutHighlightedFileUrl || null,
+                        withoutHighlightedUploadedAt: ar.withoutHighlightedUploadedAt || null,
+                        
+                        submissionCount: ar.submissionCount || currentRevisionRound,
+                        lastUpdated: ar.lastUpdated || null,
+                    };
+                }
+            }
+
             return {
                 _id: manuscript._id,
+                customId: manuscript.customId,
                 title: manuscript.title,
                 type: manuscript.type,
                 abstract: manuscript.abstract,
                 keywords: manuscript.keywords,
                 submissionDate: manuscript.submissionDate,
+                status: manuscript.status,
+                
+                // Invitation details
                 invitedAt: relevantInvitation?.invitedAt,
+                reviewRound: relevantInvitation?.reviewRound || 1,
+                revisionRound: invitationRevisionRound,
+                isRevisionReview: isRevisionReview,
+                
+                // Original manuscript
+                mergedFileUrl: manuscript.mergedFileUrl,
+                
+                // Editor notes
                 editorNotes: visibleEditorNotes,
+                
+                // Author response (only for revision reviews)
+                authorResponse: authorResponseData,
+                
+                // Revision tracking
+                currentRevisionRound: currentRevisionRound,
+                
+                // Additional revision files
+                revisionCombinedPdfUrl: isRevisionReview ? (manuscript.revisionCombinedPdfUrl || null) : null,
+                highlightedRevisionFileUrl: isRevisionReview ? (manuscript.highlightedRevisionFileUrl || null) : null,
             };
         });
+
         res.json(invitations);
+
     } catch (error) {
         console.error("Error getting pending invitations:", error);
         res.status(500).json({
@@ -580,7 +701,6 @@ exports.getPendingInvitations = async (req, res) => {
         });
     }
 };
-
 // Accept invitation
 exports.acceptInvitation = async (req, res) => {
 	try {

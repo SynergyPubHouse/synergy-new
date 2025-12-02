@@ -485,7 +485,7 @@ function ReviewerDashboard() {
                       )}
 
                       {/* Response Sheet (PDF) */}
-                      {manuscript.authorResponse?.docxUrl && (
+                      {manuscript.authorResponse?.responseSheet.docxUrl && (
                         <button
                           onClick={() => window.open(manuscript.authorResponse.docxUrl, "_blank")}
                           className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-1 flex items-center justify-center space-x-2"
@@ -496,9 +496,9 @@ function ReviewerDashboard() {
                       )}
 
                       {/* Highlighted Document (PDF) */}
-                      {manuscript.authorResponse?.highlightedFileUrl && (
+                      {manuscript.authorResponse?.highlightedDocument && (
                         <button
-                          onClick={() => window.open(manuscript.authorResponse.highlightedFileUrl, "_blank")}
+                          onClick={() => window.open(manuscript.authorResponse.highlightedDocument.url, "_blank")}
                           className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                         >
                           <span>✏️</span>
@@ -507,10 +507,10 @@ function ReviewerDashboard() {
                       )}
 
                       {/* Without Highlighted Document (DOCX/LaTeX) */}
-                      {manuscript.authorResponse?.withoutHighlightedFileUrl && (
+                      {manuscript.authorResponse?.cleanDocument && (
                         <button
                           onClick={() => {
-                            const url = manuscript.authorResponse.withoutHighlightedFileUrl;
+                            const url = manuscript?.authorResponse?.cleanDocument?.url;
                             const isZip = url.toLowerCase().includes('.zip');
 
                             if (isZip) {

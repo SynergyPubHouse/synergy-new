@@ -15,7 +15,7 @@ const ManuscriptPage = () => {
 	const [currentSection, setCurrentSection] = useState(1);
 	const totalSections = 6;
 	const [pdfBuilt, setPdfBuilt] = useState(false);
-
+	console.log("user", user)
 	const [formData, setFormData] = useState({
 		type: "",
 		classification: [],
@@ -58,7 +58,8 @@ const ManuscriptPage = () => {
 	const [correspondingAuthorId, setCorrespondingAuthorId] = useState(null);
 	const [isEditAuthorModalOpen, setIsEditAuthorModalOpen] = useState(false);
 	const [editingAuthorId, setEditingAuthorId] = useState(null);
-
+	const [isAccepting, setIsAccepting] = useState(false);
+	const [isRejecting, setIsRejecting] = useState(false); // For reject button too
 	const [users, setUsers] = useState([]);
 
 	const [newAuthor, setNewAuthor] = useState({
@@ -682,13 +683,13 @@ const ManuscriptPage = () => {
 
 		for (let section = 1; section <= 6; section++) {
 			if (!validateSection(section)) {
-				toast.error(
-					`Please complete all required fields in Section ${section}`,
-					{
-						position: "top-center",
-						autoClose: 3000,
-					}
-				);
+				// toast.error(
+				// 	`Please complete all required fields in Section ${section}`,
+				// 	{
+				// 		position: "top-center",
+				// 		autoClose: 3000,
+				// 	}
+				// );
 				setCurrentSection(section);
 				return;
 			}
@@ -797,7 +798,7 @@ const ManuscriptPage = () => {
 	// In ManuscriptPage.js, find the proceedbeforebuildpdf function
 	// Replace the ENTIRE authors section with this:
 
-const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
+	const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 
 	const proceedbeforebuildpdf = async (e) => {
 		e.preventDefault();
@@ -1119,16 +1120,26 @@ const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 	};
 
 	const handleAcceptPdf = async () => {
+		// Prevent double click
+		if (isAccepting) return;
+
+		setIsAccepting(true);
+
 		try {
 			console.log('Starting manuscript acceptance process...');
 			console.log('Manuscript ID:', manuscriptId);
 			console.log('User token available:', !!user.token);
 
+			// Show loading toast
+			const loadingToast = toast.loading('Submitting manuscript...', {
+				position: "top-center",
+			});
+
 			// First update the manuscript status
 			console.log('Updating manuscript status...');
 			const response = await axios.put(
 				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${manuscriptId}/status`,
-				{ status: "Under Review" },  // 👈 Saved → Pending
+				{ status: "Under Review" },
 				{
 					headers: {
 						Authorization: `Bearer ${user.token}`,
@@ -1149,157 +1160,181 @@ const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 			);
 			console.log('Manuscript fetch successful');
 
-			const manuscript = manuscriptResponse.data.data; // Extract actual manuscript data
+			const manuscript = manuscriptResponse.data.data;
+			console.log('Full manuscript data:', manuscript);
 
-			// Debug: Check authors data
-			console.log('Manuscript data:', manuscript);
-			console.log('Authors:', manuscript.authors);
-			console.log('Authors length:', manuscript.authors?.length);
-			console.log('Full manuscript object keys:', Object.keys(manuscript));
-			console.log('Manuscript title:', manuscript.title);
-			console.log('Manuscript customId:', manuscript.customId);
-			console.log('Manuscript _id:', manuscript._id);
+			// ============================================
+			// 🔥 FIX: COLLECT ALL AUTHOR EMAILS PROPERLY
+			// ============================================
+			const authorEmails = new Set();
 
-			// Fallback: Try to get authors from different possible fields
-			let authors = manuscript.authors || [];
-
-			// Check if authors is in different field or format
-			if (!authors || authors.length === 0) {
-				// Try alternative field names
-				authors = manuscript.author || manuscript.authorList || manuscript.contributors || [];
-				console.log('Trying alternative authors field:', authors);
-			}
-
-			// If still no authors, try to get from user data
-			if (!authors || authors.length === 0) {
-				// Fallback to current user if they are the author
-				if (user && user.email) {
-					authors = [{
-						email: user.email,
-						firstName: user.firstName || user.name || 'Author',
-						lastName: user.lastName || '',
-						_id: user._id
-					}];
-					console.log('Using current user as author:', authors);
+			// 1. Add corresponding author email
+			if (manuscript.correspondingAuthor) {
+				if (typeof manuscript.correspondingAuthor === 'object' && manuscript.correspondingAuthor.email) {
+					authorEmails.add(manuscript.correspondingAuthor.email.toLowerCase());
+					console.log('Added corresponding author email:', manuscript.correspondingAuthor.email);
 				}
 			}
 
-			console.log("manuscript dataaaaaaaaa", manuscript)
-			// Get manuscript details with fallbacks
-			const manuscriptTitle = manuscript.title || manuscript.manuscriptTitle || 'Untitled Manuscript';
-
-			// Debug all possible ID fields
-			console.log('Available ID fields:', {
-				customId: manuscript.customId,
-				_id: manuscript._id,
-				id: manuscript.id,
-				title: manuscript.title
-			});
-
-			// Try multiple ID field names
-			const manuscriptIdForEmail = manuscript.customId ||
-				manuscript._id ||
-				manuscript.id ||
-				`MS-${Date.now()}`; // Fallback to generated ID
-
-			console.log('Final manuscript title:', manuscriptTitle);
-			console.log('Final manuscript ID:', manuscriptIdForEmail);
-
-			// Send email to all authors
-			if (authors && authors.length > 0) {
-				console.log('Final authors list:', authors);
-				const emailPromises = authors.map(async (author) => {
-					try {
-						await axios.post(
-							`${import.meta.env.VITE_BACKEND_URL}/api/send-email`,
-							{
-								to: author.email,
-								subject: `Manuscript Successfully Submitted: ${manuscriptIdForEmail}`,
-								html: `
-									<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; line-height: 1.6;">
-										<div style="margin-bottom: 30px;">
-											<p style="font-size: 16px; margin-bottom: 20px;">
-												Dear Authors,
-											</p>
-											
-											<p style="font-size: 16px; margin-bottom: 20px;">
-												Your manuscript entitled "<strong>${manuscriptTitle}</strong>" has been successfully submitted online and is presently being given full consideration for publication in IEEE Access.
-											</p>
-											
-											<p style="font-size: 16px; margin-bottom: 20px;">
-												If you are receiving this email, that means you are listed as an author. If you do not approve of being listed as a co-author on this article, please reach out to ieeeaccesseic@ieee.org as soon as possible.  
-											</p>
-											
-											<p style="font-size: 16px; margin-bottom: 20px;">
-												As a reminder, IEEE Access is a fully open access journal. Open Access provides unrestricted access to published articles via IEEE Xplore. In lieu of paid subscriptions, authors are required to pay an article processing charge of $2,075 (plus applicable local taxes) after the article has been accepted for publication.
-											</p>
-											
-											<p style="font-size: 16px; margin-bottom: 20px;">
-												Your manuscript ID is <strong>${manuscriptIdForEmail}</strong>. Please mention the manuscript ID in all future correspondence to the IEEE Access Editorial Office. The submitting author can view the manuscript status at any time by checking their author dashboard on the IEEE Author Portal. If the submitting author needs to update their email address after submission, please reach out to ieeeaccesseic@ieee.org so we can assist you in doing so.
-											</p>
-											
-											<p style="font-size: 16px; margin-bottom: 20px;">
-												<strong>Please note that any change to the author list after the article has been submitted is considered rare and exceptional, and the decision to allow such changes rests with the Editor. Once the list and order of authors has been established, the list and order of authors should not be altered without permission of all living authors of that article and will still be subject to editorial review.</strong>
-											</p>
-											
-											<p style="font-size: 16px; margin-bottom: 20px;">
-												Thank you again for submitting your manuscript to IEEE Access.
-											</p>
-											
-											<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-												<p style="font-size: 16px; margin: 0; font-style: italic;">Sincerely,</p>
-												<p style="font-size: 16px; margin: 5px 0 0 0; font-weight: bold;">IEEE Access Editorial Office</p>
-											</div>
-										</div>
-										
-										<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; text-align: center;">
-											<p style="margin: 0;">This email was sent by the IEEE Access Editorial Office</p>
-											<p style="margin: 5px 0 0 0;">© 2024 IEEE Access. All rights reserved.</p>
-										</div>
-									</div>
-								`,
-							},
-							{
-								headers: {
-									Authorization: `Bearer ${user.token}`,
-								},
-							}
-						);
-						console.log(`Email sent to ${author.email}`);
-					} catch (emailError) {
-						console.error(`Failed to send email to ${author.email}:`, emailError);
+			// 2. Add authors emails (if populated)
+			if (manuscript.authors && manuscript.authors.length > 0) {
+				manuscript.authors.forEach((author) => {
+					if (typeof author === 'object' && author.email) {
+						authorEmails.add(author.email.toLowerCase());
+						console.log('Added author email:', author.email);
 					}
 				});
-
-				await Promise.all(emailPromises);
-				toast.success(`Email notifications sent to ${authors.length} author(s)`, {
-					position: "top-center",
-					autoClose: 3000,
-				});
-			} else {
-				console.log('No authors found to send emails');
-				// toast.warning('No authors found to send email notifications', {
-				// 	position: "top-center",
-				// 	autoClose: 3000,
-				// });
 			}
+
+			// 3. Always add current user (submitter) email
+			if (user && user.email) {
+				authorEmails.add(user.email.toLowerCase());
+				console.log('Added current user email:', user.email);
+			}
+
+			console.log('All author emails collected:', Array.from(authorEmails));
+
+			// Get manuscript details
+			const manuscriptTitle = manuscript.title || manuscript.manuscriptTitle || 'Untitled Manuscript';
+			const manuscriptIdForEmail = manuscript.customId || manuscript._id || manuscript.id || 'MS-' + Date.now();
+			const frontendUrl = import.meta.env.VITE_FRONTEND_URL || "https://synergyworldpress.com";
+
+			// ============================================
+			// NOTIFY ALL EDITORS (Don't wait for completion)
+			// ============================================
+			axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/notify-new-manuscript`,
+				{
+					manuscriptId: manuscriptIdForEmail,
+					manuscriptTitle: manuscriptTitle,
+					submittedBy: ((user.firstName || '') + ' ' + (user.lastName || '')).trim() || user.name || 'Unknown Author',
+					submitterEmail: user.email,
+					submissionDate: new Date().toLocaleString('en-US', {
+						year: 'numeric',
+						month: 'long',
+						day: 'numeric',
+						hour: '2-digit',
+						minute: '2-digit'
+					}),
+					status: "Under Review",
+					abstract: manuscript.abstract || '',
+					keywords: manuscript.keywords || '',
+					classification: manuscript.classification || []
+				},
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+						'Content-Type': 'application/json'
+					},
+				}
+			).then(editorNotificationResponse => {
+				console.log('Editor notification sent:', editorNotificationResponse.data);
+			}).catch(editorNotifyError => {
+				console.error('Error notifying editors:', editorNotifyError);
+			});
+
+			// ============================================
+			// 🔥 SEND EMAIL TO ALL AUTHORS
+			// ============================================
+			if (authorEmails.size > 0) {
+				console.log('Sending emails to ' + authorEmails.size + ' author(s)');
+
+				const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">' +
+
+					// Header
+					'<div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 25px; text-align: center;">' +
+					'<h1 style="margin: 0; font-size: 22px; color: #101010ff;">Manuscript Submitted Successfully</h1>' +
+					'</div>' +
+
+					// Content
+					'<div style="padding: 25px;">' +
+
+					'<p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Dear Author,</p>' +
+
+					'<p style="color: #374151; font-size: 16px; margin-bottom: 20px; line-height: 1.6;">' +
+					'Your manuscript entitled "<strong>' + manuscriptTitle + '</strong>" has been successfully submitted and is now with the editors for review.' +
+					'</p>' +
+
+					// Manuscript Details
+					'<div style="background-color: #F0FDF4; padding: 20px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 25px;">' +
+					'<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Manuscript ID:</strong></p>' +
+					'<p style="margin: 0 0 15px 0; font-size: 18px; color: #1F2937; font-weight: 600;">' + manuscriptIdForEmail + '</p>' +
+					'<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Status:</strong></p>' +
+					'<p style="margin: 0; font-size: 16px; color: #00796B; font-weight: 600;">Under Review</p>' +
+					'</div>' +
+
+					'<p style="color: #374151; font-size: 15px; margin-bottom: 20px; line-height: 1.6;">' +
+					'Please use this ID in all future correspondence regarding this manuscript.' +
+					'</p>' +
+
+					// Important Note
+					'<div style="background-color: #FEF3C7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">' +
+					'<p style="color: #92400E; font-size: 14px; margin: 0; line-height: 1.6;">' +
+					'<strong>Note:</strong> Any change to the author list after submission is considered rare and exceptional. Once the list and order of authors has been established, it should not be altered without permission of all authors.' +
+					'</p>' +
+					'</div>' +
+
+					// View Submission Button
+					'<div style="text-align: center; margin: 25px 0;">' +
+					'<a href="' + frontendUrl + '/journal/jics/my-submissions" style="display: inline-block; background-color: #00796B; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">View My Submissions</a>' +
+					'</div>' +
+
+					'<p style="color: #374151; font-size: 15px; margin-top: 25px;">Sincerely,<br><strong>Editorial Office</strong></p>' +
+
+					'</div>' +
+
+					// Footer
+					'<div style="background-color: #F3F4F6; padding: 15px; text-align: center; border-top: 1px solid #E5E7EB;">' +
+					'<p style="color: #6B7280; font-size: 12px; margin: 0;">Synergy World Press | support@synergyworldpress.com</p>' +
+					'</div>' +
+
+					'</div>';
+
+				// 🔥 Send emails to all collected emails
+				Array.from(authorEmails).forEach((email) => {
+					console.log('Sending email to:', email);
+
+					axios.post(
+						`${import.meta.env.VITE_BACKEND_URL}/api/send-email`,
+						{
+							to: email,
+							subject: 'Manuscript Successfully Submitted - ' + manuscriptIdForEmail,
+							html: emailHtml
+						},
+						{
+							headers: {
+								Authorization: `Bearer ${user.token}`,
+							},
+						}
+					).then((response) => {
+						console.log('Email sent successfully to ' + email, response.data);
+					}).catch((emailError) => {
+						console.error('Failed to send email to ' + email + ':', emailError.response?.data || emailError.message);
+					});
+				});
+
+				console.log('Email requests sent to ' + authorEmails.size + ' recipients');
+			} else {
+				console.log('No author emails found to send');
+			}
+
+			// Dismiss loading toast and show success
+			toast.dismiss(loadingToast);
+			toast.success('Manuscript submitted successfully!', {
+				position: "top-center",
+				autoClose: 2000,
+			});
 
 			setAcceptOrRejectPdf(false);
 
-			// Editor ko request chali jayegi, user ko list par redirect
-			navigate(`${BASE_URL}/my-submissions`);
+			// Redirect to my submissions after short delay
+			setTimeout(() => {
+				navigate(`${BASE_URL}/my-submissions`);
+			}, 1000);
 
 		} catch (error) {
 			console.error("Error accepting manuscript:", error);
-			console.error("Error details:", {
-				message: error.message,
-				status: error.response?.status,
-				statusText: error.response?.statusText,
-				data: error.response?.data,
-				url: error.config?.url
-			});
 
-			// Show specific error message based on error type
 			let errorMessage = "Failed to accept manuscript. Please try again.";
 
 			if (error.response?.status === 401) {
@@ -1312,10 +1347,13 @@ const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 				errorMessage = "Network error. Please check your connection.";
 			}
 
+			toast.dismiss();
 			toast.error(errorMessage, {
 				position: "top-center",
 				autoClose: 3000,
 			});
+		} finally {
+			setIsAccepting(false);
 		}
 	};
 
@@ -3242,18 +3280,46 @@ const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 											<button
 												type="button"
 												onClick={handleAcceptPdf}
-												disabled={!pdfViewed}
-												className={`px-6 py-2 rounded-lg ${pdfViewed
+												disabled={!pdfViewed || isAccepting}
+												className={`px-6 py-2 rounded-lg flex items-center justify-center min-w-[120px] ${pdfViewed && !isAccepting
 													? "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
 													: "bg-gray-400 text-gray-700 cursor-not-allowed"
 													}`}
 												title={
 													!pdfViewed
 														? "Please view the PDF first"
-														: "Accept the manuscript"
+														: isAccepting
+															? "Submitting..."
+															: "Accept the manuscript"
 												}
 											>
-												Accept
+												{isAccepting ? (
+													<>
+														<svg
+															className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+															xmlns="http://www.w3.org/2000/svg"
+															fill="none"
+															viewBox="0 0 24 24"
+														>
+															<circle
+																className="opacity-25"
+																cx="12"
+																cy="12"
+																r="10"
+																stroke="currentColor"
+																strokeWidth="4"
+															></circle>
+															<path
+																className="opacity-75"
+																fill="currentColor"
+																d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+															></path>
+														</svg>
+														Submitting...
+													</>
+												) : (
+													'Accept'
+												)}
 											</button>
 										)}
 

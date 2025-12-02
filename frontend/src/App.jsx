@@ -50,6 +50,9 @@ import PageNotAvailable from "./pages/pagenotavailable";
 import BookPublication from "./pages/BookPublication";
 import WebSeriesCast from "./pages/WebSeriesCast";
 import ConferencePublication from "./pages/ConferencePublication";
+import CurrentIssue from "./pages/CurrentIssue";
+import ArticleDetail from "./pages/journal/jics/articles/ArticleDetail";
+
 
 // Create Authentication Context
 const AuthContext = createContext(null);
@@ -195,6 +198,9 @@ function AppContent() {
         <Route path={`/team`} element={<TeamDevPage />} />
         <Route path={`/settings`} element={<Settings />} />
         <Route path={`/about`} element={<AboutUs />} />
+        <Route path={`/journal/jics/articles/current`} element={<CurrentIssue />} />
+        <Route path={`${JICS_URL}/articles/:id`} element={<ArticleDetail />} />
+        <Route path={`/journal/jics/articles/:id`} element={<ArticleDetail />} />
 
         {/* Editor Routes */}
         <Route

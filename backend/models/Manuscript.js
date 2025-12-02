@@ -131,9 +131,26 @@ const manuscriptSchema = new mongoose.Schema(
 				"Accepted",
 				"Rejected",
 				"Revision Required",
+				"Published",
 			],
 			default: "Saved",
 		},
+       revisionAttempts: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        maxRevisionAttempts: {
+            type: Number,
+            default: 3,
+            min: 1,
+        },
+        revisionLocked: {
+            type: Boolean,
+            default: false,
+        },
+
+
 		assignedReviewers: [
 			{
 				type: mongoose.Schema.Types.ObjectId,
@@ -153,7 +170,7 @@ const manuscriptSchema = new mongoose.Schema(
 				},
 				status: {
 					type: String,
-					enum: ["pending", "accepted", "rejected"],
+					enum: ["pending", "accepted", "rejected", ],
 					default: "pending",
 				},
 				acceptedAt: {
@@ -166,6 +183,16 @@ const manuscriptSchema = new mongoose.Schema(
 					type: String,
 					default: "",
 				},
+				  // 👇 NEW: Track which round of review this is
+        reviewRound: {
+            type: Number,
+            default: 1,
+        },
+        // 👇 NEW: Track if this is a re-review after revision
+        isRevisionReview: {
+            type: Boolean,
+            default: false,
+        },
 			},
 		],
 		authorNotes: [noteSchema],
@@ -197,6 +224,14 @@ const manuscriptSchema = new mongoose.Schema(
 
 		revisionCombinedPdfUrl: { type: String, default: "" },
 		highlightedRevisionFileUrl: { type: String, default: "" },
+publishedFileUrl: {
+    type: String,
+    default: "",
+},
+	publishedAt: {
+			type: Date,
+			default: null,
+		},
 
 
 	},

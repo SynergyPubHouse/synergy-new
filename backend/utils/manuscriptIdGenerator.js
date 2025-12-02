@@ -11,7 +11,7 @@ async function generateManuscriptId(title = "Untitled") {
         const shortYear = currentYear.toString().slice(-2); // Get last 2 digits (25 for 2025)
         
         // Extract first letters from title words
-        const titlePrefix = extractTitlePrefix(title);
+        const titlePrefix = "JICS";
         
         // Find the count of manuscripts created this year
         const startOfYear = new Date(currentYear, 0, 1);

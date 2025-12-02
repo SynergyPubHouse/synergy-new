@@ -68,7 +68,7 @@ const applyRevisionRequiredUpdate = async ({ manuscript, text, editor }) => {
 		},
 		addedAt: new Date(),
 	};
-
+	
 	const notesToAdd = [baseNote];
 
 	if (attemptsExhausted) {
@@ -1029,89 +1029,203 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 };
 
 // Add revision required note and update status
+// Add revision required note and update status
 exports.addRevisionRequiredNote = async (req, res) => {
-	try {
-		// Require editor authentication for adding revision notes
-	if (!req.editor && !req.user) {
-			return res.status(401).json({ message: "Authentication required" });
-		}
-		const { manuscriptId } = req.params;
-		const { text } = req.body;
+    try {
+        // Require editor authentication for adding revision notes
+        if (!req.editor && !req.user) {
+            return res.status(401).json({ message: "Authentication required" });
+        }
+        const { manuscriptId } = req.params;
+        const { text } = req.body;
 
-		if (!text || !text.trim()) {
-			return res.status(400).json({
-				message: "Revision note text is required",
-			});
-		}
+        if (!text || !text.trim()) {
+            return res.status(400).json({
+                message: "Revision note text is required",
+            });
+        }
 
-		// First, get the current manuscript to check its current status
-		const currentManuscript = await Manuscript.findById(manuscriptId);
-		if (!currentManuscript) {
-			return res.status(404).json({ message: "Manuscript not found" });
-		}
+        // Get manuscript with author details for email
+        const currentManuscript = await Manuscript.findById(manuscriptId)
+            .populate("authors", "firstName lastName email")
+            .populate("correspondingAuthor", "firstName lastName email");
+            
+        if (!currentManuscript) {
+            return res.status(404).json({ message: "Manuscript not found" });
+        }
 
-		// Store old status for comparison
-		const oldStatus = currentManuscript.status;
+        // Store old status for comparison
+        const oldStatus = currentManuscript.status;
 
-		// Prevent any status changes if the manuscript is already rejected
-		if (currentManuscript.status === "Rejected") {
-			return res.status(403).json({
-				message:
-					"Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
-			});
-		}
+        // Prevent any status changes if the manuscript is already rejected
+        if (currentManuscript.status === "Rejected") {
+            return res.status(403).json({
+                message:
+                    "Cannot modify status of a rejected manuscript. Rejected manuscripts are immutable.",
+            });
+        }
 
-		const actor = req.editor || req.user;
-		const {
-			updatedManuscript,
-			attemptsExhausted,
-			maxAttempts,
-		} = await applyRevisionRequiredUpdate({
-			manuscript: currentManuscript,
-			text: text.trim(),
-			editor: actor,
-		});
-		const notificationText = attemptsExhausted
-			? buildRevisionExhaustedMessage(maxAttempts)
-			: text.trim();
+        const actor = req.editor || req.user;
+        const {
+            updatedManuscript,
+            attemptsExhausted,
+            maxAttempts,
+        } = await applyRevisionRequiredUpdate({
+            manuscript: currentManuscript,
+            text: text.trim(),
+            editor: actor,
+        });
 
-		// Send email notification to authors if status has changed
-		if (oldStatus !== updatedManuscript.status) {
-			try {
-				await sendStatusChangeNotification(
-					updatedManuscript,
-					updatedManuscript.status,
-					notificationText,
-					actor
-				);
-			} catch (emailError) {
-				console.error(
-					"Failed to send revision required email:",
-					emailError
-				);
-				// Continue execution even if email fails
-			}
-		}
+        const notificationText = attemptsExhausted
+            ? buildRevisionExhaustedMessage(maxAttempts)
+            : text.trim();
 
-		res.json({
-			message: attemptsExhausted
-				? `Revision attempts exhausted. Manuscript rejected after ${maxAttempts} rounds.`
-				: "Revision required note added and status updated successfully",
-			manuscript: {
-				_id: updatedManuscript._id,
-				status: updatedManuscript.status,
-				revisionAttempts: updatedManuscript.revisionAttempts,
-				maxRevisionAttempts: updatedManuscript.maxRevisionAttempts,
-				revisionLocked: updatedManuscript.revisionLocked,
-			},
-		});
-	} catch (error) {
-		console.error("Error adding revision required note:", error);
-		res.status(500).json({
-			message: "Error adding revision required note",
-			error: error.message,
-		});
-	}
+        // ===================================
+        // 🔥 EMAIL NOTIFICATION TO AUTHORS
+        // ===================================
+        try {
+            // Collect all author emails
+            const authorEmails = new Set();
+            
+            if (currentManuscript.correspondingAuthor?.email) {
+                authorEmails.add(currentManuscript.correspondingAuthor.email.toLowerCase());
+            }
+            
+            if (currentManuscript.authors && currentManuscript.authors.length > 0) {
+                currentManuscript.authors.forEach((author) => {
+                    if (author?.email) {
+                        authorEmails.add(author.email.toLowerCase());
+                    }
+                });
+            }
+
+            if (authorEmails.size > 0) {
+                const customId = currentManuscript.customId || currentManuscript._id.toString();
+                const revisionNumber = updatedManuscript.revisionAttempts || 1;
+                const remainingAttempts = maxAttempts - revisionNumber;
+                const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
+                const editorName = `${actor.firstName || ''} ${actor.lastName || ''}`.trim() || 'Editor';
+
+                const emailSubject = attemptsExhausted
+                    ? `Manuscript Rejected - ${customId}`
+                    : `Revision Required - ${customId}`;
+
+                const emailHtml = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">
+                        
+                        <!-- Header -->
+                        <div style="background: ${attemptsExhausted 
+                            ? 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)' 
+                            : 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)'}; color: black; padding: 25px; text-align: center;">
+                            <h1 style="margin: 0; font-size: 22px;">
+                                ${attemptsExhausted ? '❌ Manuscript Rejected' : '📝 Revision Required'}
+                            </h1>
+                        </div>
+
+                        <!-- Content -->
+                        <div style="padding: 25px;">
+                            <p style="color: #374151; font-size: 15px; margin-bottom: 20px;">
+                                Dear Author,
+                            </p>
+                            
+                            <p style="color: #374151; font-size: 15px; margin-bottom: 20px;">
+                                ${attemptsExhausted 
+                                    ? `Your manuscript has been <strong>rejected</strong> after ${maxAttempts} revision attempts.`
+                                    : `Your manuscript requires <strong>revision</strong>. (Attempt ${revisionNumber}/${maxAttempts})`
+                                }
+                            </p>
+
+                            <!-- Manuscript Info -->
+                            <div style="background-color: #F3F4F6; padding: 15px; border-radius: 8px; border-left: 4px solid ${attemptsExhausted ? '#DC2626' : '#F59E0B'}; margin-bottom: 20px;">
+                                <p style="margin: 0 0 8px 0; font-size: 14px;"><strong>ID:</strong> ${customId}</p>
+                                <p style="margin: 0; font-size: 14px;"><strong>Title:</strong> ${currentManuscript.title || 'Untitled'}</p>
+                            </div>
+
+                            <!-- Editor's Comments -->
+                            <div style="background-color: #FEF3C7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                                <p style="font-weight: 600; color: #92400E; margin: 0 0 10px 0;">💬 Editor's Comments:</p>
+                                <p style="color: #78350F; font-size: 14px; margin: 0; line-height: 1.6;">
+                                    "${text.trim()}"
+                                </p>
+                                <p style="color: #92400E; font-size: 12px; margin: 10px 0 0 0; font-style: italic;">
+                                    - ${editorName}
+                                </p>
+                            </div>
+
+                            ${!attemptsExhausted ? `
+                                <!-- Remaining Attempts -->
+                                <div style="background-color: #DBEAFE; padding: 12px 15px; border-radius: 8px; margin-bottom: 20px;">
+                                    <p style="color: #1E40AF; font-size: 14px; margin: 0;">
+                                        ⚠️ Remaining attempts: <strong>${remainingAttempts}</strong>
+                                    </p>
+                                </div>
+
+                                <!-- Action Button -->
+                                <div style="text-align: center; margin: 25px 0;">
+                                    <a href="${frontendUrl}/journal/jics/my-submissions" 
+                                       style="display: inline-block; background-color: #00796B; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                                        Submit Revision
+                                    </a>
+                                </div>
+                            ` : `
+                                <p style="color: #6B7280; font-size: 14px; text-align: center;">
+                                    For questions, contact the editorial office.
+                                </p>
+                            `}
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="background-color: #F3F4F6; padding: 15px; text-align: center; border-top: 1px solid #E5E7EB;">
+                            <p style="color: #6B7280; font-size: 12px; margin: 0;">
+                                Synergy World Press | <a href="mailto:support@synergyworldpress.com" style="color: #00796B;">support@synergyworldpress.com</a>
+                            </p>
+                        </div>
+                    </div>
+                `;
+
+                // Send email to all authors
+                for (const email of authorEmails) {
+                    try {
+                        await sendEmail({
+                            to: email,
+                            subject: emailSubject,
+                            html: emailHtml,
+                        });
+                        console.log(`[addRevisionRequiredNote] Email sent to: ${email}`);
+                    } catch (emailError) {
+                        console.error(`[addRevisionRequiredNote] Failed to send to ${email}:`, emailError);
+                    }
+                }
+
+                console.log(`[addRevisionRequiredNote] Notified ${authorEmails.size} author(s)`);
+            }
+        } catch (emailError) {
+            console.error("[addRevisionRequiredNote] Email error:", emailError);
+            // Continue even if email fails
+        }
+        // ===================================
+        // END EMAIL NOTIFICATION
+        // ===================================
+
+        res.json({
+            message: attemptsExhausted
+                ? `Revision attempts exhausted. Manuscript rejected after ${maxAttempts} rounds.`
+                : "Revision required note added and status updated successfully",
+            manuscript: {
+                _id: updatedManuscript._id,
+                status: updatedManuscript.status,
+                revisionAttempts: updatedManuscript.revisionAttempts,
+                maxRevisionAttempts: updatedManuscript.maxRevisionAttempts,
+                revisionLocked: updatedManuscript.revisionLocked,
+            },
+        });
+    } catch (error) {
+        console.error("Error adding revision required note:", error);
+        res.status(500).json({
+            message: "Error adding revision required note",
+            error: error.message,
+        });
+    }
 };
 
 // Get all notes for a specific manuscript
@@ -1174,151 +1288,215 @@ exports.getManuscriptNotes = async (req, res) => {
 
 // Send invitation to reviewers
 exports.sendInvitation = async (req, res) => {
-	try {
-		console.log("=== INVITATION REQUEST START ===");
-		console.log("Request body:", JSON.stringify(req.body, null, 2));
-		console.log("Request params:", req.params);
-		console.log("Editor info:", {
-			id: req.editor?._id,
-			name: req.editor ? formatFullName(req.editor) : "Not found",
-			email: req.editor?.email,
-		});
+    try {
+        console.log("=== INVITATION REQUEST START ===");
 
-		console.log("req.editor:", req);
+        const { manuscriptId } = req.params;
+        const { emails, editorNote, isRevisionReview } = req.body;
 
-		const { manuscriptId } = req.params;
-		const { emails, editorNote,id, fullName, editorEmail } = req.body;
+        // Validation
+        if (!emails || !Array.isArray(emails) || emails.length === 0) {
+            return res.status(400).json({
+                message: "Please provide an array of reviewer emails",
+            });
+        }
 
-		if (!emails || !Array.isArray(emails) || emails.length === 0) {
-			return res.status(400).json({
-				message: "Please provide an array of reviewer emails",
-			});
-		}
+        const manuscript = await Manuscript.findById(manuscriptId);
+        if (!manuscript) {
+            return res.status(404).json({ message: "Manuscript not found" });
+        }
 
-		const manuscript = await Manuscript.findById(manuscriptId);
-		if (!manuscript) {
-			return res.status(404).json({ message: "Manuscript not found" });
-		}
+        // Initialize arrays if needed
+        if (!manuscript.editorNotes) manuscript.editorNotes = [];
+        if (!manuscript.invitations) manuscript.invitations = [];
 
-		// Add editor note if provided
-		if (editorNote && editorNote.trim()) {
-			console.log("Adding editor note:", editorNote.trim());
-			console.log("Editor info:", req.user);
+        // ═══════════════════════════════════════════════════════════════════════
+        // 👇 GET CURRENT REVISION ROUND
+        // ═══════════════════════════════════════════════════════════════════════
+        const currentRevisionRound = manuscript.currentRevisionRound || 0;
+        
+        console.log(`Current revision round: ${currentRevisionRound}`);
 
-			const note = {
-				text: editorNote.trim(),
-				action: "Reviewer Invitation",
-				visibility: ["editor", "reviewer"],
-				addedBy: {
-   _id: req.user._id,
-   name:  req.user.firstName + " " + (req.user.lastName || ""),
-   email: req.user.email,
-   role: "editor"
-},
+        // Calculate review round
+        const existingInvitationsForEmail = (email) => {
+            return manuscript.invitations.filter(
+                inv => inv.email.toLowerCase() === email.toLowerCase()
+            ).length;
+        };
 
-				addedAt: new Date(),
-			};
+        // Add editor note if provided
+        let editorNoteAdded = false;
+        if (editorNote && typeof editorNote === 'string' && editorNote.trim()) {
+            const note = {
+                text: editorNote.trim(),
+                action: "Reviewer Invitation",
+                visibility: ["editor", "reviewer"],
+                addedBy: {
+                    _id: req.user._id,
+                    name: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim(),
+                    email: req.user.email,
+                    role: "editor"
+                },
+                addedAt: new Date(),
+            };
+            manuscript.editorNotes.push(note);
+            editorNoteAdded = true;
+        }
 
-			manuscript.editorNotes.push(note);
-			console.log(
-				"Editor note added to manuscript. Total editor notes:",
-				manuscript.editorNotes.length
-			);
-		} else {
-			console.log("No editor note provided or empty note");
-		}
+        // ═══════════════════════════════════════════════════════════════════════
+        // 👇 CREATE INVITATIONS WITH REVISION TRACKING
+        // ═══════════════════════════════════════════════════════════════════════
+        const newInvitations = emails.map((email) => {
+            const normalizedEmail = email.toLowerCase().trim();
+            const previousInvitations = existingInvitationsForEmail(normalizedEmail);
+            
+            return {
+                email: normalizedEmail,
+                invitedAt: new Date(),
+                status: "pending",
+                reviewRound: previousInvitations + 1,
+                
+                // 👇 SET REVISION ROUND TO CURRENT MANUSCRIPT REVISION
+                revisionRound: currentRevisionRound,
+                
+                // 👇 Mark as revision review if currentRevisionRound > 0
+                isRevisionReview: isRevisionReview || currentRevisionRound > 0 || previousInvitations > 0,
+            };
+        });
 
-		// Add invitations to manuscript
-		const newInvitations = emails.map((email) => ({
-			email: email.toLowerCase().trim(),
-			invitedAt: new Date(),
-			status: "pending",
-		}));
+        console.log("New invitations:", JSON.stringify(newInvitations, null, 2));
 
-		manuscript.invitations.push(...newInvitations);
+        manuscript.invitations.push(...newInvitations);
+        
+        // Mark as modified and save
+        manuscript.markModified('editorNotes');
+        manuscript.markModified('invitations');
+        
+        // Save database first
+        await manuscript.save();
+        console.log("✅ Invitations saved to database successfully");
 
-		console.log(
-			"Before save - manuscript editorNotes length:",
-			manuscript.editorNotes.length
-		);
-		await manuscript.save();
-		console.log("After save - manuscript saved successfully");
+        // Check if author has submitted revision response
+        const hasRevisionResponse = !!(
+            manuscript.authorResponse?.pdfUrl ||
+            manuscript.authorResponse?.highlightedFileUrl ||
+            manuscript.authorResponse?.withoutHighlightedFileUrl
+        );
 
-		// Verify the note was saved
-		const savedManuscript = await Manuscript.findById(manuscriptId).select(
-			"editorNotes"
-		);
-		console.log(
-			"Verified saved manuscript editorNotes length:",
-			savedManuscript.editorNotes.length
-		);
+        // ═══════════════════════════════════════════════════════════════════════
+        // 📧 SEND EMAILS - Non-blocking
+        // ═══════════════════════════════════════════════════════════════════════
+        let emailsSent = 0;
+        let emailsFailed = 0;
+        const emailErrors = [];
 
-		// Send emails to reviewers
-		for (const email of emails) {
-			// Debug log to check environment variable
-			console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+        for (const email of emails) {
+            try {
+                const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+                const registrationUrl = `${baseUrl}/journal/jics/reviewer/register`;
 
-			const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-			const registrationUrl = `${baseUrl}/journal/jics/reviewer/register`;
+                // Build editor note section
+                const editorNoteSection = editorNoteAdded
+                    ? `
+                    <div style="background-color: #f8f9fa; padding: 15px; margin: 20px 0; border-left: 4px solid #496580;">
+                        <h4 style="color: #496580; margin-top: 0;">Editor's Note:</h4>
+                        <p style="margin-bottom: 0;">${editorNote.trim()}</p>
+                    </div>
+                    `
+                    : "";
 
-			console.log("Generated registration URL:", registrationUrl);
+                // Build revision info section for email
+                const revisionInfoSection = hasRevisionResponse
+                    ? `
+                    <div style="background-color: #fff3cd; padding: 15px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                        <h4 style="color: #856404; margin-top: 0;">📝 Revision ${currentRevisionRound} Submitted</h4>
+                        <p style="margin-bottom: 0;">
+                            The author has submitted a revised version of this manuscript. 
+                            You will be able to view the following in your dashboard:
+                        </p>
+                        <ul style="margin-top: 10px;">
+                            ${manuscript.authorResponse?.pdfUrl ? '<li>Author Response Sheet (PDF)</li>' : ''}
+                            ${manuscript.authorResponse?.highlightedFileUrl ? '<li>Highlighted Document (showing changes)</li>' : ''}
+                            ${manuscript.authorResponse?.withoutHighlightedFileUrl ? '<li>Clean Revised Document</li>' : ''}
+                        </ul>
+                    </div>
+                    `
+                    : "";
 
-			// Include editor note in email if provided
-			const editorNoteSection =
-				editorNote && editorNote.trim()
-					? `
-					<div style="background-color: #f8f9fa; padding: 15px; margin: 20px 0; border-left: 4px solid #496580;">
-						<h4 style="color: #496580; margin-top: 0;">Editor's Note:</h4>
-						<p style="margin-bottom: 0;">${editorNote.trim()}</p>
-					</div>
-				`
-					: "";
+                const emailContent = `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #496580;">Reviewer Invitation - Synergy World Press</h2>
+                        <p>Dear Reviewer,</p>
+                        <p>You have been invited to review a manuscript titled: <strong>"${manuscript.title}"</strong></p>
+                        <p><strong>Manuscript ID:</strong> ${manuscript.customId || manuscriptId}</p>
+                        ${currentRevisionRound > 0 ? `<p><strong>Revision:</strong> ${currentRevisionRound}</p>` : ''}
+                        ${revisionInfoSection}
+                        ${editorNoteSection}
+                        <p>To respond to this invitation, please register/login:</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${registrationUrl}" 
+                               style="background-color: #496580; color: white; padding: 12px 24px; 
+                                      text-decoration: none; border-radius: 5px; display: inline-block;">
+                                Register/Login as Reviewer
+                            </a>
+                        </div>
+                        <p>Best regards,<br>Synergy World Press Editorial Team</p>
+                    </div>
+                `;
 
-			const emailContent = `
-				<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-					<h2 style="color: #496580;">Reviewer Invitation - Synergy World Press</h2>
-					<p>Dear Reviewer,</p>
-					<p>You have been invited to review a manuscript titled: <strong>"${manuscript.title}"</strong></p>
-					<p><strong>Manuscript ID:</strong> ${manuscript.customId || manuscriptId}</p>
-					<p><strong>Your Email:</strong> ${email}</p>
-					${editorNoteSection}
-					<p>To accept or reject this invitation, please:</p>
-					<ol>
-						<li>Register as a reviewer (if you haven't already)</li>
-						<li>Login to your reviewer dashboard</li>
-						<li>View and respond to the invitation</li>
-					</ol>
-					<div style="text-align: center; margin: 30px 0;">
-						<a href="${registrationUrl}" 
-						   style="background-color: #496580; color: white; padding: 12px 24px; 
-						          text-decoration: none; border-radius: 5px; display: inline-block;">
-							Register/Login as Reviewer
-						</a>
-					</div>
-					<p>If you're already registered, you can login directly at: <a href="${baseUrl}/journal/jics/reviewer/login">Reviewer Login</a></p>
-					<p>Best regards,<br>Synergy World Press Editorial Team</p>
-				</div>
-			`;
+                await sendEmail({
+                    to: email,
+                    subject: `${hasRevisionResponse ? '[Revision Review] ' : ''}Reviewer Invitation: ${manuscript.title}`,
+                    html: emailContent,
+                });
 
-			await sendEmail({
-				to: email,
-				subject: `Reviewer Invitation: ${manuscript.title}`,
-				text: emailContent,
-			});
-		}
+                emailsSent++;
+                console.log(`✅ Email sent successfully to: ${email}`);
 
-		res.json({
-			message: `Invitations sent to ${emails.length} reviewers successfully`,
-			invitedEmails: emails,
-			editorNoteAdded: editorNote && editorNote.trim() ? true : false,
-		});
-	} catch (error) {
-		console.error("Error sending invitations:", error);
-		res.status(500).json({
-			message: "Error sending invitations",
-			error: error.message,
-		});
-	}
+            } catch (emailError) {
+                emailsFailed++;
+                emailErrors.push({
+                    email: email,
+                    error: emailError.message,
+                });
+                console.error(`❌ Failed to send email to ${email}:`, emailError.message);
+            }
+        }
+
+        // Respond with status
+        const response = {
+            success: true,
+            message: emailsFailed === 0 
+                ? `Invitations sent to ${emails.length} reviewers successfully`
+                : `Invitations created for ${emails.length} reviewers. ${emailsSent} emails sent, ${emailsFailed} failed.`,
+            invitedEmails: emails,
+            editorNoteAdded: editorNoteAdded,
+            isRevisionReview: hasRevisionResponse,
+            currentRevisionRound: currentRevisionRound,
+            emailStatus: {
+                total: emails.length,
+                sent: emailsSent,
+                failed: emailsFailed,
+            },
+        };
+
+        if (emailsFailed > 0 && process.env.NODE_ENV === 'development') {
+            response.emailErrors = emailErrors;
+        }
+
+        if (emailsFailed > 0) {
+            response.note = "Some emails failed to send, but invitations are saved. Reviewers can still see the invitation in their dashboard.";
+        }
+
+        res.json(response);
+
+    } catch (error) {
+        console.error("Error sending invitations:", error);
+        res.status(500).json({
+            message: "Error sending invitations",
+            error: error.message,
+        });
+    }
 };
 
 // Get accepted invitations for a manuscript
@@ -1487,4 +1665,254 @@ exports.assignReviewersFromInvitations = async (req, res) => {
 			error: error.message,
 		});
 	}
+};
+
+
+
+
+exports.notifyEditorsOnNewManuscript = async (req, res) => {
+    try {
+        const {
+            manuscriptId,
+            manuscriptTitle,
+            submittedBy,
+            submitterEmail,
+            submissionDate,
+            status,
+          
+        } = req.body;
+
+        // Validate required fields
+        if (!manuscriptId || !manuscriptTitle) {
+            return res.status(400).json({
+                success: false,
+                message: "Manuscript ID and Title are required"
+            });
+        }
+
+        console.log("=== NOTIFY EDITORS START ===");
+        console.log("Manuscript ID:", manuscriptId);
+        console.log("Title:", manuscriptTitle);
+        console.log("Submitted By:", submittedBy);
+
+        // Fetch all editors from database
+     const editors = await User.find({ roles: "editor" }).select(
+    "firstName middleName lastName email title"
+);
+
+console.log("Editors to notify:", editors.map(e => e.email));
+
+
+        if (!editors || editors.length === 0) {
+            console.log("No editors found in database");
+            return res.status(200).json({
+                success: true,
+                message: "No editors found in database",
+                editorsNotified: 0
+            });
+        }
+
+        console.log(`Found ${editors.length} editor(s)`);
+
+        // Frontend URL for dashboard link
+        const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
+
+        // Track successful and failed emails
+        const emailResults = {
+            success: [],
+            failed: []
+        };
+
+        // Send email to each editor
+        const emailPromises = editors.map(async (editor) => {
+            const editorName = formatFullName(editor);
+
+            const emailContent = `
+<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 0;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #00796b 0%, #004d40 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
+        <h1 style="margin: 0; font-size: 24px;">📄 New Journal Submission</h1>
+        <p style="margin: 10px 0 0 0; opacity: 0.9;">A new journal manuscript has been submitted by an author</p>
+    </div>
+
+    <!-- Body -->
+    <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none; background-color: #ffffff;">
+
+        <p style="font-size: 16px; color: #333;">Dear ${editor.title || ''} ${editorName},</p>
+
+        <p style="font-size: 16px; color: #333; line-height: 1.6;">
+            A new journal manuscript has been submitted by an author, and it is now assigned to you for editorial review.
+            Kindly log in to your dashboard and proceed with evaluation.
+        </p>
+
+        <!-- Manuscript Details -->
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #00796b;">
+            <h3 style="margin: 0 0 15px 0; color: #00796b; font-size: 18px;">📋 Manuscript Details</h3>
+
+            <table style="width: 100%; border-collapse: collapse;">
+                
+               
+
+                <tr>
+                    <td style="padding: 10px 0; font-weight: bold; color: #555;">Manuscript ID:</td>
+                    <td style="padding: 10px 0; color: #333;"><strong style="color: #00796b;">${manuscriptId}</strong></td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 10px 0; font-weight: bold; color: #555;">Title:</td>
+                    <td style="padding: 10px 0; color: #333;">${manuscriptTitle}</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 10px 0; font-weight: bold; color: #555;">Author Name:</td>
+                    <td style="padding: 10px 0; color: #333;">${submittedBy || "N/A"}</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 10px 0; font-weight: bold; color: #555;">Author Email:</td>
+                    <td style="padding: 10px 0; color: #333;">${submitterEmail || "N/A"}</td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 10px 0; font-weight: bold; color: #555;">Submission Date:</td>
+                    <td style="padding: 10px 0; color: #333;">
+                        ${submissionDate || new Date().toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric"
+                        })}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 10px 0; font-weight: bold; color: #555;">Status:</td>
+                    <td style="padding: 10px 0;">
+                        <span style="background-color: #fff3cd; color: #856404; padding: 5px 12px; border-radius: 20px; font-size: 14px; font-weight: bold;">
+                            ${status || "Awaiting Editor Review"}
+                        </span>
+                    </td>
+                </tr>
+
+            </table>
+        </div>
+
+        <!-- Action Required -->
+        <div style="background-color: #fff8e1; padding: 15px; border-radius: 8px; margin: 25px 0; border: 1px solid #ffcc02;">
+            <p style="margin: 0; color: #856404; font-size: 14px;">
+                <strong>⚠️ Action Required:</strong> Please review the newly submitted journal manuscript.
+            </p>
+        </div>
+
+        <!-- Button -->
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="${frontendUrl}/journal/jics/editor/dashboard"
+               style="background: linear-gradient(135deg, #00796b 0%, #004d40 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 30px; font-weight: bold; font-size: 16px; display: inline-block;">
+                🔗 Open Editor Dashboard
+            </a>
+        </div>
+
+        <p style="font-size: 14px; color: #666; line-height: 1.6;">
+            If you need help, please contact the editorial office.
+        </p>
+
+        <!-- Signature -->
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            <p style="margin: 0; color: #333;">Best regards,</p>
+            <p style="margin: 5px 0 0 0; font-weight: bold; color: #00796b;">Synergy World Press</p>
+            <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Editorial Management System</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f5f5f5; padding: 20px; text-align: center; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
+        <p style="margin: 0; font-size: 12px; color: #666;">This is an automated notification email.</p>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">
+            © ${new Date().getFullYear()} Synergy World Press. All rights reserved.
+        </p>
+    </div>
+
+</div>
+`;
+
+            try {
+                await sendEmail({
+                    to: editor.email,
+                    subject: `🔔 New Manuscript Submitted: ${manuscriptId} - ${manuscriptTitle}`,
+                    text: emailContent,
+                });
+
+                console.log(`✅ Email sent to editor: ${editor.email}`);
+                emailResults.success.push({
+                    email: editor.email,
+                    name: editorName
+                });
+            } catch (emailError) {
+                console.error(`❌ Failed to send email to ${editor.email}:`, emailError.message);
+                emailResults.failed.push({
+                    email: editor.email,
+                    name: editorName,
+                    error: emailError.message
+                });
+            }
+        });
+
+        // Wait for all emails to be sent
+        await Promise.all(emailPromises);
+
+        console.log(`=== NOTIFY EDITORS END ===`);
+        console.log(`Success: ${emailResults.success.length}, Failed: ${emailResults.failed.length}`);
+
+        return res.status(200).json({
+            success: true,
+            message: `Notifications sent to ${emailResults.success.length} editor(s)`,
+            editorsNotified: emailResults.success.length,
+            totalEditors: editors.length,
+            results: {
+                success: emailResults.success,
+                failed: emailResults.failed
+            }
+        });
+
+    } catch (error) {
+        console.error("Error in notifyEditorsOnNewManuscript:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error sending notifications to editors",
+            error: error.message
+        });
+    }
+};
+
+// @desc    Get all editors (for admin/testing purposes)
+// @route   GET /api/editors/all
+// @access  Private
+exports.getAllEditors = async (req, res) => {
+    try {
+        // Sirf un users ko fetch karo jinke roles me "editor" ho
+        const editors = await User.find({ roles: "editor" }).select(
+            "firstName middleName lastName email title manuscripts roles createdAt"
+        );
+
+        return res.status(200).json({
+            success: true,
+            count: editors.length,
+            editors: editors.map(editor => ({
+                _id: editor._id,
+                name: formatFullName(editor),
+                title: editor.title,
+                email: editor.email,
+                manuscripts: editor.manuscripts,
+                roles: editor.roles,
+                createdAt: editor.createdAt
+            }))
+        });
+    } catch (error) {
+        console.error("Error fetching editors:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching editors",
+            error: error.message
+        });
+    }
 };
