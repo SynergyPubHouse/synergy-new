@@ -207,7 +207,7 @@ const ArticleDetail = () => {
   return (
     <div className="min-h-screen bg-[#f9f9f9] text-[#212121] py-12">
       <div className="container mx-auto px-6 md:px-20">
-        <div className="bg-white rounded-xl shadow-md p-6 border border-[#e0e0e0]">
+        <div className="bg-white rounded-xl shadow-md p-6 border border-[#e0e0e0] mt-[50]">
           <div className="mb-6">
             <h1 className="text-2xl font-extrabold text-[#00796b]">{article.title}</h1>
             <p className="mt-2 text-sm text-[#757575]">
@@ -216,6 +216,11 @@ const ArticleDetail = () => {
             <p className="mt-1 text-sm text-[#757575]">
               <span className="font-medium">Submission Date:</span> {formatDate(article.submissionDate)}
             </p>
+            {article.publishedAt && (
+              <p className="mt-1 text-sm text-[#757575]">
+                <span className="font-medium">Published At:</span> {formatDate(article.publishedAt)}
+              </p>
+            )}
             <p className="mt-1 text-sm text-[#757575]">
               <span className="font-medium">Article Type:</span> {article.type || 'Manuscript'}
             </p>
@@ -271,10 +276,10 @@ const ArticleDetail = () => {
                 </div>
               )}
 
-              <div className="mb-6">
+              {/* <div className="mb-6">
                 <h3 className="text-lg font-semibold text-[#00796b] mb-2">Funding</h3>
                 <p className="text-sm text-[#424242]">{article.funding || 'No funding information available'}</p>
-              </div>
+              </div> */}
             </div>
           </div>
 
