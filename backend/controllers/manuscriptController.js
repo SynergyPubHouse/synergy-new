@@ -1832,8 +1832,8 @@ exports.uploadNotesWord = async (req, res) => {
         const emailContent = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">
             <div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 30px; text-align: center;">
-              <h1 style="margin: 0; font-size: 24px;">Synergy World Press</h1>
-              <p style="margin: 10px 0 0 0; opacity: 0.9;">Review Comments Available</p>
+              <h1 style="margin: 0; font-size: 24px;color: black;">Synergy World Press</h1>
+              <p style="margin: 10px 0 0 0; opacity: 0.9; color: black;">Review Comments Available</p>
             </div>
             <div style="padding: 30px;">
               <p style="color: #374151; font-size: 16px; line-height: 1.6;">
