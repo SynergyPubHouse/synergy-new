@@ -46,9 +46,6 @@ RUN npm install --production && \
 # Copy backend source code
 COPY backend/ ./
 
-# Copy frontend (if built)
-COPY frontend/dist ./frontend/dist 2>/dev/null || true
-
 # Create uploads directory
 RUN mkdir -p uploads && chmod 755 uploads
 
