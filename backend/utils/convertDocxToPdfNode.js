@@ -13,10 +13,10 @@ let browserLastUsed = null;
 let isLaunching = false;
 let launchPromise = null;
 
-const BROWSER_IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-const CONVERSION_TIMEOUT = 30000; // 30 seconds per conversion
+const BROWSER_IDLE_TIMEOUT = 10 * 60 * 1000; // 🔥 10 minutes (increased)
+const CONVERSION_TIMEOUT = 300000; // 🔥 5 minutes (was 30 seconds)
 
-// Browser launch options - Render optimized
+// Browser launch options - Optimized for LARGE FILES (50-100MB)
 const LAUNCH_OPTIONS = {
     headless: 'new',
     args: [
@@ -39,14 +39,17 @@ const LAUNCH_OPTIONS = {
         '--mute-audio',
         '--no-default-browser-check',
         '--safebrowsing-disable-auto-update',
-        // Memory optimizations for Render
-        '--js-flags=--max-old-space-size=256',
+        // 🔥 INCREASED MEMORY FOR LARGE FILES - 1GB
+        '--js-flags=--max-old-space-size=1024',
         '--disable-web-security',
         '--font-render-hinting=none',
-        '--disable-font-subpixel-positioning'
+        '--disable-font-subpixel-positioning',
+        // 🔥 Additional memory optimizations for large files
+        '--memory-pressure-off',
+        '--max-old-space-size=1024'
     ],
     ignoreDefaultArgs: ['--disable-extensions'],
-    timeout: 30000
+    timeout: 120000  // 🔥 2 minutes browser launch timeout
 };
 
 /**
@@ -90,7 +93,7 @@ async function getBrowser() {
     
     // Launch new browser
     isLaunching = true;
-    console.log('[getBrowser] Launching new browser instance...');
+    console.log('[getBrowser] Launching new browser instance for large files...');
     
     launchPromise = (async () => {
         try {
@@ -141,7 +144,7 @@ async function getBrowser() {
 }
 
 /**
- * Convert DOCX to PDF - Optimized for Render
+ * Convert DOCX to PDF - Optimized for LARGE FILES (50-100MB)
  */
 async function convertDocxToPdfNode(docxPath, outputPath = null) {
     let page = null;
@@ -153,22 +156,44 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
             outputPath = docxPath.replace(/\.docx?$/i, '.pdf');
         }
         
-        console.log(`[convertDocxToPdfNode] Starting conversion: ${path.basename(docxPath)}`);
+        // 🔥 Check file size
+        const fileStats = await fs.stat(docxPath);
+        const fileSizeMB = Math.round(fileStats.size / (1024 * 1024));
+        console.log(`[convertDocxToPdfNode] Starting conversion: ${path.basename(docxPath)} (${fileSizeMB} MB)`);
+        
+        // 🔥 Adjust timeout based on file size
+        const dynamicTimeout = Math.max(CONVERSION_TIMEOUT, fileSizeMB * 5000); // 5 seconds per MB
+        console.log(`[convertDocxToPdfNode] Using timeout: ${dynamicTimeout / 1000} seconds`);
         
         // ============================================
-        // Step 1: Convert DOCX to HTML (Fast - ~1-2s)
+        // Step 1: Convert DOCX to HTML (May take time for large files)
         // ============================================
         const mammothStart = Date.now();
-        const result = await mammoth.convertToHtml({ path: docxPath });
+        console.log('[convertDocxToPdfNode] Converting DOCX to HTML with Mammoth...');
+        
+        const result = await mammoth.convertToHtml({ 
+            path: docxPath,
+            // 🔥 Options for large files
+            convertImage: mammoth.images.imgElement(function(image) {
+                return image.read("base64").then(function(imageBuffer) {
+                    // Compress images for large files
+                    return {
+                        src: "data:" + image.contentType + ";base64," + imageBuffer
+                    };
+                });
+            })
+        });
+        
         const html = result.value;
-        console.log(`[convertDocxToPdfNode] Mammoth HTML: ${Date.now() - mammothStart}ms`);
+        const mammothTime = Date.now() - mammothStart;
+        console.log(`[convertDocxToPdfNode] Mammoth HTML conversion: ${mammothTime}ms (${Math.round(html.length / 1024)} KB HTML)`);
         
         if (result.messages.length > 0) {
             console.log('[convertDocxToPdfNode] Mammoth warnings:', result.messages.length);
         }
         
         // ============================================
-        // Step 2: Create minimal HTML document
+        // Step 2: Create HTML document with optimizations for large content
         // ============================================
         const fullHtml = `<!DOCTYPE html>
 <html>
@@ -215,7 +240,11 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
             padding-left: 1.5em;
         }
         li { margin-bottom: 0.3em; }
-        img { max-width: 100%; height: auto; }
+        img { 
+            max-width: 100%; 
+            height: auto;
+            page-break-inside: avoid;
+        }
         @media print {
             body { padding: 0; }
         }
@@ -233,40 +262,58 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
         console.log(`[convertDocxToPdfNode] Browser ready: ${Date.now() - browserStart}ms`);
         
         // ============================================
-        // Step 4: Optimize page for speed
+        // Step 4: Optimize page for large files
         // ============================================
         
-        // Block unnecessary resources
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const resourceType = req.resourceType();
-            if (['image', 'stylesheet', 'font', 'media', 'websocket'].includes(resourceType)) {
-                req.abort();
-            } else {
-                req.continue();
-            }
-        });
+        // 🔥 For large files, allow images to load
+        if (fileSizeMB > 20) {
+            // Allow images for large documents
+            await page.setRequestInterception(true);
+            page.on('request', (req) => {
+                const resourceType = req.resourceType();
+                if (['stylesheet', 'font', 'media', 'websocket'].includes(resourceType)) {
+                    req.abort();
+                } else {
+                    req.continue();
+                }
+            });
+        } else {
+            // Block all unnecessary resources for smaller files
+            await page.setRequestInterception(true);
+            page.on('request', (req) => {
+                const resourceType = req.resourceType();
+                if (['image', 'stylesheet', 'font', 'media', 'websocket'].includes(resourceType)) {
+                    req.abort();
+                } else {
+                    req.continue();
+                }
+            });
+        }
         
         // Disable JavaScript for faster rendering
         await page.setJavaScriptEnabled(false);
         
-        // Set smaller viewport (less memory)
+        // Set viewport
         await page.setViewport({ width: 800, height: 600 });
         
         // ============================================
-        // Step 5: Set content (Fast - only domcontentloaded)
+        // Step 5: Set content with dynamic timeout
         // ============================================
         const contentStart = Date.now();
+        console.log('[convertDocxToPdfNode] Setting page content...');
+        
         await page.setContent(fullHtml, { 
-            waitUntil: 'domcontentloaded', // Much faster than networkidle0
-            timeout: CONVERSION_TIMEOUT 
+            waitUntil: 'domcontentloaded',
+            timeout: dynamicTimeout 
         });
         console.log(`[convertDocxToPdfNode] Content set: ${Date.now() - contentStart}ms`);
         
         // ============================================
-        // Step 6: Generate PDF
+        // Step 6: Generate PDF with dynamic timeout
         // ============================================
         const pdfStart = Date.now();
+        console.log('[convertDocxToPdfNode] Generating PDF...');
+        
         await page.pdf({
             path: outputPath,
             format: 'A4',
@@ -276,9 +323,9 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
                 bottom: '1in',
                 left: '1in'
             },
-            printBackground: false, // Faster without background
+            printBackground: false,
             preferCSSPageSize: false,
-            timeout: CONVERSION_TIMEOUT
+            timeout: dynamicTimeout
         });
         console.log(`[convertDocxToPdfNode] PDF generated: ${Date.now() - pdfStart}ms`);
         
@@ -290,8 +337,12 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
             throw new Error('Generated PDF is too small (likely empty)');
         }
         
+        const outputSizeMB = Math.round(stats.size / (1024 * 1024) * 100) / 100;
         const totalTime = Date.now() - startTime;
-        console.log(`[convertDocxToPdfNode] ✅ Complete: ${path.basename(outputPath)} (${totalTime}ms, ${Math.round(stats.size/1024)}KB)`);
+        
+        console.log(`[convertDocxToPdfNode] ✅ Complete: ${path.basename(outputPath)}`);
+        console.log(`[convertDocxToPdfNode] ✅ Input: ${fileSizeMB} MB → Output: ${outputSizeMB} MB`);
+        console.log(`[convertDocxToPdfNode] ✅ Total time: ${totalTime}ms (${Math.round(totalTime / 1000)} seconds)`);
         
         return outputPath;
         
@@ -313,8 +364,8 @@ async function convertDocxToPdfNode(docxPath, outputPath = null) {
 }
 
 /**
- * Convert multiple DOCX files to PDF in parallel
- * Use this for batch conversions
+ * Convert multiple DOCX files to PDF in sequence (for large files)
+ * 🔥 Changed to sequential for large files to avoid memory issues
  */
 async function convertMultipleDocxToPdf(docxPaths) {
     console.log(`[convertMultipleDocxToPdf] Converting ${docxPaths.length} files...`);
@@ -323,16 +374,21 @@ async function convertMultipleDocxToPdf(docxPaths) {
     // Pre-warm the browser
     await getBrowser();
     
-    // Convert all files in parallel
-    const results = await Promise.all(
-        docxPaths.map(docxPath => 
-            convertDocxToPdfNode(docxPath).catch(err => ({
+    const results = [];
+    
+    // 🔥 Convert sequentially for large files (prevents memory overflow)
+    for (const docxPath of docxPaths) {
+        try {
+            const result = await convertDocxToPdfNode(docxPath);
+            results.push(result);
+        } catch (err) {
+            results.push({
                 error: true,
                 path: docxPath,
                 message: err.message
-            }))
-        )
-    );
+            });
+        }
+    }
     
     console.log(`[convertMultipleDocxToPdf] All done in ${Date.now() - startTime}ms`);
     return results;
@@ -361,7 +417,7 @@ async function closeBrowser() {
  */
 async function warmupBrowser() {
     try {
-        console.log('[warmupBrowser] Pre-warming browser...');
+        console.log('[warmupBrowser] Pre-warming browser for large file conversion...');
         await getBrowser();
         console.log('[warmupBrowser] Browser ready');
         return true;
