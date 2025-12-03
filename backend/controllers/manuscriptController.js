@@ -26,6 +26,7 @@ const {
     failJob, 
     STATUS 
 } = require('../utils/jobProcessor');
+const { convertDocxWithLibreOffice } = require("../utils/convertDocxWithLibreOffice");
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
@@ -159,17 +160,18 @@ function isValidPdf(filePath) {
 	}
 }
 
-// Helper: Convert DOCX to PDF using Node.js libraries (no external software required)
+// Helper: Convert DOCX to PDF using LibreOffice; fallback to Puppeteer in dev if allowed
 async function convertDocxToPdf(docxPath) {
-	try {
-		console.log(`[convertDocxToPdf] Converting ${docxPath} using Node.js libraries`);
-		const outputPdf = await convertDocxToPdfNode(docxPath);
-		console.log(`[convertDocxToPdf] PDF created successfully: ${outputPdf}`);
-		return outputPdf;
-	} catch (error) {
-		console.error(`[convertDocxToPdf] Conversion failed: ${error.message}`);
-		throw new Error(`DOCX to PDF conversion failed: ${error.message}`);
-	}
+    try {
+        return await convertDocxWithLibreOffice(docxPath);
+    } catch (e) {
+        const allowFallback = process.env.USE_PUPPETEER_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
+        if (allowFallback) {
+            console.warn(`[convertDocxToPdf] LibreOffice failed: ${e.message}. Falling back to Puppeteer conversion (dev mode).`);
+            return await convertDocxToPdfNode(docxPath);
+        }
+        throw e;
+    }
 }
 
 // Helper function to extract abstract from text
@@ -613,7 +615,7 @@ async function mergePdfs(pdfPaths, outputPath) {
     const pages = mergedPdf.getPages();
     const font = await mergedPdf.embedFont(StandardFonts.Helvetica);
     
-    for (let pageIndex = 1; pageIndex < pages.length; pageIndex++) { // Start from index 1 to skip first page
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) { // Start from index 1 to skip first page
         const page = pages[pageIndex];
         const { width, height } = page.getSize();
         
@@ -641,7 +643,7 @@ async function mergePdfs(pdfPaths, outputPath) {
         }
 
         // Add page number at bottom center (start from page 1 for display)
-        page.drawText(`Page ${pageIndex}`, {
+        page.drawText(`Page ${pageIndex + 1}`, {
             x: width / 2 - 20,
             y: bottomMargin / 2,
             size: 9,
@@ -884,6 +886,12 @@ exports.createManuscript = async (req, res) => {
                         message: "Declaration PDF is invalid after conversion.",
                     });
                 }
+                // Track generated PDFs for cleanup
+                try {
+                    tempFiles.push(manuscriptPdfPath);
+                    tempFiles.push(coverLetterPdfPath);
+                    tempFiles.push(declarationPdfPath);
+                } catch (_) {}
             } catch (err) {
                 console.error(
                     "[createManuscript] DOCX to PDF conversion failed:",

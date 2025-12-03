@@ -12,8 +12,7 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
 });
 const upload = multer({ storage });
-// 🔥 NEW: Import browser warmup
-const { warmupBrowser, closeBrowser } = require("./utils/convertDocxToPdfNode");
+ 
 
 dotenv.config();
 
@@ -121,13 +120,7 @@ const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   
-  // 🔥 NEW: Pre-warm browser for faster first conversion
-  try {
-    await warmupBrowser();
-    console.log('✅ Browser pre-warmed for PDF conversion');
-  } catch (e) {
-    console.log('⚠️ Browser warmup failed (will retry on first request)');
-  }
+  
 });
 
 // Handle unhandled promise rejections
@@ -136,16 +129,14 @@ process.on("unhandledRejection", (err) => {
   server.close(() => process.exit(1));
 });
 
-// 🔥 NEW: Graceful shutdown - close browser
+// 🔥 NEW: Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, closing...");
-  await closeBrowser();
   server.close(() => process.exit(0));
 });
 
 process.on("SIGINT", async () => {
   console.log("SIGINT received, closing...");
-  await closeBrowser();
   server.close(() => process.exit(0));
 });
 
