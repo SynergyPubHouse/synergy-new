@@ -124,4 +124,4 @@ module.exports = {
     deleteJob,
     cleanupOldJobs,
     STATUS
-};
+}; 
