@@ -59,6 +59,7 @@ function candidateBins() {
   const envBin = (process.env.LIBREOFFICE_BIN || '').trim();
   const list = [];
   if (envBin) list.push(envBin);
+
   if (process.platform === 'win32') {
     list.push('soffice');
     list.push('libreoffice');
@@ -75,11 +76,13 @@ function candidateBins() {
     list.push('libreoffice');
     list.push('/Applications/LibreOffice.app/Contents/MacOS/soffice');
   } else {
-    list.push('soffice');
-    list.push('libreoffice');
+    // Linux (Render production): try explicit paths first
     list.push('/usr/bin/soffice');
     list.push('/usr/local/bin/soffice');
+    list.push('soffice');
+    list.push('libreoffice');
   }
+
   return list;
 }
 
