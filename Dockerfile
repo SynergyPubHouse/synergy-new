@@ -124,15 +124,23 @@
 FROM python:3.10-slim AS backend
 
 # Install system dependencies and Node.js
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \
+    ca-certificates \
     build-essential \
     libreoffice \
+    fonts-dejavu-core \
+    fonts-liberation \
+    fontconfig \
  && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
- && apt-get install -y nodejs \
+ && apt-get install -y --no-install-recommends nodejs \
+ && fc-cache -f -v \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
+
+# Ensure our Node helper finds LibreOffice in the container
+ENV LIBREOFFICE_BIN=/usr/bin/soffice
 
 # Set working directory
 WORKDIR /app
