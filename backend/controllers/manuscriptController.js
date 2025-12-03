@@ -18,6 +18,14 @@ const axios = require("axios");
 const { uploadToCloudinary } = require("../utils/cloudinary");
 const sendEmail = require("../utils/sendEmail");
 const { console } = require("inspector");
+const { 
+    createJob, 
+    getJob, 
+    updateJob, 
+    completeJob, 
+    failJob, 
+    STATUS 
+} = require('../utils/jobprocessor');
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
@@ -2578,7 +2586,347 @@ exports.getPublishedManuscripts = async (req, res) => {
   }
 };
 
+// ============================================
+// 🔥 NEW: JOB-BASED MANUSCRIPT CREATION
+// ============================================
 
+
+/**
+ * 🔥 NEW: Create manuscript with background processing
+ * Returns immediately with jobId, processes in background
+ */
+exports.createManuscriptAsync = async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        upload(req, res, async (err) => {
+            if (err) {
+                console.error("[createManuscriptAsync] Multer error:", err);
+                return res.status(400).json({ 
+                    success: false, 
+                    message: err.message 
+                });
+            }
+
+            // Check required files
+            if (!req.files["manuscript"] || !req.files["coverLetter"] || !req.files["declaration"]) {
+                return res.status(400).json({
+                    success: false,
+                    message: "All three files (manuscript, cover letter, and declaration) are required",
+                });
+            }
+
+            // Track temp files
+            tempFiles = [
+                req.files["manuscript"][0].path,
+                req.files["coverLetter"][0].path,
+                req.files["declaration"][0].path,
+            ];
+
+            // Create job with all necessary data
+            const jobId = createJob({
+                files: {
+                    manuscript: req.files["manuscript"][0].path,
+                    coverLetter: req.files["coverLetter"][0].path,
+                    declaration: req.files["declaration"][0].path,
+                },
+                body: req.body,
+                user: req.user ? { _id: req.user._id, token: req.user.token } : null,
+                editor: req.editor || null
+            });
+
+            // ⚡ RESPOND IMMEDIATELY
+            res.status(202).json({
+                success: true,
+                message: 'Manuscript upload received, processing started',
+                jobId: jobId
+            });
+
+            // 🔥 PROCESS IN BACKGROUND
+            setImmediate(() => {
+                processManuscriptJob(jobId, tempFiles).catch(error => {
+                    console.error(`[createManuscriptAsync] Background error:`, error);
+                    failJob(jobId, error);
+                });
+            });
+        });
+
+    } catch (error) {
+        console.error("[createManuscriptAsync] Error:", error);
+        if (tempFiles.length > 0) {
+            await cleanupFiles(tempFiles).catch(() => {});
+        }
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+/**
+ * 🔥 Process manuscript in background
+ */
+async function processManuscriptJob(jobId, tempFiles) {
+    const job = getJob(jobId);
+    if (!job) return;
+
+    const { files, body, user, editor } = job.data;
+
+    try {
+        updateJob(jobId, { 
+            status: STATUS.PROCESSING, 
+            progress: 5, 
+            step: 'Starting processing...' 
+        });
+
+        // Parse additionalInfo
+        let additionalInfo = body.additionalInfo;
+        if (additionalInfo) {
+            try {
+                const arr = JSON.parse(additionalInfo);
+                additionalInfo = arr.join(", ");
+            } catch (e) {}
+        }
+
+        // Parse billingInfo
+        let billingInfo = body.billingInfo;
+        if (billingInfo && typeof billingInfo === 'string') {
+            try {
+                billingInfo = JSON.parse(billingInfo);
+            } catch (e) {
+                billingInfo = {};
+            }
+        }
+
+        // Parse authors
+        const authors = body.authors ? JSON.parse(body.authors) : [];
+        const correspondingAuthorId = body.correspondingAuthorId;
+
+        const isEditorSubmitter = !!editor;
+        if (!isEditorSubmitter && user) {
+            if (!authors.includes(user._id.toString())) {
+                authors.unshift(user._id.toString());
+            }
+        }
+
+        // Validate author IDs
+        const authorObjectIds = [];
+        for (const id of authors) {
+            if (mongoose.Types.ObjectId.isValid(id)) {
+                authorObjectIds.push(new mongoose.Types.ObjectId(id));
+            }
+        }
+
+        let correspondingAuthorObjectId;
+        if (mongoose.Types.ObjectId.isValid(correspondingAuthorId || (user && user._id))) {
+            correspondingAuthorObjectId = new mongoose.Types.ObjectId(
+                correspondingAuthorId || (user && user._id)
+            );
+        }
+
+        updateJob(jobId, { progress: 10, step: 'Extracting text from documents...' });
+
+        // Extract text from DOCX files
+        let manuscriptText = "", coverLetterText = "", declarationText = "";
+        let manuscriptTitle = "", manuscriptAbstract = "", manuscriptKeywords = "";
+
+        try {
+            const result = await extractTextFromDocx(files.manuscript);
+            manuscriptText = result.full_text || "";
+            manuscriptTitle = result.title || "";
+            manuscriptAbstract = result.abstract || "";
+            manuscriptKeywords = result.keywords || "";
+        } catch (err) {
+            console.error("[processManuscriptJob] Manuscript extraction failed:", err);
+        }
+
+        try {
+            const result = await extractTextFromDocx(files.coverLetter);
+            coverLetterText = result.full_text || "";
+        } catch (err) {}
+
+        try {
+            const result = await extractTextFromDocx(files.declaration);
+            declarationText = result.full_text || "";
+        } catch (err) {}
+
+        updateJob(jobId, { progress: 20, step: 'Converting manuscript to PDF...' });
+
+        // Convert DOCX to PDF
+        let manuscriptPdfPath, coverLetterPdfPath, declarationPdfPath;
+        
+        manuscriptPdfPath = await convertDocxToPdf(files.manuscript);
+        if (!isValidPdf(manuscriptPdfPath)) {
+            throw new Error("Manuscript PDF is invalid after conversion.");
+        }
+
+        updateJob(jobId, { progress: 35, step: 'Converting cover letter to PDF...' });
+        
+        coverLetterPdfPath = await convertDocxToPdf(files.coverLetter);
+        if (!isValidPdf(coverLetterPdfPath)) {
+            throw new Error("Cover letter PDF is invalid after conversion.");
+        }
+
+        updateJob(jobId, { progress: 50, step: 'Converting declaration to PDF...' });
+        
+        declarationPdfPath = await convertDocxToPdf(files.declaration);
+        if (!isValidPdf(declarationPdfPath)) {
+            throw new Error("Declaration PDF is invalid after conversion.");
+        }
+
+        updateJob(jobId, { progress: 60, step: 'Generating manuscript ID...' });
+
+        // Generate custom manuscript ID
+        const manuscriptTitleForId = body.title || "Untitled";
+        const customManuscriptId = await generateUniqueManuscriptId(manuscriptTitleForId);
+
+        updateJob(jobId, { progress: 65, step: 'Uploading files to cloud...' });
+
+        // Upload to Cloudinary
+        const [manuscriptUpload, coverLetterUpload, declarationUpload] = await Promise.all([
+            uploadToCloudinary(manuscriptPdfPath, "manuscripts", "raw", `manuscript_${customManuscriptId}`),
+            uploadToCloudinary(coverLetterPdfPath, "coverLetters", "raw", `cover_letter_${customManuscriptId}`),
+            uploadToCloudinary(declarationPdfPath, "declarations", "raw", `declaration_${customManuscriptId}`),
+        ]);
+
+        updateJob(jobId, { progress: 75, step: 'Creating merged PDF...' });
+
+        // Create manuscript data
+        const manuscriptData = {
+            ...body,
+            additionalInfo: additionalInfo,
+            billingInfo: billingInfo,
+            customId: customManuscriptId,
+            authors: authorObjectIds,
+            correspondingAuthor: correspondingAuthorObjectId,
+            manuscriptFile: manuscriptUpload.secure_url,
+            coverLetterFile: coverLetterUpload.secure_url,
+            declarationFile: declarationUpload.secure_url,
+            status: "Saved",
+            extractedText: manuscriptText,
+            coverLetterText: coverLetterText,
+            declarationText: declarationText,
+            extractedTitle: manuscriptTitle,
+            extractedAbstract: manuscriptAbstract,
+            extractedKeywords: manuscriptKeywords,
+        };
+
+        // Save manuscript first
+        const manuscript = new Manuscript(manuscriptData);
+        await manuscript.save();
+
+        updateJob(jobId, { progress: 85, step: 'Creating merged PDF with table...' });
+
+        // Create merged PDF
+        const mergedPdfResult = await createMergedPDFWithTable(
+            manuscriptPdfPath,
+            coverLetterPdfPath,
+            declarationPdfPath,
+            {
+                ...body,
+                billingInfo: billingInfo,
+                authors: authorObjectIds,
+                correspondingAuthor: correspondingAuthorObjectId,
+            },
+            customManuscriptId
+        );
+
+        tempFiles.push(mergedPdfResult.localPath);
+
+        updateJob(jobId, { progress: 90, step: 'Uploading merged PDF...' });
+
+        // Upload merged PDF
+        const mergedUpload = await uploadToCloudinary(
+            mergedPdfResult.localPath,
+            "merged_manuscripts",
+            "raw",
+            `manuscript_${customManuscriptId}`
+        );
+
+        manuscript.mergedFileUrl = mergedUpload.secure_url;
+        await manuscript.save();
+
+        updateJob(jobId, { progress: 95, step: 'Updating author records...' });
+
+        // Update authors
+        for (const authorId of authors) {
+            if (mongoose.Types.ObjectId.isValid(authorId)) {
+                await User.findByIdAndUpdate(
+                    authorId,
+                    {
+                        $addToSet: {
+                            manuscripts: manuscript._id,
+                            roles: authorId === correspondingAuthorId
+                                ? ["author", "corresponding_author"]
+                                : ["author"],
+                        },
+                    },
+                    { new: true }
+                );
+            }
+        }
+
+        // Cleanup temp files
+        await cleanupFiles(tempFiles);
+
+        // Complete job with result
+        completeJob(jobId, {
+            manuscriptId: manuscript._id,
+            customId: customManuscriptId,
+            mergedPdfUrl: manuscript.mergedFileUrl,
+            manuscriptFile: manuscript.manuscriptFile,
+            coverLetterFile: manuscript.coverLetterFile,
+            declarationFile: manuscript.declarationFile,
+            extractedTitle: manuscriptTitle,
+            extractedAbstract: manuscriptAbstract,
+            extractedKeywords: manuscriptKeywords,
+        });
+
+    } catch (error) {
+        console.error(`[processManuscriptJob] Error:`, error);
+        
+        // Cleanup on error
+        await cleanupFiles(tempFiles).catch(() => {});
+        
+        failJob(jobId, error);
+    }
+}
+
+/**
+ * 🔥 NEW: Get job status
+ */
+exports.getJobStatus = async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const job = getJob(jobId);
+
+        if (!job) {
+            return res.status(404).json({
+                success: false,
+                error: 'Job not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            id: job.id,
+            status: job.status,
+            progress: job.progress,
+            step: job.step,
+            result: job.result,
+            error: job.error,
+            createdAt: job.createdAt,
+            completedAt: job.completedAt
+        });
+
+    } catch (error) {
+        console.error("[getJobStatus] Error:", error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
 
 
 module.exports.convertDocxToPdf = convertDocxToPdf;
