@@ -25,7 +25,7 @@ const {
     completeJob, 
     failJob, 
     STATUS 
-} = require('../utils/jobprocessor');
+} = require('../utils/jobProcessor');
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
