@@ -84,27 +84,40 @@ function candidateBins() {
 }
 
 async function convertDocxWithLibreOffice(docxPath, timeoutMs = 300000) {
+  console.log("[LO] convertDocxWithLibreOffice called for:", docxPath);
+
   const outdir = path.dirname(docxPath) || os.tmpdir();
   const candidates = candidateBins();
+  console.log("[LO] Candidate LibreOffice binaries:", candidates);
+
   let lastErr = null;
-  console.log("Working........")
+
   for (const bin of candidates) {
     try {
       // If bin is an absolute path, ensure it exists on disk (for Windows/macOS paths)
       if (bin.includes(path.sep) && !fsSync.existsSync(bin)) {
+        console.log("[LO] Skipping non-existent binary:", bin);
         continue;
       }
-      return await runLibreOffice(bin, docxPath, outdir, timeoutMs);
+
+      console.log("[LO] Trying LibreOffice binary:", bin);
+      const pdfPath = await runLibreOffice(bin, docxPath, outdir, timeoutMs);
+      console.log("[LO] LibreOffice conversion success:", pdfPath);
+      return pdfPath;
     } catch (e) {
+      console.error("[LO] LibreOffice attempt failed with", bin, "error:", e.message);
       lastErr = e;
       continue;
     }
   }
+
   const hint = process.platform === 'win32'
     ? 'Install LibreOffice and ensure soffice.exe is on PATH, or set LIBREOFFICE_BIN to e.g. C\\Program Files\\LibreOffice\\program\\soffice.exe'
     : 'Install LibreOffice and ensure soffice/libreoffice is on PATH, or set LIBREOFFICE_BIN with the binary path';
+
   const msg = `LibreOffice not found or failed to run. ${hint}. Last error: ${lastErr ? lastErr.message : 'unknown'}`;
   throw new Error(msg);
 }
+
 
 module.exports = { convertDocxWithLibreOffice };
