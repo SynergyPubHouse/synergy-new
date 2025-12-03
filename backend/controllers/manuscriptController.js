@@ -37,22 +37,22 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({
-	storage: storage,
-	limits: { fileSize: 100 * 1024 * 1024 }, // 10MB limit
-	fileFilter: (req, file, cb) => {
-		const allowedTypes = /docx/;
-		const extname = allowedTypes.test(
-			path.extname(file.originalname).toLowerCase()
-		);
-		if (extname) {
-			return cb(null, true);
-		}
-		cb(new Error("Only Word documents (.docx) are allowed!"));
-	},
+    storage: storage,
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit ← Fixed comment
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /docx/;
+        const extname = allowedTypes.test(
+            path.extname(file.originalname).toLowerCase()
+        );
+        if (extname) {
+            return cb(null, true);
+        }
+        cb(new Error("Only Word documents (.docx) are allowed!"));
+    },
 }).fields([
-	{ name: "manuscript", maxCount: 1 },
-	{ name: "coverLetter", maxCount: 1 },
-	{ name: "declaration", maxCount: 1 },
+    { name: "manuscript", maxCount: 1 },
+    { name: "coverLetter", maxCount: 1 },
+    { name: "declaration", maxCount: 1 },
 ]);
 
 const responseUpload = multer({
