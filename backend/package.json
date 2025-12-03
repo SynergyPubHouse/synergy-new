@@ -5,10 +5,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node server.js",
-     "postinstall": "node node_modules/puppeteer/install.mjs",
+    "postinstall": "node node_modules/puppeteer/install.mjs",
     "start": "node server.js",
-    "build": "echo \"Installing Python dependencies...\" && python3 -m pip install docx2txt && echo \"Backend build completed\"",
-     "build": "npm run install-browser && python3 -m pip install docx2txt",
+    "build": "npm run install-browser && python3 -m pip install docx2txt",
     "install-browser": "node ./scripts/installBrowser.js"
   },
   "keywords": [],
@@ -34,10 +33,11 @@
     "mammoth": "^1.11.0",
     "mongoose": "^8.10.0",
     "multer": "^1.4.5-lts.1",
+    "nodemon": "^3.1.9",
     "pdf-lib": "^1.17.1",
     "puppeteer": "^24.30.0",
-    "nodemon": "^3.1.9",
-    "python-shell": "^5.0.0"
+    "python-shell": "^5.0.0",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"
