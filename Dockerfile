@@ -3,15 +3,15 @@ FROM libreoffice/libreoffice:latest AS base-with-libreoffice
 
 # Install Node.js and Python dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    gnupg \
-    ca-certificates \
-    python3 \
-    python3-pip \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && apt-get clean && apt-get autoclean && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+  curl \
+  gnupg \
+  ca-certificates \
+  python3 \
+  python3-pip \
+  && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
+  && apt-get clean && apt-get autoclean && apt-get autoremove -y \
+  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Verify LibreOffice installed
 RUN soffice --version || echo "LibreOffice verification"
@@ -35,8 +35,8 @@ COPY backend/requirements.txt ./backend/
 # Install backend dependencies
 WORKDIR /app/backend
 RUN npm install --production && \
-    pip install --no-cache-dir -r requirements.txt && \
-    python -m spacy download en_core_web_sm
+  pip install --no-cache-dir -r requirements.txt && \
+  python -m spacy download en_core_web_sm
 
 # Copy backend source code
 COPY backend/ ./
