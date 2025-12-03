@@ -1,6 +1,4 @@
 services:
-  # ===== OPTION 1: Docker Build (Primary) =====
-  # If this works, use it. Render will build using the ./Dockerfile
   - type: web
     name: synergy-world-press
     env: docker
@@ -16,19 +14,5 @@ services:
         value: "false"
       - key: LIBREOFFICE_BIN
         value: /usr/bin/soffice
-
-  # ===== OPTION 2: Node Buildpack with render-build.sh (Fallback) =====
-  # If Docker build fails, comment out OPTION 1 above and uncomment this section
-  # - type: web
-  #   name: synergy-world-press
-  #   env: node
-  #   plan: free
-  #   buildCommand: bash render-build.sh
-  #   startCommand: node backend/server.js
-  #   envVars:
-  #     - key: NODE_ENV
-  #       value: production
-  #     - key: USE_PUPPETEER_FALLBACK
-  #       value: "false"
-  #     - key: LIBREOFFICE_BIN
-  #       value: /usr/bin/soffice
+      - key: PYTHONUNBUFFERED
+        value: "1"
