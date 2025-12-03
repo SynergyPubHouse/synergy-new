@@ -1,7 +1,7 @@
 # Use official Node.js 18 image as base
 FROM node:18-slim AS runtime
 
-# Install system dependencies including LibreOffice
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice \
     fonts-dejavu \
@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-writer \
     python3 \
     python3-pip \
+    python3-venv \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && fc-cache -f -v
@@ -39,9 +40,18 @@ COPY backend/requirements.txt ./backend/
 
 # Install backend dependencies
 WORKDIR /app/backend
-RUN npm install --production && \
-  pip install --no-cache-dir -r requirements.txt && \
-  python -m spacy download en_core_web_sm
+
+# Install Python dependencies in a virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python packages
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    python -m spacy download en_core_web_sm --no-cache-dir
+
+# Install Node.js dependencies
+RUN npm install --production
 
 # Copy backend source code
 COPY backend/ ./
