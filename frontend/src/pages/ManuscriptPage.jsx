@@ -800,64 +800,85 @@ const ManuscriptPage = () => {
 
 	const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 // 🔥 NEW: Add this helper function BEFORE proceedbeforebuildpdf
-const pollJobStatus = async (jobId, token, onProgress) => {
-    return new Promise((resolve, reject) => {
-        let attempts = 0;
-        const maxAttempts = 180; // 4.5 minutes (1.5s x 180)
-        
-        const poll = async () => {
-            try {
-                const response = await axios.get(
-                    `${import.meta.env.VITE_BACKEND_URL}/api/jobs/${jobId}`,
-                    {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }
-                );
-                
-                const job = response.data;
-                
-                // Update progress callback
-                if (onProgress && typeof onProgress === 'function') {
-                    onProgress(job.progress || 0, job.step || 'Processing...');
-                }
-                
-                console.log(`[Poll] Job ${jobId}: ${job.progress}% - ${job.step}`);
-                
-                if (job.status === 'completed') {
-                    resolve(job.result);
-                    return;
-                }
-                
-                if (job.status === 'failed') {
-                    reject(new Error(job.error || 'Processing failed'));
-                    return;
-                }
-                
-                attempts++;
-                if (attempts >= maxAttempts) {
-                    reject(new Error('Processing is taking longer than expected. Please check "My Submissions" later.'));
-                    return;
-                }
-                
-                // Continue polling every 1.5 seconds
-                setTimeout(poll, 1500);
-                
-            } catch (error) {
-                console.error('[Poll] Error:', error);
-                // Don't reject immediately on network error, retry a few times
-                if (attempts < 5) {
-                    attempts++;
-                    setTimeout(poll, 2000);
-                } else {
-                    reject(error);
-                }
-            }
-        };
-        
-        poll();
-    });
-};
+const pollJobStatus = async (jobId, token) => {
+  return new Promise((resolve, reject) => {
+    let attempts = 0;
+    const maxAttempts = 120;      // 3 minutes at 1.5s
+    const baseDelay = 1500;       // ms
 
+    const poll = async () => {
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/jobs/${jobId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const job = response.data;
+
+        // Update progress state if you added it
+        if (typeof setProcessingProgress === "function") {
+          setProcessingProgress(job.progress || 0);
+        }
+        if (typeof setProcessingStep === "function") {
+          setProcessingStep(job.step || "Processing...");
+        }
+
+        if (job.status === "completed") {
+          return resolve(job.result);
+        }
+
+        if (job.status === "failed") {
+          return reject(new Error(job.error || "Processing failed"));
+        }
+
+        attempts++;
+        if (attempts >= maxAttempts) {
+          return reject(
+            new Error("Processing timeout. Please check My Submissions later.")
+          );
+        }
+
+        setTimeout(poll, baseDelay);
+      } catch (error) {
+        // If we got an HTTP response, inspect status
+        const status = error.response?.status;
+
+        // Auth / permission / job-not-found -> hard fail
+        if (status === 401 || status === 403 || status === 404) {
+          return reject(
+            new Error(
+              error.response?.data?.error ||
+                error.response?.data?.message ||
+                `Request failed with status ${status}`
+            )
+          );
+        }
+
+        // For 5xx or network errors, retry until maxAttempts
+        attempts++;
+        if (attempts >= maxAttempts) {
+          return reject(
+            new Error(
+              "Processing failed due to repeated network/server errors. Please try again later."
+            )
+          );
+        }
+
+        console.warn(
+          "[pollJobStatus] Transient error while polling, will retry:",
+          error.message || error
+        );
+
+        // Small backoff for error cases
+        setTimeout(poll, baseDelay * 2);
+      }
+    };
+
+    poll();
+  });
+};
 // 🔥 NEW: Add these state variables at the top of your component (with other useState)
 // const [processingProgress, setProcessingProgress] = useState(0);
 // const [processingStep, setProcessingStep] = useState('');
