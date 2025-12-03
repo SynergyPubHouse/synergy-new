@@ -18,6 +18,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && fc-cache -f -v
 
+# Install build tools required for spaCy / blis
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    libopenblas-dev \
+    liblapack-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Verify LibreOffice installation
 RUN soffice --version
 
@@ -53,8 +64,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 RUN npm install --production
 
 # Copy backend source
-COPY backend/ ./
+COPY backend/ ./        
 
+# Uploads directory
 RUN mkdir -p uploads && chmod 755 uploads
 
 # Non-root user
