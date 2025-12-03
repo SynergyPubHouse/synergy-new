@@ -1,0 +1,39 @@
+# Base image with LibreOffice pre-installed
+# Build: docker build -t yourusername/synergy-base:latest -f Dockerfile.base .
+# Push: docker push yourusername/synergy-base:latest
+
+FROM python:3.10-slim
+
+# Install LibreOffice + Node.js + dependencies in one layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg \
+    ca-certificates \
+    build-essential \
+    libreoffice-writer \
+    libreoffice-calc \
+    libreoffice-impress \
+    libreoffice-draw \
+    libreoffice-base \
+    libreoffice-common \
+    libreoffice-core \
+    ure \
+    fonts-dejavu-core \
+    fonts-liberation \
+    fonts-liberation-mono \
+    fontconfig \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && fc-cache -f -v \
+    && apt-get clean && apt-get autoclean && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Verify LibreOffice
+RUN soffice --version && echo "✅ LibreOffice installed successfully"
+
+# Set environment
+ENV LIBREOFFICE_BIN=/usr/bin/soffice
+ENV PYTHONUNBUFFERED=1
+
+LABEL maintainer="Synergy World Press"
+LABEL description="Base image with LibreOffice, Python 3.10, and Node.js 18"

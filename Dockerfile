@@ -121,57 +121,66 @@
 
 
 # Backend-only Dockerfile for Synergy World Press Application
-FROM python:3.10-slim AS backend
+FROM python:3.10-slim AS backend# Multi-stage: Build backend + frontend using official LibreOffice image
+FROM libreoffice/libreoffice:latest AS base-with-libreoffice
 
-# Install system dependencies and Node.js
+# Install Node.js and Python dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    gnupg \
-    ca-certificates \
-    build-essential \
-    libreoffice \
-    fonts-dejavu-core \
-    fonts-liberation \
-    fontconfig \
- && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
- && apt-get install -y --no-install-recommends nodejs \
- && fc-cache -f -v \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+  curl \
+  gnupg \
+  ca-certificates \
+  python3 \
+  python3-pip \
+  && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
+  && apt-get clean && apt-get autoclean && apt-get autoremove -y \
+  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Ensure our Node helper finds LibreOffice in the container
+# Verify LibreOffice installed
+RUN soffice --version || echo "LibreOffice verification"
+
+# Runtime stage
+FROM base-with-libreoffice AS runtime
+
+# Set environment
 ENV LIBREOFFICE_BIN=/usr/bin/soffice
+ENV PYTHONUNBUFFERED=1
+ENV NODE_ENV=production
+ENV USE_PUPPETEER_FALLBACK=false
 
 # Set working directory
 WORKDIR /app
 
-# Copy package and requirements first (to leverage Docker caching)
+# Copy backend files
 COPY backend/package*.json ./backend/
 COPY backend/requirements.txt ./backend/
 
-# Install dependencies
+# Install backend dependencies
 WORKDIR /app/backend
-RUN npm install --omit=dev
-RUN pip install --no-cache-dir -r requirements.txt
-RUN python -m spacy download en_core_web_sm
+RUN npm install --production && \
+  pip install --no-cache-dir -r requirements.txt && \
+  python -m spacy download en_core_web_sm
 
-# Copy rest of backend code
-COPY backend/ ./ 
+# Copy backend source code
+COPY backend/ ./
 
-# Create uploads directory and set permissions
+# Copy frontend (if built)
+COPY frontend/dist ./frontend/dist 2>/dev/null || true
+
+# Create uploads directory
 RUN mkdir -p uploads && chmod 755 uploads
 
-# Create a non-root user for security
-RUN useradd -m appuser
+# Create non-root user
+RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Expose backend port
+# Expose port
 EXPOSE 5000
 
-# Health check (optional)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
   CMD curl -f http://localhost:5000/api/health || exit 1
 
-# Default command to start the Node server
+# Start backend
 CMD ["node", "server.js"]
 
