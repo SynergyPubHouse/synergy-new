@@ -1,29 +1,34 @@
-# Multi-stage: Build backend + frontend using official LibreOffice image
-FROM libreoffice/libreoffice:latest AS base-with-libreoffice
+# Use official Node.js 18 image as base
+FROM node:18-slim AS runtime
 
-# Install Node.js and Python dependencies
+# Install system dependencies including LibreOffice
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  curl \
-  gnupg \
-  ca-certificates \
-  python3 \
-  python3-pip \
-  && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-  && apt-get install -y --no-install-recommends nodejs \
-  && apt-get clean && apt-get autoclean && apt-get autoremove -y \
-  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    libreoffice \
+    fonts-dejavu \
+    fonts-liberation \
+    fonts-noto \
+    fonts-freefont-ttf \
+    libreoffice-common \
+    libreoffice-writer \
+    python3 \
+    python3-pip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -f -v
 
-# Verify LibreOffice installed
-RUN soffice --version || echo "LibreOffice verification"
-
-# Runtime stage
-FROM base-with-libreoffice AS runtime
+# Verify LibreOffice installation
+RUN soffice --version
 
 # Set environment
 ENV LIBREOFFICE_BIN=/usr/bin/soffice
 ENV PYTHONUNBUFFERED=1
 ENV NODE_ENV=production
 ENV USE_PUPPETEER_FALLBACK=false
+
+# Set default locale
+ENV LANG=C.UTF-8 \
+    LANGUAGE=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
 # Set working directory
 WORKDIR /app
