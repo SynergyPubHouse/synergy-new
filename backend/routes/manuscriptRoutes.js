@@ -96,5 +96,9 @@ router.post(
     upload.single("pdfFile"), 
     manuscriptController.uploadPublishedPdf
 );
+// 🔥 NEW: Async manuscript creation with job tracking
+router.post("/manuscripts/async", auth, manuscriptController.createManuscriptAsync);
 
+// 🔥 NEW: Get job status
+router.get("/jobs/:jobId", auth, manuscriptController.getJobStatus);
 module.exports = router;

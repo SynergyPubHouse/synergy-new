@@ -2,9 +2,16 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const path = require("path");
+const multer = require("multer");  // 🔥 ADD THIS
+const os = require("os");          // 🔥 ADD THIS
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 const connectDB = require("./config/db");
 
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, os.tmpdir()),
+    filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
+});
+const upload = multer({ storage });
 // 🔥 NEW: Import browser warmup
 const { warmupBrowser, closeBrowser } = require("./utils/convertDocxToPdfNode");
 
@@ -69,6 +76,16 @@ app.use((req, res, next) => {
 // ============================================
 // ROUTES
 // ============================================
+// Add this BEFORE your other routes
+app.post('/api/test-upload', upload.single('file'), (req, res) => {
+    // Respond IMMEDIATELY - no processing
+    res.json({ 
+        success: true, 
+        message: 'File received',
+        fileName: req.file?.originalname,
+        fileSize: req.file?.size
+    });
+});
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/auth/editor", require("./routes/editorRoutes"));
 app.use("/api/auth/reviewer", require("./routes/reviewerRoutes"));
