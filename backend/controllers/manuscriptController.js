@@ -163,13 +163,16 @@ function isValidPdf(filePath) {
 // Helper: Convert DOCX to PDF using LibreOffice; fallback to Puppeteer in dev if allowed
 async function convertDocxToPdf(docxPath) {
     try {
+        console.log('[convertDocxToPdf] Using LibreOffice for conversion');
         return await convertDocxWithLibreOffice(docxPath);
     } catch (e) {
-        const allowFallback = process.env.USE_PUPPETEER_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
-        if (allowFallback) {
-            console.warn(`[convertDocxToPdf] LibreOffice failed: ${e.message}. Falling back to Puppeteer conversion (dev mode).`);
-            return await convertDocxToPdfNode(docxPath);
-        }
+        // ❌ FALLBACK DISABLED - ONLY USE LIBREOFFICE
+        // const allowFallback = process.env.USE_PUPPETEER_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
+        // if (allowFallback) {
+        //     console.warn(`[convertDocxToPdf] LibreOffice failed: ${e.message}. Falling back to Puppeteer conversion (dev mode).`);
+        //     return await convertDocxToPdfNode(docxPath);
+        // }
+        console.error(`[convertDocxToPdf] LibreOffice conversion failed: ${e.message}`);
         throw e;
     }
 }
