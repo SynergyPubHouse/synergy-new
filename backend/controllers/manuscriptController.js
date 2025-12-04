@@ -198,13 +198,70 @@ async function convertDocxToPdf(docxPath) {
 
                     console.log('[convertDocxToPdf] Remote request:', JSON.stringify({ url, attempt, timeout: config.timeout }, null, 2));
                     const response = await axios.post(url, formData, config);
-                    if (!response.data || !response.data.length) throw new Error('Empty response');
 
-                    const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-                    await fs.writeFile(pdfPath, response.data);
-                    if (!isValidPdf(pdfPath)) throw new Error('Invalid PDF');
-                    console.log('[convertDocxToPdf] Remote conversion successful');
-                    return pdfPath;
+                    const ct = (response.headers?.['content-type'] || '').toLowerCase();
+                    if (ct.includes('application/pdf')) {
+                        if (!response.data || !response.data.length) throw new Error('Empty PDF response');
+                        const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+                        await fs.writeFile(pdfPath, response.data);
+                        if (!isValidPdf(pdfPath)) throw new Error('Invalid PDF');
+                        console.log('[convertDocxToPdf] Remote conversion successful (direct PDF)');
+                        return pdfPath;
+                    }
+
+                    // Handle job-based JSON API (like /api/convert/docx-to-pdf)
+                    let json;
+                    try {
+                        json = JSON.parse(Buffer.from(response.data).toString('utf-8'));
+                    } catch (_) {
+                        json = null;
+                    }
+
+                    if (json && json.success && json.jobId) {
+                        const routeBaseOverride = (process.env.CONVERTER_STATUS_BASE || '').trim();
+                        let statusBase;
+                        if (routeBaseOverride) {
+                            statusBase = routeBaseOverride.replace(/\/+$/, '');
+                        } else {
+                            const m = url.match(/^(.*\/api\/convert)(?:\/.*)?$/);
+                            statusBase = m ? m[1] : url;
+                        }
+
+                        const statusUrl = `${statusBase}/status/${json.jobId}`;
+                        const downloadUrl = `${statusBase}/download/${json.jobId}`;
+
+                        console.log('[convertDocxToPdf] Job started:', { jobId: json.jobId, statusUrl, downloadUrl });
+
+                        const pollStart = Date.now();
+                        const pollTimeoutMs = Math.max(300000, parseInt(process.env.CONVERTER_POLL_TIMEOUT_MS || '600000', 10));
+                        const pollDelayMs = Math.max(500, parseInt(process.env.CONVERTER_POLL_DELAY_MS || '1500', 10));
+
+                        while (true) {
+                            if (Date.now() - pollStart > pollTimeoutMs) {
+                                throw new Error('Remote job timed out');
+                            }
+                            try {
+                                const st = await axios.get(statusUrl, { timeout: 15000 });
+                                const state = st.data?.status;
+                                if (state === 'completed') {
+                                    const dl = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 120000 });
+                                    const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+                                    await fs.writeFile(pdfPath, dl.data);
+                                    if (!isValidPdf(pdfPath)) throw new Error('Invalid PDF after download');
+                                    console.log('[convertDocxToPdf] Remote conversion successful (job download)');
+                                    return pdfPath;
+                                }
+                                if (state === 'failed') {
+                                    throw new Error(`Remote job failed: ${st.data?.error || 'unknown error'}`);
+                                }
+                            } catch (pollErr) {
+                                // transient errors are okay; we keep polling
+                            }
+                            await new Promise(r => setTimeout(r, pollDelayMs));
+                        }
+                    }
+
+                    throw new Error('Unexpected remote response format');
                 } catch (error) {
                     const key = `remote@${url}:${error.response?.status || error.code || error.message}`;
                     errors.push(key);
