@@ -161,8 +161,25 @@ function isValidPdf(filePath) {
 	}
 }
 
-async function convertDocxToPdf(docxPath) {
+async function convertDocxToPdf(docxPath, onProgress) {
     const errors = [];
+    const progress = (percent, step) => {
+        try {
+            if (typeof onProgress === 'function') {
+                onProgress(Math.max(0, Math.min(100, Math.round(percent))), step || 'Converting...');
+            }
+        } catch (_) {}
+    };
+
+    // Quick health ping for remote converter base URL
+    async function ping(url) {
+        try {
+            await axios.get(url, { timeout: 5000 });
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
 
     const useRemote = (process.env.USE_REMOTE_CONVERTER || 'true').toLowerCase() === 'true';
     const remoteUrl = process.env.CONVERTER_URL || process.env.DOCX_CONVERTER_URL || "https://doc-converter-kypa.onrender.com";
@@ -174,6 +191,11 @@ async function convertDocxToPdf(docxPath) {
         const endpoints = envEndpointsRaw.length ? envEndpointsRaw : defaultEndpoints;
         const candidateUrls = endpoints.map(ep => ep ? `${base}${ep.startsWith('/') ? ep : `/${ep}`}` : base);
 
+        // If remote base is not healthy, skip remote immediately
+        const healthy = await ping(`${base}/health`).catch(() => false) || await ping(base).catch(() => false);
+        if (!healthy) {
+            console.warn(`[convertDocxToPdf] Remote converter not healthy at ${base}, skipping remote.`);
+        } else {
         const fileName = path.basename(docxPath);
         const formData = new FormData();
         formData.append("file", fsSync.createReadStream(docxPath), fileName);
@@ -191,12 +213,13 @@ async function convertDocxToPdf(docxPath) {
                             'Accept': 'application/pdf',
                         },
                         responseType: "arraybuffer",
-                        timeout: 300000,
+                        timeout: Math.max(60000, parseInt(process.env.CONVERTER_TIMEOUT_MS || '120000', 10)),
                         maxContentLength: 100 * 1024 * 1024,
                         maxBodyLength: 100 * 1024 * 1024
                     };
 
                     console.log('[convertDocxToPdf] Remote request:', JSON.stringify({ url, attempt, timeout: config.timeout }, null, 2));
+                    progress(5, 'Uploading to remote converter...');
                     const response = await axios.post(url, formData, config);
 
                     const ct = (response.headers?.['content-type'] || '').toLowerCase();
@@ -206,6 +229,7 @@ async function convertDocxToPdf(docxPath) {
                         await fs.writeFile(pdfPath, response.data);
                         if (!isValidPdf(pdfPath)) throw new Error('Invalid PDF');
                         console.log('[convertDocxToPdf] Remote conversion successful (direct PDF)');
+                        progress(100, 'Remote conversion complete');
                         return pdfPath;
                     }
 
@@ -233,7 +257,7 @@ async function convertDocxToPdf(docxPath) {
                         console.log('[convertDocxToPdf] Job started:', { jobId: json.jobId, statusUrl, downloadUrl });
 
                         const pollStart = Date.now();
-                        const pollTimeoutMs = Math.max(300000, parseInt(process.env.CONVERTER_POLL_TIMEOUT_MS || '600000', 10));
+                        const pollTimeoutMs = Math.max(60000, parseInt(process.env.CONVERTER_POLL_TIMEOUT_MS || '180000', 10));
                         const pollDelayMs = Math.max(500, parseInt(process.env.CONVERTER_POLL_DELAY_MS || '1500', 10));
 
                         while (true) {
@@ -243,12 +267,18 @@ async function convertDocxToPdf(docxPath) {
                             try {
                                 const st = await axios.get(statusUrl, { timeout: 15000 });
                                 const state = st.data?.status;
+                                // Use remote-provided progress/step if available
+                                const remotePct = parseInt(st.data?.progress);
+                                if (!Number.isNaN(remotePct)) {
+                                    progress(Math.min(95, Math.max(10, remotePct)), st.data?.step || 'Remote conversion in progress...');
+                                }
                                 if (state === 'completed') {
                                     const dl = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 120000 });
                                     const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
                                     await fs.writeFile(pdfPath, dl.data);
                                     if (!isValidPdf(pdfPath)) throw new Error('Invalid PDF after download');
                                     console.log('[convertDocxToPdf] Remote conversion successful (job download)');
+                                    progress(100, 'Remote conversion complete');
                                     return pdfPath;
                                 }
                                 if (state === 'failed') {
@@ -257,6 +287,9 @@ async function convertDocxToPdf(docxPath) {
                             } catch (pollErr) {
                                 // transient errors are okay; we keep polling
                             }
+                            const elapsed = Date.now() - pollStart;
+                            const pct = Math.min(95, 10 + Math.floor((elapsed / pollTimeoutMs) * 80));
+                            progress(pct, 'Remote conversion in progress...');
                             await new Promise(r => setTimeout(r, pollDelayMs));
                         }
                     }
@@ -267,7 +300,8 @@ async function convertDocxToPdf(docxPath) {
                     errors.push(key);
                     attempt++;
                     if (attempt <= retries) {
-                        const wait = backoffBaseMs * Math.pow(2, attempt - 1);
+                        const jitter = Math.floor(Math.random() * 250);
+                        const wait = backoffBaseMs * Math.pow(2, attempt - 1) + jitter;
                         await new Promise(r => setTimeout(r, wait));
                         continue;
                     }
@@ -275,15 +309,18 @@ async function convertDocxToPdf(docxPath) {
                 }
             }
         }
+        }
     }
 
     const preferLibreOffice = (process.env.USE_LIBREOFFICE || 'false').toLowerCase() === 'true' || !!process.env.LIBREOFFICE_BIN;
     if (preferLibreOffice) {
         try {
             console.log('[convertDocxToPdf] Trying local LibreOffice');
+            progress(10, 'LibreOffice converting...');
             const pdfPath = await convertDocxWithLibreOffice(docxPath);
             if (!isValidPdf(pdfPath)) throw new Error('LibreOffice returned invalid PDF');
             console.log('[convertDocxToPdf] LibreOffice conversion successful');
+            progress(100, 'LibreOffice conversion complete');
             return pdfPath;
         } catch (error) {
             console.error('[convertDocxToPdf] LibreOffice error:', error.message);
@@ -293,7 +330,7 @@ async function convertDocxToPdf(docxPath) {
 
     try {
         console.log('[convertDocxToPdf] Falling back to Puppeteer/Mammoth');
-        const pdfPath = await convertDocxToPdfNode(docxPath);
+        const pdfPath = await convertDocxToPdfNode(docxPath, null, (percent, step) => progress(percent, step));
         if (!isValidPdf(pdfPath)) throw new Error('Puppeteer returned invalid PDF');
         console.log('[convertDocxToPdf] Puppeteer conversion successful');
         return pdfPath;
@@ -2894,21 +2931,30 @@ async function processManuscriptJob(jobId, tempFiles) {
         // Convert DOCX to PDF
         let manuscriptPdfPath, coverLetterPdfPath, declarationPdfPath;
         
-        manuscriptPdfPath = await convertDocxToPdf(files.manuscript);
+        manuscriptPdfPath = await convertDocxToPdf(files.manuscript, (p, step) => {
+            const mapped = 20 + Math.round((p / 100) * 15); // 20 → 35
+            updateJob(jobId, { progress: mapped, step: step || 'Converting manuscript to PDF...' });
+        });
         if (!isValidPdf(manuscriptPdfPath)) {
             throw new Error("Manuscript PDF is invalid after conversion.");
         }
 
         updateJob(jobId, { progress: 35, step: 'Converting cover letter to PDF...' });
         
-        coverLetterPdfPath = await convertDocxToPdf(files.coverLetter);
+        coverLetterPdfPath = await convertDocxToPdf(files.coverLetter, (p, step) => {
+            const mapped = 35 + Math.round((p / 100) * 15); // 35 → 50
+            updateJob(jobId, { progress: mapped, step: step || 'Converting cover letter to PDF...' });
+        });
         if (!isValidPdf(coverLetterPdfPath)) {
             throw new Error("Cover letter PDF is invalid after conversion.");
         }
 
         updateJob(jobId, { progress: 50, step: 'Converting declaration to PDF...' });
         
-        declarationPdfPath = await convertDocxToPdf(files.declaration);
+        declarationPdfPath = await convertDocxToPdf(files.declaration, (p, step) => {
+            const mapped = 50 + Math.round((p / 100) * 10); // 50 → 60
+            updateJob(jobId, { progress: mapped, step: step || 'Converting declaration to PDF...' });
+        });
         if (!isValidPdf(declarationPdfPath)) {
             throw new Error("Declaration PDF is invalid after conversion.");
         }
