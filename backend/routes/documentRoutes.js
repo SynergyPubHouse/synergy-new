@@ -90,18 +90,8 @@ function isValidPdf(filePath) {
 }
 
 async function callLibreOfficeService(inputPath, fileName, jobId) {
-  const serviceUrl = (
-    process.env.LIBREOFFICE_SERVICE_URL ||
-    process.env.CONVERTER_URL ||
-    process.env.DOCX_CONVERTER_URL ||
-    ''
-  ).trim();
-
-  if (!serviceUrl) {
-    throw new Error(
-      'No LibreOffice service URL configured (LIBREOFFICE_SERVICE_URL / CONVERTER_URL / DOCX_CONVERTER_URL)'
-    );
-  }
+  // Hard-coded external LibreOffice HTTP service URL for now (no env lookup)
+  const serviceUrl = 'https://doc-converter-kypa.onrender.com/convert';
 
   let sizeBytes = null;
   let sizeMB = null;
@@ -165,6 +155,11 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
   const pdfPath = path.join(os.tmpdir(), `docjob_${jobId || Date.now()}.pdf`);
 
   try {
+    console.log('[LO-HTTP] Calling converter at', serviceUrl, 'for job', {
+      jobId: jobId || null,
+      serviceUrl,
+      fileName,
+    });
     const response = await axios.post(serviceUrl, formData, config);
     const requestDurationMs = Date.now() - requestStartedAt;
     const contentType = (response.headers?.['content-type'] || '').toLowerCase();

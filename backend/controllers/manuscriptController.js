@@ -173,15 +173,11 @@ async function convertDocxToPdf(docxPath, onProgress) {
 		} catch (_) {}
 	};
 
-	const serviceUrlRaw = (
-		process.env.LIBREOFFICE_SERVICE_URL ||
-		process.env.CONVERTER_URL ||
-		process.env.DOCX_CONVERTER_URL ||
-		""
-	).trim();
+	// Hard-coded external LibreOffice HTTP service URL for now (no env lookup)
+	const serviceUrl = "https://doc-converter-kypa.onrender.com/convert";
 	const useRemote = (process.env.USE_REMOTE_CONVERTER || "true").toLowerCase() !== "false";
 
-	if (useRemote && serviceUrlRaw) {
+	if (useRemote) {
 		const timeoutMs = Math.max(
 			60000,
 			parseInt(
@@ -203,7 +199,7 @@ async function convertDocxToPdf(docxPath, onProgress) {
 		} catch (e) {}
 
 		const meta = {
-			serviceUrl: serviceUrlRaw,
+			serviceUrl,
 			timeoutMs,
 			maxContentLength,
 			maxBodyLength,
@@ -239,13 +235,22 @@ async function convertDocxToPdf(docxPath, onProgress) {
 
 			console.log("[convertDocxToPdf] Remote request config", {
 				method: "POST",
-				url: serviceUrlRaw,
+				url: serviceUrl,
 				timeoutMs: config.timeout,
 				maxContentLength,
 				maxBodyLength,
 			});
 
-			const response = await axios.post(serviceUrlRaw, formData, config);
+			console.log(
+				"[LO-HTTP] Calling converter at",
+				serviceUrl,
+				"from convertDocxToPdf",
+				{
+					serviceUrl,
+					fileName,
+				}
+			);
+			const response = await axios.post(serviceUrl, formData, config);
 			const requestDurationMs = Date.now() - requestStartedAt;
 			const contentType = (response.headers?.["content-type"] || "").toLowerCase();
 			const contentLengthHeader = response.headers?.["content-length"];
@@ -340,12 +345,10 @@ async function convertDocxToPdf(docxPath, onProgress) {
 			errors.push(`remote:${error.message}`);
 		}
 	} else {
-		if (!serviceUrlRaw) {
-			console.error(
-				"[convertDocxToPdf] No LibreOffice service URL configured (LIBREOFFICE_SERVICE_URL / CONVERTER_URL / DOCX_CONVERTER_URL)"
-			);
-			errors.push("config:missing_service_url");
-		}
+		console.log(
+			"[convertDocxToPdf] Remote converter disabled via USE_REMOTE_CONVERTER; skipping remote HTTP call"
+		);
+		errors.push("remote:disabled");
 	}
 
 	try {
