@@ -803,7 +803,7 @@ const ManuscriptPage = () => {
 const pollJobStatus = async (jobId, token) => {
   return new Promise((resolve, reject) => {
     let attempts = 0;
-    const maxAttempts = 120;      // 3 minutes at 1.5s
+    const maxAttempts = 240;      // 6 minutes at 1.5s
     const baseDelay = 1500;       // ms
 
     const poll = async () => {
