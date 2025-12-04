@@ -56,8 +56,6 @@ function candidateBins() {
     list.push('/usr/bin/libreoffice');
     list.push('/usr/lib/libreoffice/program/soffice');
     list.push('/usr/local/bin/soffice');
-    list.push('soffice');
-    list.push('libreoffice');
   }
 
   return list;
@@ -71,6 +69,16 @@ async function convertDocxWithLibreOffice(docxPath, timeoutMs = 300000) {
   console.log("[LO] Candidate LibreOffice binaries:", candidates);
 
   let lastErr = null;
+  const errs = [];
+
+  try {
+    if (!fsSync.existsSync(docxPath)) {
+      throw new Error(`Input file not found: ${docxPath}`);
+    }
+  } catch (e) {
+    console.error('[LO] Input path check failed:', e.message);
+    throw e;
+  }
 
   for (const bin of candidates) {
     try {
@@ -87,6 +95,7 @@ async function convertDocxWithLibreOffice(docxPath, timeoutMs = 300000) {
     } catch (e) {
       console.error("[LO] LibreOffice attempt failed with", bin, "error:", e.message);
       lastErr = e;
+      errs.push(`${bin}: ${e.message}`);
       continue;
     }
   }
@@ -95,7 +104,7 @@ async function convertDocxWithLibreOffice(docxPath, timeoutMs = 300000) {
     ? 'Install LibreOffice and ensure soffice.exe is on PATH, or set LIBREOFFICE_BIN to e.g. C\\Program Files\\LibreOffice\\program\\soffice.exe'
     : 'Install LibreOffice and ensure soffice/libreoffice is on PATH, or set LIBREOFFICE_BIN with the binary path';
 
-  const msg = `LibreOffice not found or failed to run. ${hint}. Last error: ${lastErr ? lastErr.message : 'unknown'}`;
+  const msg = `LibreOffice not found or failed to run. ${hint}. Attempts: [${errs.join(' | ')}]`;
   throw new Error(msg);
 }
 
