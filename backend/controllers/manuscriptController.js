@@ -14,6 +14,7 @@ const { PythonShell } = require("python-shell");
 const { generateUniqueManuscriptId } = require("../utils/manuscriptIdGenerator");
 const fsSync = require("fs"); // Add at the top if not already
 const axios = require("axios");
+const FormData = require('form-data');
 // At the top of manuscriptController.js
 const { uploadToCloudinary } = require("../utils/cloudinary");
 const sendEmail = require("../utils/sendEmail");
@@ -162,17 +163,57 @@ function isValidPdf(filePath) {
 
 // Helper: Convert DOCX to PDF using LibreOffice; fallback to Puppeteer in dev if allowed
 async function convertDocxToPdf(docxPath) {
+    const useExternal = process.env.CONVERTER_URL;
+    if (useExternal) {
+        console.log('[convertDocxToPdf] Using external converter service:', useExternal);
+        const base = useExternal.replace(/\/$/, '');
+        try {
+            // Upload file to external converter
+            const form = new FormData();
+            form.append('file', fsSync.createReadStream(docxPath), path.basename(docxPath));
+
+            const uploadResp = await axios.post(`${base}/docx-to-pdf`, form, {
+                headers: form.getHeaders(),
+                timeout: 120000
+            });
+
+            const jobId = uploadResp.data?.jobId;
+            if (!jobId) throw new Error('Converter did not return jobId');
+
+            // Poll status
+            const start = Date.now();
+            const maxWait = 5 * 60 * 1000; // 5 minutes
+            const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+            let status;
+            let step;
+            while (Date.now() - start < maxWait) {
+                const statusResp = await axios.get(`${base}/status/${jobId}`, { timeout: 30000 });
+                status = statusResp.data?.status;
+                step = statusResp.data?.step;
+                if (status === 'completed') break;
+                if (status === 'failed') throw new Error(statusResp.data?.error || 'Conversion failed');
+                await delay(1500);
+            }
+            if (status !== 'completed') throw new Error(`Converter timeout during step: ${step || 'unknown'}`);
+
+            // Download PDF to temp
+            const downloadResp = await axios.get(`${base}/download/${jobId}`, { responseType: 'arraybuffer', timeout: 60000 });
+            const outPath = path.join(os.tmpdir(), `converted_${Date.now()}.pdf`);
+            await fs.writeFile(outPath, downloadResp.data);
+            if (!isValidPdf(outPath)) throw new Error('Downloaded PDF is invalid');
+            return outPath;
+        } catch (err) {
+            console.error('[convertDocxToPdf] External converter failed:', err.message);
+            throw err;
+        }
+    }
+
+    // Default: local LibreOffice
     try {
-        console.log('[convertDocxToPdf] Using LibreOffice for conversion');
+        console.log('[convertDocxToPdf] Using local LibreOffice');
         return await convertDocxWithLibreOffice(docxPath);
     } catch (e) {
-        // ❌ FALLBACK DISABLED - ONLY USE LIBREOFFICE
-        // const allowFallback = process.env.USE_PUPPETEER_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
-        // if (allowFallback) {
-        //     console.warn(`[convertDocxToPdf] LibreOffice failed: ${e.message}. Falling back to Puppeteer conversion (dev mode).`);
-        //     return await convertDocxToPdfNode(docxPath);
-        // }
-        console.error(`[convertDocxToPdf] LibreOffice conversion failed: ${e.message}`);
+        console.error(`[convertDocxToPdf] Local LibreOffice conversion failed: ${e.message}`);
         throw e;
     }
 }
