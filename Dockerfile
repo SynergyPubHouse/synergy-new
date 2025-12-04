@@ -29,11 +29,17 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Verify LibreOffice installation
-RUN soffice --version
+# ✅ FIX: Create symlink so "libreoffice" command works
+RUN ln -sf /usr/bin/soffice /usr/bin/libreoffice
 
-# Set environment
+# Verify LibreOffice installation (both commands)
+RUN which soffice && soffice --version
+RUN which libreoffice && libreoffice --version
+
+# Set environment - provide both paths
 ENV LIBREOFFICE_BIN=/usr/bin/soffice
+ENV SOFFICE_BIN=/usr/bin/soffice
+ENV PATH="/usr/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV NODE_ENV=production
 ENV USE_PUPPETEER_FALLBACK=false
@@ -69,13 +75,19 @@ COPY backend/ ./
 # Uploads directory
 RUN mkdir -p uploads && chmod 755 uploads
 
+# ✅ FIX: Create temp directory for LibreOffice with proper permissions
+RUN mkdir -p /tmp/.libreoffice && chmod 777 /tmp/.libreoffice
+
 # Non-root user
 RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 
+# ✅ FIX: Set HOME for LibreOffice profile
+ENV HOME=/home/appuser
+
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-  CMD curl -f http://localhost:5000/api/health || exit 1
+    CMD curl -f http://localhost:5000/api/health || exit 1
 
 CMD ["node", "server.js"]
