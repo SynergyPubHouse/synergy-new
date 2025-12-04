@@ -153,6 +153,17 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
         maxBodyLength,
       };
 
+      try {
+        const len = await new Promise((resolve) =>
+          typeof formData.getLength === 'function'
+            ? formData.getLength((err, length) => resolve(err ? undefined : length))
+            : resolve(undefined)
+        );
+        if (typeof len === 'number' && Number.isFinite(len)) {
+          config.headers['Content-Length'] = len;
+        }
+      } catch (_) {}
+
       console.log('[DocumentJob] LibreOffice request config', {
         method: 'POST',
         url: serviceUrl,
@@ -194,6 +205,37 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
     });
 
     if (!contentType.includes('application/pdf')) {
+      let nonPdfSnippet = null;
+      try {
+        const MAX_SNIPPET = 1024;
+        let collected = 0;
+        let chunks = [];
+        await new Promise((resolve, reject) => {
+          response.data.on('data', (chunk) => {
+            if (collected < MAX_SNIPPET) {
+              const remaining = MAX_SNIPPET - collected;
+              const piece = chunk.slice(0, remaining);
+              chunks.push(piece);
+              collected += piece.length;
+            } else {
+              // we have enough, stop reading further
+              response.data.removeAllListeners('data');
+              response.data.destroy();
+              resolve();
+            }
+          });
+          response.data.on('end', resolve);
+          response.data.on('error', reject);
+        });
+        nonPdfSnippet = Buffer.concat(chunks).toString('utf8');
+      } catch (_) {}
+
+      console.error('[DocumentJob] Non-PDF response from converter', {
+        url: serviceUrl,
+        status: response.status,
+        contentType,
+        nonPdfSnippet,
+      });
       throw new Error(`Expected application/pdf but got ${contentType || 'unknown'}`);
     }
 
