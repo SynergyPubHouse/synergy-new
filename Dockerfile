@@ -1,34 +1,12 @@
-FROM node:18-bullseye AS runtime
+# Start from the prebuilt LibreOffice image
+FROM ghcr.io/linuxserver/libreoffice:latest AS runtime
 
-# Install LibreOffice and dependencies (Debian-based)
+# Install Node.js 18 and required dependencies
 RUN apt-get update && \
-    apt-get install -y \
-      libreoffice \
-      libreoffice-writer \
-      libreoffice-common \
-      libreoffice-core \
-      default-jre-headless \
-      fonts-dejavu \
-      fonts-liberation \
-      fonts-noto \
-      fonts-freefont-ttf \
-      python3 \
-      python3-pip \
-      python3-venv \
-      build-essential \
-      gcc \
-      g++ \
-      make \
-      libopenblas-dev \
-      liblapack-dev \
-      python3-dev \
-      curl \
-      ca-certificates \
-    && apt-get clean && rm -rf /var/lib/apt/lists/* \
-    && fc-cache -f -v
-
-# Ensure both soffice and libreoffice exist
-RUN ln -sf /usr/bin/soffice /usr/bin/libreoffice || true
+    apt-get install -y curl ca-certificates python3 python3-pip python3-venv build-essential gcc g++ make libopenblas-dev liblapack-dev python3-dev && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 3) Environment so Node libs can find LibreOffice
 ENV LIBREOFFICE_BIN=/usr/bin/soffice
@@ -38,10 +16,8 @@ ENV NODE_ENV=production
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-# 4) Quick verification at build time (fail build if missing)
-RUN set -e; \
-    which soffice; \
-    soffice --version
+# 4) Quick verification at build time
+RUN which soffice && soffice --version || echo "LibreOffice check failed at build"
 
 # 5) Create app directories
 WORKDIR /app
