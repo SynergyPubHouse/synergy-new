@@ -92,7 +92,12 @@ function isValidPdf(filePath) {
 async function callLibreOfficeService(inputPath, fileName, jobId) {
   // Hard-coded external LibreOffice HTTP service URL for now (no env lookup)
   const CONVERTER_BASE = 'https://doc-converter-kypa.onrender.com';
-  const CONVERTER_ENDPOINTS = ['/convert', '/api/convert/docx-to-pdf'];
+  const CONVERTER_ENDPOINTS = [
+    '/api/convert/docx-to-pdf',
+    '/convert',
+    '/api/convert',
+    '/convert/docx-to-pdf',
+  ];
   let serviceUrl = `${CONVERTER_BASE}${CONVERTER_ENDPOINTS[0]}`;
 
   let sizeBytes = null;
@@ -119,32 +124,10 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
     fileName,
   };
 
-  const formData = new FormData();
-  formData.append('file', fsSync.createReadStream(inputPath), fileName);
-
   const requestStartedAt = Date.now();
   console.log('[DocumentJob] Starting LibreOffice conversion', {
     ...meta,
     startedAt: new Date(requestStartedAt).toISOString(),
-  });
-
-  const config = {
-    headers: {
-      ...(typeof formData.getHeaders === 'function' ? formData.getHeaders() : {}),
-      Accept: 'application/pdf',
-    },
-    responseType: 'stream',
-    timeout: timeoutMs,
-    maxContentLength,
-    maxBodyLength,
-  };
-
-  console.log('[DocumentJob] LibreOffice request config', {
-    method: 'POST',
-    url: serviceUrl,
-    timeoutMs: config.timeout,
-    maxContentLength,
-    maxBodyLength,
   });
 
   const pdfPath = path.join(os.tmpdir(), `docjob_${jobId || Date.now()}.pdf`);
@@ -155,6 +138,29 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
     for (const endpoint of CONVERTER_ENDPOINTS) {
       serviceUrl = `${CONVERTER_BASE}${endpoint}`;
       attempted.push(serviceUrl);
+      // Recreate form-data and stream for each attempt
+      const formData = new FormData();
+      formData.append('file', fsSync.createReadStream(inputPath), fileName);
+
+      const config = {
+        headers: {
+          ...(typeof formData.getHeaders === 'function' ? formData.getHeaders() : {}),
+          Accept: 'application/pdf',
+        },
+        responseType: 'stream',
+        timeout: timeoutMs,
+        maxContentLength,
+        maxBodyLength,
+      };
+
+      console.log('[DocumentJob] LibreOffice request config', {
+        method: 'POST',
+        url: serviceUrl,
+        timeoutMs: config.timeout,
+        maxContentLength,
+        maxBodyLength,
+      });
+
       console.log('[LO-HTTP][documents] Calling converter at', serviceUrl, 'for job', jobId || null);
       try {
         response = await axios.post(serviceUrl, formData, config);
@@ -215,6 +221,8 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
       throw new Error('Remote converter returned invalid PDF');
     }
 
+    // Reflect the actual URL used in meta
+    meta.serviceUrl = serviceUrl;
     return { pdfPath, meta: { ...meta, requestDurationMs, downloadedBytes } };
   } catch (error) {
     const durationMs = Date.now() - requestStartedAt;

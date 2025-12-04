@@ -173,8 +173,14 @@ async function convertDocxToPdf(docxPath, onProgress) {
 		} catch (_) {}
 	};
 
-	// Hard-coded external LibreOffice HTTP service URL for now (no env lookup)
-	const serviceUrl = "https://doc-converter-kypa.onrender.com/convert";
+	// Hard-coded external LibreOffice HTTP service base + endpoints (no env lookup)
+	const CONVERTER_BASE = "https://doc-converter-kypa.onrender.com";
+	const CONVERTER_ENDPOINTS = [
+		"/convert",
+		"/api/convert/docx-to-pdf",
+		"/api/convert",
+		"/convert/docx-to-pdf",
+	];
 	const useRemote = (process.env.USE_REMOTE_CONVERTER || "true").toLowerCase() !== "false";
 
 	if (useRemote) {
@@ -198,8 +204,8 @@ async function convertDocxToPdf(docxPath, onProgress) {
 			sizeMB = Math.round((stat.size / (1024 * 1024)) * 100) / 100;
 		} catch (e) {}
 
-		const meta = {
-			serviceUrl,
+		let meta = {
+			serviceUrl: `${CONVERTER_BASE}${CONVERTER_ENDPOINTS[0]}`,
 			timeoutMs,
 			maxContentLength,
 			maxBodyLength,
@@ -209,98 +215,112 @@ async function convertDocxToPdf(docxPath, onProgress) {
 		};
 
 		const fileName = meta.fileName;
-		const formData = new FormData();
-		formData.append("file", fsSync.createReadStream(docxPath), fileName);
-
 		const requestStartedAt = Date.now();
-		console.log("[convertDocxToPdf] Starting remote LibreOffice conversion", {
-			...meta,
-			startedAt: new Date(requestStartedAt).toISOString(),
-		});
-		progress(2, "Sending document to converter...");
-
 		try {
-			const config = {
-				headers: {
-					...(typeof formData.getHeaders === "function"
-						? formData.getHeaders()
-						: {}),
-					Accept: "application/pdf",
-				},
-				responseType: "stream",
-				timeout: timeoutMs,
-				maxContentLength,
-				maxBodyLength,
-			};
+			let response;
+			const attempted = [];
+			for (const endpoint of CONVERTER_ENDPOINTS) {
+				const url = `${CONVERTER_BASE}${endpoint}`;
+				attempted.push(url);
+				meta.serviceUrl = url;
+				
+				const formData = new FormData();
+				formData.append("file", fsSync.createReadStream(docxPath), fileName);
 
-			console.log("[convertDocxToPdf] Remote request config", {
-				method: "POST",
-				url: serviceUrl,
-				timeoutMs: config.timeout,
-				maxContentLength,
-				maxBodyLength,
-			});
+				const config = {
+					headers: {
+						...(typeof formData.getHeaders === "function"
+							? formData.getHeaders()
+							: {}),
+						Accept: "application/pdf",
+					},
+					responseType: "stream",
+					timeout: timeoutMs,
+					maxContentLength,
+					maxBodyLength,
+				};
 
-			console.log('[LO-HTTP][manuscript] Calling converter at', serviceUrl, 'for', docxPath);
-			const response = await axios.post(serviceUrl, formData, config);
-			const requestDurationMs = Date.now() - requestStartedAt;
-			const contentType = (response.headers?.["content-type"] || "").toLowerCase();
-			const contentLengthHeader = response.headers?.["content-length"];
-			const contentLength = contentLengthHeader
-				? parseInt(contentLengthHeader, 10) || null
-				: null;
-
-			console.log("[convertDocxToPdf] Remote response received", {
-				status: response.status,
-				statusText: response.statusText,
-				requestDurationMs,
-				contentType,
-				contentLength,
-			});
-
-			if (!contentType.includes("application/pdf")) {
-				throw new Error(
-					`Expected application/pdf but got ${contentType || "unknown"}`
-				);
-			}
-
-			const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-			const writeStartedAt = Date.now();
-			let downloadedBytes = 0;
-
-			await new Promise((resolve, reject) => {
-				const writeStream = fsSync.createWriteStream(pdfPath);
-				response.data.on("data", (chunk) => {
-					downloadedBytes += chunk.length;
-					if (downloadedBytes < 1024 * 1024) {
-						progress(10, "Downloading PDF from converter...");
-					} else if (downloadedBytes < 10 * 1024 * 1024) {
-						progress(40, "Downloading PDF from converter...");
-					} else {
-						progress(70, "Downloading PDF from converter...");
-					}
+				console.log("[convertDocxToPdf] Remote request config", {
+					method: "POST",
+					url,
+					timeoutMs: config.timeout,
+					maxContentLength,
+					maxBodyLength,
 				});
-				response.data.on("error", (err) => reject(err));
-				writeStream.on("error", (err) => reject(err));
-				writeStream.on("finish", () => resolve());
-				response.data.pipe(writeStream);
-			});
 
-			console.log("[convertDocxToPdf] PDF stream written", {
-				writeDurationMs: Date.now() - writeStartedAt,
-				bytes: downloadedBytes,
-			});
+				console.log('[LO-HTTP][manuscript] Calling converter at', url, 'for', docxPath);
+				try {
+					response = await axios.post(url, formData, config);
+					meta.serviceUrl = url;
+					// success
+					const requestDurationMs = Date.now() - requestStartedAt;
+					const contentType = (response.headers?.["content-type"] || "").toLowerCase();
+					const contentLengthHeader = response.headers?.["content-length"];
+					const contentLength = contentLengthHeader
+						? parseInt(contentLengthHeader, 10) || null
+						: null;
 
-			if (!isValidPdf(pdfPath)) {
-				throw new Error("Remote converter returned invalid PDF");
+					console.log("[convertDocxToPdf] Remote response received", {
+						status: response.status,
+						statusText: response.statusText,
+						requestDurationMs,
+						contentType,
+						contentLength,
+					});
+
+					if (!contentType.includes("application/pdf")) {
+						throw new Error(
+							`Expected application/pdf but got ${contentType || "unknown"}`
+						);
+					}
+
+					const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+					const writeStartedAt = Date.now();
+					let downloadedBytes = 0;
+
+					await new Promise((resolve, reject) => {
+						const writeStream = fsSync.createWriteStream(pdfPath);
+						response.data.on("data", (chunk) => {
+							downloadedBytes += chunk.length;
+							if (downloadedBytes < 1024 * 1024) {
+								progress(10, "Downloading PDF from converter...");
+							} else if (downloadedBytes < 10 * 1024 * 1024) {
+								progress(40, "Downloading PDF from converter...");
+							} else {
+								progress(70, "Downloading PDF from converter...");
+							}
+						});
+						response.data.on("error", (err) => reject(err));
+						writeStream.on("error", (err) => reject(err));
+						writeStream.on("finish", () => resolve());
+						response.data.pipe(writeStream);
+					});
+
+					console.log("[convertDocxToPdf] PDF stream written", {
+						writeDurationMs: Date.now() - writeStartedAt,
+						bytes: downloadedBytes,
+					});
+
+					if (!isValidPdf(pdfPath)) {
+						throw new Error("Remote converter returned invalid PDF");
+					}
+
+					progress(100, "Conversion complete");
+					console.log("[convertDocxToPdf] Remote LibreOffice conversion successful", {
+						pdfPath,
+						requestDurationMs,
+					});
+					return pdfPath;
+				} catch (error) {
+					const status = error.response?.status;
+					if (status === 404 || status === 405) {
+						console.error('[convertDocxToPdf] Converter endpoint not found/allowed', { status, url });
+						continue; // try next endpoint
+					}
+					throw error;
+				}
 			}
-
-			progress(100, "Conversion complete");
-			console.log("[convertDocxToPdf] Remote LibreOffice conversion successful", {
-				pdfPath,
-				requestDurationMs,
-			});
-			return pdfPath;
+			throw new Error(`No converter endpoint available (tried: ${attempted.join(', ')})`);
 		} catch (error) {
 			const durationMs = Date.now() - requestStartedAt;
 			const isTimeout =
