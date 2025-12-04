@@ -1,12 +1,34 @@
-# Start from the prebuilt LibreOffice image
-FROM ghcr.io/linuxserver/libreoffice:latest AS runtime
+FROM node:18-bullseye AS runtime
 
-# Install Node.js 18 and required dependencies
+# Install LibreOffice and dependencies (Debian-based)
 RUN apt-get update && \
-    apt-get install -y curl ca-certificates python3 python3-pip python3-venv build-essential gcc g++ make libopenblas-dev liblapack-dev python3-dev && \
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get install -y \
+      libreoffice \
+      libreoffice-writer \
+      libreoffice-common \
+      libreoffice-core \
+      default-jre-headless \
+      fonts-dejavu \
+      fonts-liberation \
+      fonts-noto \
+      fonts-freefont-ttf \
+      python3 \
+      python3-pip \
+      python3-venv \
+      build-essential \
+      gcc \
+      g++ \
+      make \
+      libopenblas-dev \
+      liblapack-dev \
+      python3-dev \
+      curl \
+      ca-certificates \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -f -v
+
+# Ensure both soffice and libreoffice exist
+RUN ln -sf /usr/bin/soffice /usr/bin/libreoffice || true
 
 # 3) Environment so Node libs can find LibreOffice
 ENV LIBREOFFICE_BIN=/usr/bin/soffice
