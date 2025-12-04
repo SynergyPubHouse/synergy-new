@@ -6,6 +6,7 @@ const multer = require("multer");  // 🔥 ADD THIS
 const os = require("os");          // 🔥 ADD THIS
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 const connectDB = require("./config/db");
+process.env.LIBREOFFICE_BIN = '/usr/bin/soffice';
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, os.tmpdir()),
@@ -104,6 +105,13 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     uptime: Math.round(process.uptime()) 
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime())
   });
 });
 
