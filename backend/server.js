@@ -29,15 +29,20 @@ const allowedOrigins = [
   "https://accounts.google.com"
 ];
 
+const extraOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+const effectiveOrigins = [...allowedOrigins, ...extraOrigins];
+
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
+    if (/^http:\/\/localhost(?::\d+)?$/.test(origin)) return callback(null, true);
+    const allowed = effectiveOrigins.includes(origin) || effectiveOrigins.some(p => p.startsWith('*.') && origin.endsWith(p.slice(1)));
+    if (allowed) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
