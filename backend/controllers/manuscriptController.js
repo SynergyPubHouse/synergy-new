@@ -162,7 +162,10 @@ function isValidPdf(filePath) {
 
 // Helper: Convert DOCX to PDF using remote converter
 async function convertDocxToPdf(docxPath) {
-	const remoteUrl = process.env.CONVERTER_URL || process.env.DOCX_CONVERTER_URL;
+	const remoteUrl =
+		process.env.CONVERTER_URL ||
+		process.env.DOCX_CONVERTER_URL ||
+		"https://doc-converter-kypa.onrender.com";
 
 	if (!remoteUrl) {
 		throw new Error("Remote DOCX converter URL is not configured. Set CONVERTER_URL in the environment.");
