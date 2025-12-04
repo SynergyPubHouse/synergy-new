@@ -54,7 +54,7 @@ EXPOSE 5000
 
 # 12) Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-    CMD curl -f http://localhost:5000/api/health || exit 1
+    CMD curl -f http://localhost:$PORT/health || exit 1
 
 # 13) Start your Node server
 CMD ["node", "server.js"]

@@ -107,6 +107,13 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime())
+  });
+});
+
 app.use("/api", require("./routes/manuscriptRoutes"));
 
 // Error Handling

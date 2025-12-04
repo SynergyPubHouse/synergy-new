@@ -10,6 +10,7 @@ const Reviewer = require("../models/Reviewer");
 const mongoose = require("mongoose");
 const os = require("os");
 const { convertDocxToPdfNode } = require("../utils/convertDocxToPdfNode");
+const { convertDocxWithLibreOffice } = require("../utils/convertDocxWithLibreOffice");
 const { PythonShell } = require("python-shell");
 const { generateUniqueManuscriptId } = require("../utils/manuscriptIdGenerator");
 const fsSync = require("fs"); // Add at the top if not already
@@ -160,83 +161,78 @@ function isValidPdf(filePath) {
 	}
 }
 
-// Helper: Convert DOCX to PDF using remote converter
 async function convertDocxToPdf(docxPath) {
-    const remoteUrl =
-        process.env.CONVERTER_URL ||
-        process.env.DOCX_CONVERTER_URL ||
-        "https://doc-converter-kypa.onrender.com";
+    const errors = [];
 
-    if (!remoteUrl) {
-        throw new Error("Remote DOCX converter URL is not configured. Set CONVERTER_URL in the environment.");
+    const useRemote = (process.env.USE_REMOTE_CONVERTER || 'true').toLowerCase() === 'true';
+    const remoteUrl = process.env.CONVERTER_URL || process.env.DOCX_CONVERTER_URL || "https://doc-converter-kypa.onrender.com";
+
+    if (useRemote && remoteUrl) {
+        try {
+            console.log('[convertDocxToPdf] Using remote converter at:', remoteUrl);
+            const fileName = path.basename(docxPath);
+            const formData = new FormData();
+            formData.append("file", fsSync.createReadStream(docxPath), fileName);
+
+            const config = {
+                headers: {
+                    ...(typeof formData.getHeaders === "function" ? formData.getHeaders() : {}),
+                    'Accept': 'application/pdf',
+                },
+                responseType: "arraybuffer",
+                timeout: 300000,
+                maxContentLength: 50 * 1024 * 1024,
+                maxBodyLength: 50 * 1024 * 1024
+            };
+
+            console.log('[convertDocxToPdf] Remote request:', JSON.stringify({ url: remoteUrl, method: 'POST', timeout: config.timeout }, null, 2));
+            const response = await axios.post(remoteUrl, formData, config);
+            if (!response.data || !response.data.length) throw new Error('Empty response from converter service');
+
+            const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+            await fs.writeFile(pdfPath, response.data);
+            if (!isValidPdf(pdfPath)) throw new Error('Remote converter returned invalid PDF');
+            console.log('[convertDocxToPdf] Remote conversion successful');
+            return pdfPath;
+        } catch (error) {
+            console.error('[convertDocxToPdf] Remote converter error:', {
+                message: error.message,
+                code: error.code,
+                status: error.response?.status,
+                statusText: error.response?.statusText
+            });
+            errors.push(`remote:${error.response?.status || error.code || error.message}`);
+        }
+    } else {
+        console.log('[convertDocxToPdf] Remote converter disabled by env');
     }
 
-    console.log('[convertDocxToPdf] Using remote converter service at:', remoteUrl);
-    console.log('[convertDocxToPdf] Processing file:', docxPath);
+    const preferLibreOffice = (process.env.USE_LIBREOFFICE || 'false').toLowerCase() === 'true' || !!process.env.LIBREOFFICE_BIN;
+    if (preferLibreOffice) {
+        try {
+            console.log('[convertDocxToPdf] Trying local LibreOffice');
+            const pdfPath = await convertDocxWithLibreOffice(docxPath);
+            if (!isValidPdf(pdfPath)) throw new Error('LibreOffice returned invalid PDF');
+            console.log('[convertDocxToPdf] LibreOffice conversion successful');
+            return pdfPath;
+        } catch (error) {
+            console.error('[convertDocxToPdf] LibreOffice error:', error.message);
+            errors.push(`libreoffice:${error.message}`);
+        }
+    }
 
-    const fileName = path.basename(docxPath);
-    const formData = new FormData();
-    formData.append("file", fsSync.createReadStream(docxPath), fileName);
-
-    console.log('[convertDocxToPdf] Sending request to converter service...');
-    
     try {
-        const config = {
-            headers: {
-                ...(typeof formData.getHeaders === "function" ? formData.getHeaders() : {}),
-                'Accept': 'application/pdf',
-            },
-            responseType: "arraybuffer",
-            timeout: 300000,
-            maxContentLength: 50 * 1024 * 1024, // 50MB max
-            maxBodyLength: 50 * 1024 * 1024    // 50MB max
-        };
-
-        console.log('[convertDocxToPdf] Request config:', JSON.stringify({
-            url: remoteUrl,
-            method: 'POST',
-            headers: Object.keys(config.headers),
-            timeout: config.timeout
-        }, null, 2));
-
-        const response = await axios.post(remoteUrl, formData, config);
-        console.log(`[convertDocxToPdf] Received response with status: ${response.status}`);
-        
-        if (!response.data || !response.data.length) {
-            throw new Error('Empty response from converter service');
-        }
-
-        const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-        console.log(`[convertDocxToPdf] Saving PDF to: ${pdfPath}`);
-        
-        await fs.writeFile(pdfPath, response.data);
-
-        if (!isValidPdf(pdfPath)) {
-            throw new Error("Remote converter returned invalid PDF");
-        }
-
-        console.log('[convertDocxToPdf] PDF conversion successful');
+        console.log('[convertDocxToPdf] Falling back to Puppeteer/Mammoth');
+        const pdfPath = await convertDocxToPdfNode(docxPath);
+        if (!isValidPdf(pdfPath)) throw new Error('Puppeteer returned invalid PDF');
+        console.log('[convertDocxToPdf] Puppeteer conversion successful');
         return pdfPath;
     } catch (error) {
-        console.error('[convertDocxToPdf] Converter service error:', {
-            message: error.message,
-            code: error.code,
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            responseHeaders: error.response?.headers,
-            responseData: error.response?.data ? 
-                (Buffer.isBuffer(error.response.data) ? 
-                    `[Binary data, length: ${error.response.data.length}]` : 
-                    error.response.data.toString().substring(0, 500) + '...') :
-                'No response data',
-            stack: error.stack
-        });
-        
-        // Re-throw with a more descriptive message
-        const err = new Error(`Failed to convert document: ${error.message}`);
-        err.originalError = error;
-        throw err;
+        console.error('[convertDocxToPdf] Puppeteer fallback error:', error.message);
+        errors.push(`puppeteer:${error.message}`);
     }
+
+    throw new Error(`All conversion methods failed (${errors.join(', ')})`);
 }
 
 // Helper function to extract abstract from text
