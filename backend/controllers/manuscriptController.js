@@ -168,43 +168,56 @@ async function convertDocxToPdf(docxPath) {
     const remoteUrl = process.env.CONVERTER_URL || process.env.DOCX_CONVERTER_URL || "https://doc-converter-kypa.onrender.com";
 
     if (useRemote && remoteUrl) {
-        try {
-            console.log('[convertDocxToPdf] Using remote converter at:', remoteUrl);
-            const fileName = path.basename(docxPath);
-            const formData = new FormData();
-            formData.append("file", fsSync.createReadStream(docxPath), fileName);
+        const base = remoteUrl.replace(/\/+$/, '');
+        const envEndpointsRaw = (process.env.CONVERTER_ENDPOINTS || '').split(',').map(s => s.trim()).filter(Boolean);
+        const defaultEndpoints = ['', '/convert', '/api/convert', '/api/convert/docx-to-pdf'];
+        const endpoints = envEndpointsRaw.length ? envEndpointsRaw : defaultEndpoints;
+        const candidateUrls = endpoints.map(ep => ep ? `${base}${ep.startsWith('/') ? ep : `/${ep}`}` : base);
 
-            const config = {
-                headers: {
-                    ...(typeof formData.getHeaders === "function" ? formData.getHeaders() : {}),
-                    'Accept': 'application/pdf',
-                },
-                responseType: "arraybuffer",
-                timeout: 300000,
-                maxContentLength: 50 * 1024 * 1024,
-                maxBodyLength: 50 * 1024 * 1024
-            };
+        const fileName = path.basename(docxPath);
+        const formData = new FormData();
+        formData.append("file", fsSync.createReadStream(docxPath), fileName);
 
-            console.log('[convertDocxToPdf] Remote request:', JSON.stringify({ url: remoteUrl, method: 'POST', timeout: config.timeout }, null, 2));
-            const response = await axios.post(remoteUrl, formData, config);
-            if (!response.data || !response.data.length) throw new Error('Empty response from converter service');
+        const retries = Math.max(0, parseInt(process.env.CONVERTER_RETRIES || '2', 10));
+        const backoffBaseMs = Math.max(100, parseInt(process.env.CONVERTER_BACKOFF_MS || '500', 10));
 
-            const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-            await fs.writeFile(pdfPath, response.data);
-            if (!isValidPdf(pdfPath)) throw new Error('Remote converter returned invalid PDF');
-            console.log('[convertDocxToPdf] Remote conversion successful');
-            return pdfPath;
-        } catch (error) {
-            console.error('[convertDocxToPdf] Remote converter error:', {
-                message: error.message,
-                code: error.code,
-                status: error.response?.status,
-                statusText: error.response?.statusText
-            });
-            errors.push(`remote:${error.response?.status || error.code || error.message}`);
+        for (const url of candidateUrls) {
+            let attempt = 0;
+            while (attempt <= retries) {
+                try {
+                    const config = {
+                        headers: {
+                            ...(typeof formData.getHeaders === "function" ? formData.getHeaders() : {}),
+                            'Accept': 'application/pdf',
+                        },
+                        responseType: "arraybuffer",
+                        timeout: 300000,
+                        maxContentLength: 100 * 1024 * 1024,
+                        maxBodyLength: 100 * 1024 * 1024
+                    };
+
+                    console.log('[convertDocxToPdf] Remote request:', JSON.stringify({ url, attempt, timeout: config.timeout }, null, 2));
+                    const response = await axios.post(url, formData, config);
+                    if (!response.data || !response.data.length) throw new Error('Empty response');
+
+                    const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+                    await fs.writeFile(pdfPath, response.data);
+                    if (!isValidPdf(pdfPath)) throw new Error('Invalid PDF');
+                    console.log('[convertDocxToPdf] Remote conversion successful');
+                    return pdfPath;
+                } catch (error) {
+                    const key = `remote@${url}:${error.response?.status || error.code || error.message}`;
+                    errors.push(key);
+                    attempt++;
+                    if (attempt <= retries) {
+                        const wait = backoffBaseMs * Math.pow(2, attempt - 1);
+                        await new Promise(r => setTimeout(r, wait));
+                        continue;
+                    }
+                    break;
+                }
+            }
         }
-    } else {
-        console.log('[convertDocxToPdf] Remote converter disabled by env');
     }
 
     const preferLibreOffice = (process.env.USE_LIBREOFFICE || 'false').toLowerCase() === 'true' || !!process.env.LIBREOFFICE_BIN;
