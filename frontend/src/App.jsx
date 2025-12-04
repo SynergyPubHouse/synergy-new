@@ -33,6 +33,7 @@ import AboutUs from "./pages/about";
 import EditorRegister from "./components/EditorRegister";
 import EditorDashboard from "./components/EditorDashboard";
 import MySubmissions from "./pages/MySubmissions";
+import DocumentConversionTest from "./pages/DocumentConversionTest";
 import ReviewerRegister from "./components/ReviewerRegister";
 import ReviewerForgotPassword from "./components/ReviewerForgotPassword";
 import ReviewerResetPassword from "./components/ReviewerResetPassword";
@@ -286,6 +287,10 @@ function AppContent() {
         <Route
           path={`${JICS_URL}/my-submissions`}
           element={<MySubmissions />}
+        />
+        <Route
+          path={`${JICS_URL}/doc-conversion-test`}
+          element={<DocumentConversionTest />}
         />
         <Route path="*" element={<PageNotAvailable />} />
       </Routes>
