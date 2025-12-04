@@ -53,6 +53,8 @@ function candidateBins() {
   } else {
     // Linux (Render production): try explicit paths first
     list.push('/usr/bin/soffice');
+    list.push('/usr/bin/libreoffice');
+    list.push('/usr/lib/libreoffice/program/soffice');
     list.push('/usr/local/bin/soffice');
     list.push('soffice');
     list.push('libreoffice');
