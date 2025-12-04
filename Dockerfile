@@ -1,5 +1,4 @@
-# Start from the prebuilt LibreOffice image
-FROM ghcr.io/linuxserver/libreoffice:latest AS runtime
+FROM debian:bookworm-slim AS runtime
 
 # Install Node.js 18 and required dependencies
 RUN apt-get update && \
@@ -8,16 +7,11 @@ RUN apt-get update && \
     apt-get install -y nodejs && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 3) Environment so Node libs can find LibreOffice
-ENV LIBREOFFICE_BIN=/usr/bin/soffice
-ENV PATH="/usr/bin:/usr/lib/libreoffice/program:${PATH}"
+# 3) Environment
 ENV PYTHONUNBUFFERED=1
 ENV NODE_ENV=production
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-
-# 4) Quick verification at build time
-RUN which soffice && soffice --version || echo "LibreOffice check failed at build"
 
 # 5) Create app directories
 WORKDIR /app
