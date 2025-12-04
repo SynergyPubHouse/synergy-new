@@ -56,6 +56,8 @@ function candidateBins() {
     list.push('/usr/bin/libreoffice');
     list.push('/usr/lib/libreoffice/program/soffice');
     list.push('/usr/local/bin/soffice');
+    list.push('soffice');
+    list.push('libreoffice');
   }
 
   return list;
@@ -85,6 +87,7 @@ async function convertDocxWithLibreOffice(docxPath, timeoutMs = 300000) {
       // If bin is an absolute path, ensure it exists on disk (for Windows/macOS paths)
       if (bin.includes(path.sep) && !fsSync.existsSync(bin)) {
         console.log("[LO] Skipping non-existent binary:", bin);
+        errs.push(`${bin}: not found`);
         continue;
       }
 
