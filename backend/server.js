@@ -107,6 +107,45 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ✅ ADD THIS BELOW ↓↓↓
+app.get('/api/debug/libreoffice', (req, res) => {
+  const { execSync } = require('child_process');
+  const fs = require('fs');
+  
+  const checks = {
+    env: {
+      LIBREOFFICE_BIN: process.env.LIBREOFFICE_BIN || 'NOT SET',
+      HOME: process.env.HOME || 'NOT SET'
+    },
+    files: {},
+    commands: {}
+  };
+  
+  const paths = [
+    '/usr/bin/soffice',
+    '/usr/bin/libreoffice',
+    '/usr/lib/libreoffice/program/soffice'
+  ];
+  
+  paths.forEach(p => {
+    checks.files[p] = fs.existsSync(p) ? 'EXISTS' : 'NOT FOUND';
+  });
+  
+  try {
+    checks.commands.find_soffice = execSync('find /usr -name "soffice*" -type f 2>/dev/null | head -5').toString().trim();
+  } catch (e) {
+    checks.commands.find_soffice = 'ERROR';
+  }
+  
+  try {
+    checks.commands.dpkg = execSync('dpkg -l | grep libreoffice | head -3 2>/dev/null').toString().trim();
+  } catch (e) {
+    checks.commands.dpkg = 'NOT INSTALLED';
+  }
+  
+  res.json(checks);
+});
+
 app.use("/api", require("./routes/manuscriptRoutes"));
 
 // Error Handling
