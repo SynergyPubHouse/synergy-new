@@ -91,7 +91,9 @@ function isValidPdf(filePath) {
 
 async function callLibreOfficeService(inputPath, fileName, jobId) {
   // Hard-coded external LibreOffice HTTP service URL for now (no env lookup)
-  const serviceUrl = 'https://doc-converter-kypa.onrender.com/convert';
+  const CONVERTER_BASE = 'https://doc-converter-kypa.onrender.com';
+  const CONVERTER_ENDPOINTS = ['/convert', '/api/convert/docx-to-pdf'];
+  let serviceUrl = `${CONVERTER_BASE}${CONVERTER_ENDPOINTS[0]}`;
 
   let sizeBytes = null;
   let sizeMB = null;
@@ -148,8 +150,28 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
   const pdfPath = path.join(os.tmpdir(), `docjob_${jobId || Date.now()}.pdf`);
 
   try {
-    console.log('[LO-HTTP][documents] Calling converter at', serviceUrl, 'for job', jobId || null);
-    const response = await axios.post(serviceUrl, formData, config);
+    let response;
+    const attempted = [];
+    for (const endpoint of CONVERTER_ENDPOINTS) {
+      serviceUrl = `${CONVERTER_BASE}${endpoint}`;
+      attempted.push(serviceUrl);
+      console.log('[LO-HTTP][documents] Calling converter at', serviceUrl, 'for job', jobId || null);
+      try {
+        response = await axios.post(serviceUrl, formData, config);
+        break; // success
+      } catch (err) {
+        const status = err.response?.status;
+        if (status === 404 || status === 405) {
+          console.error('[DocumentJob] Converter endpoint not found/allowed', { status, url: serviceUrl });
+          continue; // try next endpoint
+        }
+        throw err; // rethrow other errors
+      }
+    }
+
+    if (!response) {
+      throw new Error(`No converter endpoint available (tried: ${attempted.join(', ')})`);
+    }
     const requestDurationMs = Date.now() - requestStartedAt;
     const contentType = (response.headers?.['content-type'] || '').toLowerCase();
     const contentLengthHeader = response.headers?.['content-length'];
