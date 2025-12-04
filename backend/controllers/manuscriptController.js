@@ -162,40 +162,81 @@ function isValidPdf(filePath) {
 
 // Helper: Convert DOCX to PDF using remote converter
 async function convertDocxToPdf(docxPath) {
-	const remoteUrl =
-		process.env.CONVERTER_URL ||
-		process.env.DOCX_CONVERTER_URL ||
-		"https://doc-converter-kypa.onrender.com";
+    const remoteUrl =
+        process.env.CONVERTER_URL ||
+        process.env.DOCX_CONVERTER_URL ||
+        "https://doc-converter-kypa.onrender.com";
 
-	if (!remoteUrl) {
-		throw new Error("Remote DOCX converter URL is not configured. Set CONVERTER_URL in the environment.");
-	}
+    if (!remoteUrl) {
+        throw new Error("Remote DOCX converter URL is not configured. Set CONVERTER_URL in the environment.");
+    }
 
-	console.log('[convertDocxToPdf] Using remote converter service');
+    console.log('[convertDocxToPdf] Using remote converter service at:', remoteUrl);
+    console.log('[convertDocxToPdf] Processing file:', docxPath);
 
-	const fileName = path.basename(docxPath);
-	const formData = new FormData();
-	formData.append("file", fsSync.createReadStream(docxPath), fileName);
+    const fileName = path.basename(docxPath);
+    const formData = new FormData();
+    formData.append("file", fsSync.createReadStream(docxPath), fileName);
 
-	try {
-		const response = await axios.post(remoteUrl, formData, {
-			headers: typeof formData.getHeaders === "function" ? formData.getHeaders() : {},
-			responseType: "arraybuffer",
-			timeout: 300000,
-		});
+    console.log('[convertDocxToPdf] Sending request to converter service...');
+    
+    try {
+        const config = {
+            headers: {
+                ...(typeof formData.getHeaders === "function" ? formData.getHeaders() : {}),
+                'Accept': 'application/pdf',
+            },
+            responseType: "arraybuffer",
+            timeout: 300000,
+            maxContentLength: 50 * 1024 * 1024, // 50MB max
+            maxBodyLength: 50 * 1024 * 1024    // 50MB max
+        };
 
-		const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-		await fs.writeFile(pdfPath, response.data);
+        console.log('[convertDocxToPdf] Request config:', JSON.stringify({
+            url: remoteUrl,
+            method: 'POST',
+            headers: Object.keys(config.headers),
+            timeout: config.timeout
+        }, null, 2));
 
-		if (!isValidPdf(pdfPath)) {
-			throw new Error("Remote converter returned invalid PDF");
-		}
+        const response = await axios.post(remoteUrl, formData, config);
+        console.log(`[convertDocxToPdf] Received response with status: ${response.status}`);
+        
+        if (!response.data || !response.data.length) {
+            throw new Error('Empty response from converter service');
+        }
 
-		return pdfPath;
-	} catch (e) {
-		console.error("[convertDocxToPdf] Remote converter failed:", e.message || e);
-		throw e;
-	}
+        const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+        console.log(`[convertDocxToPdf] Saving PDF to: ${pdfPath}`);
+        
+        await fs.writeFile(pdfPath, response.data);
+
+        if (!isValidPdf(pdfPath)) {
+            throw new Error("Remote converter returned invalid PDF");
+        }
+
+        console.log('[convertDocxToPdf] PDF conversion successful');
+        return pdfPath;
+    } catch (error) {
+        console.error('[convertDocxToPdf] Converter service error:', {
+            message: error.message,
+            code: error.code,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            responseHeaders: error.response?.headers,
+            responseData: error.response?.data ? 
+                (Buffer.isBuffer(error.response.data) ? 
+                    `[Binary data, length: ${error.response.data.length}]` : 
+                    error.response.data.toString().substring(0, 500) + '...') :
+                'No response data',
+            stack: error.stack
+        });
+        
+        // Re-throw with a more descriptive message
+        const err = new Error(`Failed to convert document: ${error.message}`);
+        err.originalError = error;
+        throw err;
+    }
 }
 
 // Helper function to extract abstract from text
