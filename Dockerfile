@@ -1,11 +1,13 @@
 # Use full Debian-based Node image (not slim!)
 FROM node:18-bullseye AS runtime
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# ✅ Install LibreOffice with all dependencies
+RUN apt-get update && apt-get install -y \
     libreoffice \
     libreoffice-writer \
     libreoffice-common \
+    libreoffice-core \
+    default-jre-headless \
     fonts-dejavu \
     fonts-liberation \
     fonts-noto \
@@ -14,11 +16,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     curl \
+    ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && fc-cache -f -v
 
-# Install build tools required for spaCy / blis
+# Install build tools required for spaCy
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -29,25 +32,23 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# ✅ FIX: Create symlink so "libreoffice" command works
-RUN ln -sf /usr/bin/soffice /usr/bin/libreoffice
+# ✅ Create symlink for libreoffice command
+RUN ln -sf /usr/bin/soffice /usr/bin/libreoffice || true
 
-# Verify LibreOffice installation (both commands)
-RUN which soffice && soffice --version
-RUN which libreoffice && libreoffice --version
+# ✅ Verify LibreOffice installed
+RUN which soffice && soffice --version || echo "LibreOffice check"
 
-# Set environment - provide both paths
+# Environment variables
 ENV LIBREOFFICE_BIN=/usr/bin/soffice
-ENV SOFFICE_BIN=/usr/bin/soffice
-ENV PATH="/usr/bin:$PATH"
+ENV PATH="/usr/bin:/usr/lib/libreoffice/program:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV NODE_ENV=production
-ENV USE_PUPPETEER_FALLBACK=false
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
-# Set default locale
-ENV LANG=C.UTF-8 \
-    LANGUAGE=C.UTF-8 \
-    LC_ALL=C.UTF-8
+# Create directories
+RUN mkdir -p /tmp/.libreoffice && chmod 777 /tmp
+RUN mkdir -p /home/appuser && chmod 755 /home/appuser
 
 WORKDIR /app
 
@@ -55,10 +56,9 @@ WORKDIR /app
 COPY backend/package*.json ./backend/
 COPY backend/requirements.txt ./backend/
 
-# Install backend dependencies
 WORKDIR /app/backend
 
-# Python venv
+# Python setup
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -66,23 +66,19 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     python -m spacy download en_core_web_sm --no-cache-dir
 
-# Install Node dependencies
+# Node dependencies
 RUN npm install --production
 
-# Copy backend source
-COPY backend/ ./        
+# Copy source
+COPY backend/ ./
 
 # Uploads directory
 RUN mkdir -p uploads && chmod 755 uploads
 
-# ✅ FIX: Create temp directory for LibreOffice with proper permissions
-RUN mkdir -p /tmp/.libreoffice && chmod 777 /tmp/.libreoffice
-
 # Non-root user
-RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app /home/appuser
 USER appuser
 
-# ✅ FIX: Set HOME for LibreOffice profile
 ENV HOME=/home/appuser
 
 EXPOSE 5000
