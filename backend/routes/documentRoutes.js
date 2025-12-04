@@ -101,15 +101,8 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
     sizeMB = Math.round((stat.size / (1024 * 1024)) * 100) / 100;
   } catch (_) {}
 
-  const timeoutMs = Math.max(
-    60000,
-    parseInt(
-      process.env.LIBREOFFICE_SERVICE_TIMEOUT_MS ||
-        process.env.CONVERTER_TIMEOUT_MS ||
-        '120000',
-      10
-    )
-  );
+  // Hard-coded request timeout for converter (120s)
+  const timeoutMs = 120000;
   const maxContentLength = 100 * 1024 * 1024;
   const maxBodyLength = 100 * 1024 * 1024;
 
@@ -155,11 +148,7 @@ async function callLibreOfficeService(inputPath, fileName, jobId) {
   const pdfPath = path.join(os.tmpdir(), `docjob_${jobId || Date.now()}.pdf`);
 
   try {
-    console.log('[LO-HTTP] Calling converter at', serviceUrl, 'for job', {
-      jobId: jobId || null,
-      serviceUrl,
-      fileName,
-    });
+    console.log('[LO-HTTP][documents] Calling converter at', serviceUrl, 'for job', jobId || null);
     const response = await axios.post(serviceUrl, formData, config);
     const requestDurationMs = Date.now() - requestStartedAt;
     const contentType = (response.headers?.['content-type'] || '').toLowerCase();

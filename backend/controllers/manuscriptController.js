@@ -241,15 +241,7 @@ async function convertDocxToPdf(docxPath, onProgress) {
 				maxBodyLength,
 			});
 
-			console.log(
-				"[LO-HTTP] Calling converter at",
-				serviceUrl,
-				"from convertDocxToPdf",
-				{
-					serviceUrl,
-					fileName,
-				}
-			);
+			console.log('[LO-HTTP][manuscript] Calling converter at', serviceUrl, 'for', docxPath);
 			const response = await axios.post(serviceUrl, formData, config);
 			const requestDurationMs = Date.now() - requestStartedAt;
 			const contentType = (response.headers?.["content-type"] || "").toLowerCase();
