@@ -10,7 +10,6 @@ const Reviewer = require("../models/Reviewer");
 const mongoose = require("mongoose");
 const os = require("os");
 const { convertDocxToPdfNode } = require("../utils/convertDocxToPdfNode");
-const { convertDocxWithLibreOffice } = require("../utils/convertDocxWithLibreOffice");
 const { PythonShell } = require("python-shell");
 const { generateUniqueManuscriptId } = require("../utils/manuscriptIdGenerator");
 const fsSync = require("fs"); // Add at the top if not already
@@ -162,184 +161,214 @@ function isValidPdf(filePath) {
 }
 
 async function convertDocxToPdf(docxPath, onProgress) {
-    const errors = [];
-    const progress = (percent, step) => {
-        try {
-            if (typeof onProgress === 'function') {
-                onProgress(Math.max(0, Math.min(100, Math.round(percent))), step || 'Converting...');
-            }
-        } catch (_) {}
-    };
+	const errors = [];
+	const progress = (percent, step) => {
+		try {
+			if (typeof onProgress === "function") {
+				onProgress(
+					Math.max(0, Math.min(100, Math.round(percent))),
+					step || "Converting..."
+				);
+			}
+		} catch (_) {}
+	};
 
-    // Quick health ping for remote converter base URL
-    async function ping(url) {
-        try {
-            await axios.get(url, { timeout: 5000 });
-            return true;
-        } catch (_) {
-            return false;
-        }
-    }
+	const serviceUrlRaw = (
+		process.env.LIBREOFFICE_SERVICE_URL ||
+		process.env.CONVERTER_URL ||
+		process.env.DOCX_CONVERTER_URL ||
+		""
+	).trim();
+	const useRemote = (process.env.USE_REMOTE_CONVERTER || "true").toLowerCase() !== "false";
 
-    const useRemote = (process.env.USE_REMOTE_CONVERTER || 'true').toLowerCase() === 'true';
-    const remoteUrl = process.env.CONVERTER_URL || process.env.DOCX_CONVERTER_URL || "https://doc-converter-kypa.onrender.com";
+	if (useRemote && serviceUrlRaw) {
+		const timeoutMs = Math.max(
+			60000,
+			parseInt(
+				process.env.LIBREOFFICE_SERVICE_TIMEOUT_MS ||
+					process.env.CONVERTER_TIMEOUT_MS ||
+					"120000",
+				10
+			)
+		);
+		const maxContentLength = 100 * 1024 * 1024;
+		const maxBodyLength = 100 * 1024 * 1024;
 
-    if (useRemote && remoteUrl) {
-        const base = remoteUrl.replace(/\/+$/, '');
-        const envEndpointsRaw = (process.env.CONVERTER_ENDPOINTS || '').split(',').map(s => s.trim()).filter(Boolean);
-        const defaultEndpoints = ['', '/convert', '/api/convert', '/api/convert/docx-to-pdf'];
-        const endpoints = envEndpointsRaw.length ? envEndpointsRaw : defaultEndpoints;
-        const candidateUrls = endpoints.map(ep => ep ? `${base}${ep.startsWith('/') ? ep : `/${ep}`}` : base);
+		let sizeBytes = null;
+		let sizeMB = null;
+		try {
+			const stat = fsSync.statSync(docxPath);
+			sizeBytes = stat.size;
+			sizeMB = Math.round((stat.size / (1024 * 1024)) * 100) / 100;
+		} catch (e) {}
 
-        // If remote base is not healthy, skip remote immediately
-        const healthy = await ping(`${base}/health`).catch(() => false) || await ping(base).catch(() => false);
-        if (!healthy) {
-            console.warn(`[convertDocxToPdf] Remote converter not healthy at ${base}, skipping remote.`);
-        } else {
-        const fileName = path.basename(docxPath);
-        const formData = new FormData();
-        formData.append("file", fsSync.createReadStream(docxPath), fileName);
+		const meta = {
+			serviceUrl: serviceUrlRaw,
+			timeoutMs,
+			maxContentLength,
+			maxBodyLength,
+			sizeBytes,
+			sizeMB,
+			fileName: path.basename(docxPath),
+		};
 
-        const retries = Math.max(0, parseInt(process.env.CONVERTER_RETRIES || '2', 10));
-        const backoffBaseMs = Math.max(100, parseInt(process.env.CONVERTER_BACKOFF_MS || '500', 10));
+		const fileName = meta.fileName;
+		const formData = new FormData();
+		formData.append("file", fsSync.createReadStream(docxPath), fileName);
 
-        for (const url of candidateUrls) {
-            let attempt = 0;
-            while (attempt <= retries) {
-                try {
-                    const config = {
-                        headers: {
-                            ...(typeof formData.getHeaders === "function" ? formData.getHeaders() : {}),
-                            'Accept': 'application/pdf',
-                        },
-                        responseType: "arraybuffer",
-                        timeout: Math.max(60000, parseInt(process.env.CONVERTER_TIMEOUT_MS || '120000', 10)),
-                        maxContentLength: 100 * 1024 * 1024,
-                        maxBodyLength: 100 * 1024 * 1024
-                    };
+		const requestStartedAt = Date.now();
+		console.log("[convertDocxToPdf] Starting remote LibreOffice conversion", {
+			...meta,
+			startedAt: new Date(requestStartedAt).toISOString(),
+		});
+		progress(2, "Sending document to converter...");
 
-                    console.log('[convertDocxToPdf] Remote request:', JSON.stringify({ url, attempt, timeout: config.timeout }, null, 2));
-                    progress(5, 'Uploading to remote converter...');
-                    const response = await axios.post(url, formData, config);
+		try {
+			const config = {
+				headers: {
+					...(typeof formData.getHeaders === "function"
+						? formData.getHeaders()
+						: {}),
+					Accept: "application/pdf",
+				},
+				responseType: "stream",
+				timeout: timeoutMs,
+				maxContentLength,
+				maxBodyLength,
+			};
 
-                    const ct = (response.headers?.['content-type'] || '').toLowerCase();
-                    if (ct.includes('application/pdf')) {
-                        if (!response.data || !response.data.length) throw new Error('Empty PDF response');
-                        const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-                        await fs.writeFile(pdfPath, response.data);
-                        if (!isValidPdf(pdfPath)) throw new Error('Invalid PDF');
-                        console.log('[convertDocxToPdf] Remote conversion successful (direct PDF)');
-                        progress(100, 'Remote conversion complete');
-                        return pdfPath;
-                    }
+			console.log("[convertDocxToPdf] Remote request config", {
+				method: "POST",
+				url: serviceUrlRaw,
+				timeoutMs: config.timeout,
+				maxContentLength,
+				maxBodyLength,
+			});
 
-                    // Handle job-based JSON API (like /api/convert/docx-to-pdf)
-                    let json;
-                    try {
-                        json = JSON.parse(Buffer.from(response.data).toString('utf-8'));
-                    } catch (_) {
-                        json = null;
-                    }
+			const response = await axios.post(serviceUrlRaw, formData, config);
+			const requestDurationMs = Date.now() - requestStartedAt;
+			const contentType = (response.headers?.["content-type"] || "").toLowerCase();
+			const contentLengthHeader = response.headers?.["content-length"];
+			const contentLength = contentLengthHeader
+				? parseInt(contentLengthHeader, 10) || null
+				: null;
 
-                    if (json && json.success && json.jobId) {
-                        const routeBaseOverride = (process.env.CONVERTER_STATUS_BASE || '').trim();
-                        let statusBase;
-                        if (routeBaseOverride) {
-                            statusBase = routeBaseOverride.replace(/\/+$/, '');
-                        } else {
-                            const m = url.match(/^(.*\/api\/convert)(?:\/.*)?$/);
-                            statusBase = m ? m[1] : url;
-                        }
+			console.log("[convertDocxToPdf] Remote response received", {
+				status: response.status,
+				statusText: response.statusText,
+				requestDurationMs,
+				contentType,
+				contentLength,
+			});
 
-                        const statusUrl = `${statusBase}/status/${json.jobId}`;
-                        const downloadUrl = `${statusBase}/download/${json.jobId}`;
+			if (!contentType.includes("application/pdf")) {
+				throw new Error(
+					`Expected application/pdf but got ${contentType || "unknown"}`
+				);
+			}
 
-                        console.log('[convertDocxToPdf] Job started:', { jobId: json.jobId, statusUrl, downloadUrl });
+			const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+			const writeStartedAt = Date.now();
+			let downloadedBytes = 0;
 
-                        const pollStart = Date.now();
-                        const pollTimeoutMs = Math.max(60000, parseInt(process.env.CONVERTER_POLL_TIMEOUT_MS || '180000', 10));
-                        const pollDelayMs = Math.max(500, parseInt(process.env.CONVERTER_POLL_DELAY_MS || '1500', 10));
+			await new Promise((resolve, reject) => {
+				const writeStream = fsSync.createWriteStream(pdfPath);
+				response.data.on("data", (chunk) => {
+					downloadedBytes += chunk.length;
+					if (downloadedBytes < 1024 * 1024) {
+						progress(10, "Downloading PDF from converter...");
+					} else if (downloadedBytes < 10 * 1024 * 1024) {
+						progress(40, "Downloading PDF from converter...");
+					} else {
+						progress(70, "Downloading PDF from converter...");
+					}
+				});
+				response.data.on("error", (err) => reject(err));
+				writeStream.on("error", (err) => reject(err));
+				writeStream.on("finish", () => resolve());
+				response.data.pipe(writeStream);
+			});
 
-                        while (true) {
-                            if (Date.now() - pollStart > pollTimeoutMs) {
-                                throw new Error('Remote job timed out');
-                            }
-                            try {
-                                const st = await axios.get(statusUrl, { timeout: 15000 });
-                                const state = st.data?.status;
-                                // Use remote-provided progress/step if available
-                                const remotePct = parseInt(st.data?.progress);
-                                if (!Number.isNaN(remotePct)) {
-                                    progress(Math.min(95, Math.max(10, remotePct)), st.data?.step || 'Remote conversion in progress...');
-                                }
-                                if (state === 'completed') {
-                                    const dl = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 120000 });
-                                    const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-                                    await fs.writeFile(pdfPath, dl.data);
-                                    if (!isValidPdf(pdfPath)) throw new Error('Invalid PDF after download');
-                                    console.log('[convertDocxToPdf] Remote conversion successful (job download)');
-                                    progress(100, 'Remote conversion complete');
-                                    return pdfPath;
-                                }
-                                if (state === 'failed') {
-                                    throw new Error(`Remote job failed: ${st.data?.error || 'unknown error'}`);
-                                }
-                            } catch (pollErr) {
-                                // transient errors are okay; we keep polling
-                            }
-                            const elapsed = Date.now() - pollStart;
-                            const pct = Math.min(95, 10 + Math.floor((elapsed / pollTimeoutMs) * 80));
-                            progress(pct, 'Remote conversion in progress...');
-                            await new Promise(r => setTimeout(r, pollDelayMs));
-                        }
-                    }
+			console.log("[convertDocxToPdf] PDF stream written", {
+				writeDurationMs: Date.now() - writeStartedAt,
+				bytes: downloadedBytes,
+			});
 
-                    throw new Error('Unexpected remote response format');
-                } catch (error) {
-                    const key = `remote@${url}:${error.response?.status || error.code || error.message}`;
-                    errors.push(key);
-                    attempt++;
-                    if (attempt <= retries) {
-                        const jitter = Math.floor(Math.random() * 250);
-                        const wait = backoffBaseMs * Math.pow(2, attempt - 1) + jitter;
-                        await new Promise(r => setTimeout(r, wait));
-                        continue;
-                    }
-                    break;
-                }
-            }
-        }
-        }
-    }
+			if (!isValidPdf(pdfPath)) {
+				throw new Error("Remote converter returned invalid PDF");
+			}
 
-    const preferLibreOffice = (process.env.USE_LIBREOFFICE || 'false').toLowerCase() === 'true' || !!process.env.LIBREOFFICE_BIN;
-    if (preferLibreOffice) {
-        try {
-            console.log('[convertDocxToPdf] Trying local LibreOffice');
-            progress(10, 'LibreOffice converting...');
-            const pdfPath = await convertDocxWithLibreOffice(docxPath);
-            if (!isValidPdf(pdfPath)) throw new Error('LibreOffice returned invalid PDF');
-            console.log('[convertDocxToPdf] LibreOffice conversion successful');
-            progress(100, 'LibreOffice conversion complete');
-            return pdfPath;
-        } catch (error) {
-            console.error('[convertDocxToPdf] LibreOffice error:', error.message);
-            errors.push(`libreoffice:${error.message}`);
-        }
-    }
+			progress(100, "Conversion complete");
+			console.log("[convertDocxToPdf] Remote LibreOffice conversion successful", {
+				pdfPath,
+				requestDurationMs,
+			});
+			return pdfPath;
+		} catch (error) {
+			const durationMs = Date.now() - requestStartedAt;
+			const isTimeout =
+				error.code === "ECONNABORTED" || /timeout/i.test(error.message || "");
 
-    try {
-        console.log('[convertDocxToPdf] Falling back to Puppeteer/Mammoth');
-        const pdfPath = await convertDocxToPdfNode(docxPath, null, (percent, step) => progress(percent, step));
-        if (!isValidPdf(pdfPath)) throw new Error('Puppeteer returned invalid PDF');
-        console.log('[convertDocxToPdf] Puppeteer conversion successful');
-        return pdfPath;
-    } catch (error) {
-        console.error('[convertDocxToPdf] Puppeteer fallback error:', error.message);
-        errors.push(`puppeteer:${error.message}`);
-    }
+			let responseSnippet = null;
+			try {
+				if (error.response && error.response.data) {
+					if (Buffer.isBuffer(error.response.data)) {
+						responseSnippet = `Binary data length=${error.response.data.length}`;
+					} else if (typeof error.response.data === "string") {
+						responseSnippet = error.response.data.substring(0, 500);
+					} else {
+						responseSnippet = JSON.stringify(error.response.data).substring(
+							0,
+							500
+						);
+					}
+				}
+			} catch (_) {}
 
-    throw new Error(`All conversion methods failed (${errors.join(', ')})`);
+			console.error("[convertDocxToPdf] Remote LibreOffice service call failed", {
+				...meta,
+				durationMs,
+				isTimeout,
+				message: error.message,
+				code: error.code,
+				status: error.response?.status,
+				statusText: error.response?.statusText,
+				responseHeaders: error.response?.headers,
+				responseSnippet,
+				stack: error.stack,
+			});
+			errors.push(`remote:${error.message}`);
+		}
+	} else {
+		if (!serviceUrlRaw) {
+			console.error(
+				"[convertDocxToPdf] No LibreOffice service URL configured (LIBREOFFICE_SERVICE_URL / CONVERTER_URL / DOCX_CONVERTER_URL)"
+			);
+			errors.push("config:missing_service_url");
+		}
+	}
+
+	try {
+		console.log("[convertDocxToPdf] Falling back to internal Puppeteer/Mammoth converter");
+		const pdfPath = await convertDocxToPdfNode(
+			docxPath,
+			null,
+			(percent, step) => progress(percent, step)
+		);
+		if (!isValidPdf(pdfPath)) throw new Error("Puppeteer returned invalid PDF");
+		console.log("[convertDocxToPdf] Puppeteer conversion successful");
+		return pdfPath;
+	} catch (error) {
+		console.error("[convertDocxToPdf] Puppeteer fallback error", {
+			message: error.message,
+			stack: error.stack,
+		});
+		errors.push(`puppeteer:${error.message}`);
+	}
+
+	throw new Error(
+		`DOCX to PDF conversion failed. Attempts: ${errors.join(" | ")}`
+	);
 }
 
 // Helper function to extract abstract from text
@@ -779,45 +808,50 @@ async function mergePdfs(pdfPaths, outputPath) {
         copiedPages.forEach((page) => mergedPdf.addPage(page));
     }
     
-    // Add line numbering starting from page 2 (skip first page which is the table)
+    // Add line numbering and page numbers starting from the second page
+    // First page is the metadata table and should remain unnumbered.
     const pages = mergedPdf.getPages();
     const font = await mergedPdf.embedFont(StandardFonts.Helvetica);
     
-    for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) { // Start from index 1 to skip first page
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
         const page = pages[pageIndex];
         const { width, height } = page.getSize();
+        const isTablePage = pageIndex === 0;
         
-        // Calculate number of lines based on page height
-        const lineHeight = 14; // adjust as needed to match your sample
-        const topMargin = 72; // 1 inch from top
-        const bottomMargin = 72; // 1 inch from bottom
-        const leftMargin = 20; // place numbers in left margin
-        const usableHeight = height - topMargin - bottomMargin;
-        const numberOfLines = Math.floor(usableHeight / lineHeight);
+        if (!isTablePage) {
+            // Calculate number of lines based on page height
+            const lineHeight = 14; // adjust as needed to match your sample
+            const topMargin = 72; // 1 inch from top
+            const bottomMargin = 72; // 1 inch from bottom
+            const leftMargin = 20; // place numbers in left margin
+            const usableHeight = height - topMargin - bottomMargin;
+            const numberOfLines = Math.floor(usableHeight / lineHeight);
 
-        // Per-page line numbering starting at 1
-        for (let i = 0; i < numberOfLines; i++) {
-            const yPosition = height - topMargin - (i * lineHeight);
-            const lineNum = String(i + 1);
-            const textWidth = font.widthOfTextAtSize(lineNum, 9);
+            // Per-page line numbering starting at 1 on each content page
+            for (let i = 0; i < numberOfLines; i++) {
+                const yPosition = height - topMargin - i * lineHeight;
+                const lineNum = String(i + 1);
+                const textWidth = font.widthOfTextAtSize(lineNum, 9);
 
-            page.drawText(lineNum, {
-                x: leftMargin - textWidth, // right-align to the left margin
-                y: yPosition - 10,
+                page.drawText(lineNum, {
+                    x: leftMargin - textWidth, // right-align to the left margin
+                    y: yPosition - 10,
+                    size: 9,
+                    font: font,
+                    color: rgb(0.2, 0.2, 0.2),
+                });
+            }
+
+            // Add page number at bottom center.
+            // Physical page index 1 (second page) should display "Page 2", etc.
+            page.drawText(`Page ${pageIndex + 1}`, {
+                x: width / 2 - 20,
+                y: bottomMargin / 2,
                 size: 9,
                 font: font,
-                color: rgb(0.2, 0.2, 0.2)
+                color: rgb(0.3, 0.3, 0.3),
             });
         }
-
-        // Add page number at bottom center (start from page 1 for display)
-        page.drawText(`Page ${pageIndex + 1}`, {
-            x: width / 2 - 20,
-            y: bottomMargin / 2,
-            size: 9,
-            font: font,
-            color: rgb(0.3, 0.3, 0.3)
-        });
     }
 
     const mergedPdfBytes = await mergedPdf.save();
