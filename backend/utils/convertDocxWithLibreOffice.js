@@ -1,4 +1,4 @@
-const { spawn } = require('child_process');
+const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -12,34 +12,9 @@ function expectedPdfPath(inputPath, outdir) {
 function runLibreOffice(bin, docxPath, outdir, timeoutMs) {
   return new Promise((resolve, reject) => {
     const args = ['--headless', '--convert-to', 'pdf', '--outdir', outdir, docxPath];
-    const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    let stdout = '';
-    let finished = false;
-
-    const timer = setTimeout(() => {
-      if (finished) return;
-      finished = true;
-      try { proc.kill('SIGKILL'); } catch (_) {}
-      reject(new Error(`LibreOffice timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    proc.stdout.on('data', (d) => { stdout += d.toString(); });
-    proc.stderr.on('data', (d) => { stderr += d.toString(); });
-
-    proc.on('error', (err) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      reject(err);
-    });
-
-    proc.on('close', async (code) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      if (code !== 0) {
-        return reject(new Error(`LibreOffice exited with code ${code}: ${stderr || stdout}`));
+    execFile(bin, args, { timeout: timeoutMs }, async (err, _stdout, stderr) => {
+      if (err) {
+        return reject(new Error(`LibreOffice failed (${bin}): ${err.message}${stderr ? `\nSTDERR: ${stderr}` : ''}`));
       }
       try {
         const pdfPath = expectedPdfPath(docxPath, outdir);
