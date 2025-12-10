@@ -9,7 +9,7 @@ const FormData = require('form-data');
 const mongoose = require('mongoose');
 
 const DocumentJob = require('../models/DocumentJob');
-const { uploadToCloudinary } = require('../utils/cloudinary');
+const { uploadPdfToDrive } = require('../services/driveStorage');
 
 const router = express.Router();
 
@@ -355,29 +355,26 @@ async function processDocumentJob(jobId) {
     let pdfUrl = null;
     let keepLocalPdf = true;
     try {
-      if (process.env.CLOUDINARY_CLOUD_NAME) {
-        const uploadResult = await uploadToCloudinary(pdfPath, 'documents');
-        pdfUrl = uploadResult.secure_url || uploadResult.url || null;
-
-        if (pdfUrl) {
-          try {
-            await fs.unlink(pdfPath);
-            keepLocalPdf = false;
-            console.log('[DocumentJob] Local PDF removed after cloud upload', {
-              jobId: job._id.toString(),
-              pdfPath,
-            });
-          } catch (cleanupErr) {
-            console.error('[DocumentJob] Failed to remove local PDF after cloud upload', {
-              jobId: job._id.toString(),
-              pdfPath,
-              message: cleanupErr.message,
-            });
-          }
-        }
+      const drive = await uploadPdfToDrive(pdfPath, { filename: `docjob_${job._id.toString()}.pdf` });
+      job.driveFileId = drive.driveFileId;
+      job.driveViewUrl = drive.driveViewUrl;
+      pdfUrl = drive.driveViewUrl; // legacy compatibility
+      try {
+        await fs.unlink(pdfPath);
+        keepLocalPdf = false;
+        console.log('[DocumentJob] Local PDF removed after Drive upload', {
+          jobId: job._id.toString(),
+          pdfPath,
+        });
+      } catch (cleanupErr) {
+        console.error('[DocumentJob] Failed to remove local PDF after Drive upload', {
+          jobId: job._id.toString(),
+          pdfPath,
+          message: cleanupErr.message,
+        });
       }
     } catch (uploadErr) {
-      console.error('[DocumentJob] Cloud upload failed', {
+      console.error('[DocumentJob] Drive upload failed', {
         jobId: job._id.toString(),
         message: uploadErr.message,
       });
@@ -505,6 +502,8 @@ router.get('/:id/status', async (req, res) => {
       completedAt: job.completedAt,
       pdfReady: job.status === 'completed',
       pdfUrl: job.pdfUrl || null,
+      driveViewUrl: job.driveViewUrl || null,
+      driveFileId: job.driveFileId || null,
     });
   } catch (err) {
     console.error('[DocumentJob] Status error', { message: err.message });
@@ -542,7 +541,12 @@ router.get('/:id/pdf', async (req, res) => {
 
     const downloadName = (job.originalFilename || 'document').replace(/\.[^.]+$/, '') + '.pdf';
 
-    // Prefer cloud URL if available
+    // Prefer Google Drive URL if available
+    if (job.driveViewUrl) {
+      return res.redirect(302, job.driveViewUrl);
+    }
+
+    // Prefer cloud URL if available (legacy)
     if (job.pdfUrl) {
       console.log('[DocumentJob] Streaming PDF from cloud', {
         jobId: job._id.toString(),

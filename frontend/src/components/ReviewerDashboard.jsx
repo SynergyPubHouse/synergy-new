@@ -511,21 +511,48 @@ function ReviewerDashboard() {
                         <button
                           onClick={() => {
                             const url = manuscript?.authorResponse?.cleanDocument?.url;
-                            const isZip = url.toLowerCase().includes('.zip');
 
-                            if (isZip) {
+                            if (!url) {
+                              console.error("No URL found");
+                              return;
+                            }
 
-                              const link = document.createElement('a');
-                              link.href = url;
-                              link.download = 'clean-document.zip';
-                              link.target = '_blank';
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
+                            // Check if Google Drive URL
+                            if (url.includes('drive.google.com')) {
+                              // Extract file ID
+                              const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                              const fileId = match?.[1];
+
+                              if (fileId) {
+                                // Check if ZIP file
+                                const isZip = url.toLowerCase().includes('.zip');
+
+                                if (isZip) {
+                                  // Download ZIP
+                                  const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                                  window.open(downloadUrl, '_blank');
+                                } else {
+                                  // View DOC/DOCX in Google Drive Preview
+                                  const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+                                  window.open(previewUrl, '_blank');
+                                }
+                              } else {
+                                window.open(url, '_blank');
+                              }
                             } else {
-                              // Existing logic for other file types
+                              // Non-Google Drive URL (Original logic)
+                              const isZip = url.toLowerCase().includes('.zip');
                               const isPdf = url.toLowerCase().includes('.pdf');
-                              if (isPdf) {
+
+                              if (isZip) {
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = 'clean-document.zip';
+                                link.target = '_blank';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              } else if (isPdf) {
                                 window.open(url, "_blank");
                               } else {
                                 const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;

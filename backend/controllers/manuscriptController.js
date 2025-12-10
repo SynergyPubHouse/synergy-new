@@ -17,6 +17,7 @@ const axios = require("axios");
 const FormData = require("form-data");
 // At the top of manuscriptController.js
 const { uploadToCloudinary } = require("../utils/cloudinary");
+const { uploadFileToDrive,deleteFileFromDrive, downloadDriveFileToTemp   } = require('../services/googleDriveOAuth');
 const sendEmail = require("../utils/sendEmail");
 const { console } = require("inspector");
 const { 
@@ -878,7 +879,8 @@ exports.createManuscript = async (req, res) => {
     let tempFiles = [];
 
     console.log("[createManuscript] Request body:", req.body);
-    console.log("[createManuscript] Request files:", req);
+    console.log("[createManuscript] Request files:", req.files);
+    
     try {
         upload(req, res, async (err) => {
             if (err) {
@@ -895,8 +897,7 @@ exports.createManuscript = async (req, res) => {
                 console.error("[createManuscript] Missing required files.");
                 return res.status(400).json({
                     success: false,
-                    message:
-                        "All three files (manuscript, cover letter, and declaration) are required",
+                    message: "All three files (manuscript, cover letter, and declaration) are required",
                 });
             }
 
@@ -907,18 +908,20 @@ exports.createManuscript = async (req, res) => {
                 req.files["declaration"][0].path,
             ];
 
+            // ═══════════════════════════════════════════════════════════
+            // 🔥 Store original DOCX paths for uploading
+            // ═══════════════════════════════════════════════════════════
+            const manuscriptDocxPath = req.files["manuscript"][0].path;
+            const coverLetterDocxPath = req.files["coverLetter"][0].path;
+            const declarationDocxPath = req.files["declaration"][0].path;
+
             // Convert additionalInfo array to string if it exists
             if (req.body.additionalInfo) {
                 try {
-                    const additionalInfoArray = JSON.parse(
-                        req.body.additionalInfo
-                    );
+                    const additionalInfoArray = JSON.parse(req.body.additionalInfo);
                     req.body.additionalInfo = additionalInfoArray.join(", ");
                 } catch (e) {
-                    console.error(
-                        "[createManuscript] Error parsing additionalInfo:",
-                        e
-                    );
+                    console.error("[createManuscript] Error parsing additionalInfo:", e);
                 }
             }
 
@@ -928,18 +931,13 @@ exports.createManuscript = async (req, res) => {
                     req.body.billingInfo = JSON.parse(req.body.billingInfo);
                     console.log('[createManuscript] Parsed billingInfo:', req.body.billingInfo);
                 } catch (e) {
-                    console.error(
-                        "[createManuscript] Error parsing billingInfo:",
-                        e
-                    );
+                    console.error("[createManuscript] Error parsing billingInfo:", e);
                     req.body.billingInfo = {};
                 }
             }
 
             // Handle authors and roles
-            const authors = req.body.authors
-                ? JSON.parse(req.body.authors)
-                : [];
+            const authors = req.body.authors ? JSON.parse(req.body.authors) : [];
             const correspondingAuthorId = req.body.correspondingAuthorId;
 
             const isEditorSubmitter = !!req.editor;
@@ -972,10 +970,7 @@ exports.createManuscript = async (req, res) => {
                         throw new Error(`Invalid author ID: ${id}`);
                     }
                 } catch (error) {
-                    console.error(
-                        "[createManuscript] Error converting author ID:",
-                        error
-                    );
+                    console.error("[createManuscript] Error converting author ID:", error);
                     return res.status(400).json({
                         success: false,
                         message: `Invalid author ID format: ${id}`,
@@ -986,147 +981,106 @@ exports.createManuscript = async (req, res) => {
             // Validate and convert corresponding author ID
             let correspondingAuthorObjectId;
             try {
-                if (
-                    mongoose.Types.ObjectId.isValid(
-                        correspondingAuthorId || (req.user && req.user._id)
-                    )
-                ) {
+                if (mongoose.Types.ObjectId.isValid(correspondingAuthorId || (req.user && req.user._id))) {
                     correspondingAuthorObjectId = new mongoose.Types.ObjectId(
                         correspondingAuthorId || (req.user && req.user._id)
                     );
                 } else {
-                    throw new Error(
-                        `Invalid corresponding author ID: ${
-                            correspondingAuthorId || (req.user && req.user._id)
-                        }`
-                    );
+                    throw new Error(`Invalid corresponding author ID: ${correspondingAuthorId || (req.user && req.user._id)}`);
                 }
             } catch (error) {
-                console.error(
-                    "[createManuscript] Error converting corresponding author ID:",
-                    error
-                );
+                console.error("[createManuscript] Error converting corresponding author ID:", error);
                 return res.status(400).json({
                     success: false,
-                    message: `Invalid corresponding author ID format: ${
-                        correspondingAuthorId || (req.user && req.user._id)
-                    }`,
+                    message: `Invalid corresponding author ID format: ${correspondingAuthorId || (req.user && req.user._id)}`,
                 });
             }
 
-            // Extract text from all three uploaded DOCX files
-            const manuscriptPath = req.files["manuscript"][0].path;
-            const coverLetterPath = req.files["coverLetter"][0].path;
-            const declarationPath = req.files["declaration"][0].path;
-            let manuscriptText = "",
-                coverLetterText = "",
-                declarationText = "";
-            let manuscriptTitle = "",
-                manuscriptAbstract = "",
-                manuscriptKeywords = "";
+            // ═══════════════════════════════════════════════════════════
+            // 🔥 Extract text from DOCX files
+            // ═══════════════════════════════════════════════════════════
+            let manuscriptText = "", coverLetterText = "", declarationText = "";
+            let manuscriptTitle = "", manuscriptAbstract = "", manuscriptKeywords = "";
+            
             try {
-                const result = await extractTextFromDocx(manuscriptPath);
+                const result = await extractTextFromDocx(manuscriptDocxPath);
                 manuscriptText = result.full_text || "";
                 manuscriptTitle = result.title || "";
                 manuscriptAbstract = result.abstract || "";
                 manuscriptKeywords = result.keywords || "";
-                console.log(
-                    "[createManuscript] Extracted manuscript title:",
-                    manuscriptTitle
-                );
-                console.log(
-                    "[createManuscript] Extracted manuscript abstract:",
-                    manuscriptAbstract
-                );
-                console.log(
-                    "[createManuscript] Extracted manuscript keywords:",
-                    manuscriptKeywords
-                );
+                console.log("[createManuscript] Extracted manuscript title:", manuscriptTitle);
             } catch (err) {
-                console.error(
-                    "[createManuscript] Manuscript text extraction failed:",
-                    err
-                );
-                manuscriptText = "";
+                console.error("[createManuscript] Manuscript text extraction failed:", err);
             }
+            
             try {
-                const result = await extractTextFromDocx(coverLetterPath);
+                const result = await extractTextFromDocx(coverLetterDocxPath);
                 coverLetterText = result.full_text || "";
             } catch (err) {
-                console.error(
-                    "[createManuscript] Cover letter text extraction failed:",
-                    err
-                );
-                coverLetterText = "";
+                console.error("[createManuscript] Cover letter text extraction failed:", err);
             }
+            
             try {
-                const result = await extractTextFromDocx(declarationPath);
+                const result = await extractTextFromDocx(declarationDocxPath);
                 declarationText = result.full_text || "";
             } catch (err) {
-                console.error(
-                    "[createManuscript] Declaration text extraction failed:",
-                    err
-                );
-                declarationText = "";
+                console.error("[createManuscript] Declaration text extraction failed:", err);
             }
-            // Convert all DOCX files to PDF before proceeding
+
+            // ═══════════════════════════════════════════════════════════
+            // 🔥 Convert DOCX to PDF (ONLY for merged PDF creation)
+            // Individual files are stored as DOCX, but PDF needed for merging
+            // ═══════════════════════════════════════════════════════════
             let manuscriptPdfPath, coverLetterPdfPath, declarationPdfPath;
             try {
-                manuscriptPdfPath = await convertDocxToPdf(manuscriptPath);
+                console.log("[createManuscript] Converting DOCX to PDF for merging...");
+                
+                manuscriptPdfPath = await convertDocxToPdf(manuscriptDocxPath);
                 if (!isValidPdf(manuscriptPdfPath)) {
-                    console.error(
-                        "[createManuscript] Manuscript PDF is invalid!"
-                    );
+                    console.error("[createManuscript] Manuscript PDF is invalid!");
                     return res.status(500).json({
                         success: false,
                         message: "Manuscript PDF is invalid after conversion.",
                     });
                 }
-                coverLetterPdfPath = await convertDocxToPdf(coverLetterPath);
+                
+                coverLetterPdfPath = await convertDocxToPdf(coverLetterDocxPath);
                 if (!isValidPdf(coverLetterPdfPath)) {
-                    console.error(
-                        "[createManuscript] Cover letter PDF is invalid!"
-                    );
+                    console.error("[createManuscript] Cover letter PDF is invalid!");
                     return res.status(500).json({
                         success: false,
-                        message:
-                            "Cover letter PDF is invalid after conversion.",
+                        message: "Cover letter PDF is invalid after conversion.",
                     });
                 }
-                declarationPdfPath = await convertDocxToPdf(declarationPath);
+                
+                declarationPdfPath = await convertDocxToPdf(declarationDocxPath);
                 if (!isValidPdf(declarationPdfPath)) {
-                    console.error(
-                        "[createManuscript] Declaration PDF is invalid!"
-                    );
+                    console.error("[createManuscript] Declaration PDF is invalid!");
                     return res.status(500).json({
                         success: false,
                         message: "Declaration PDF is invalid after conversion.",
                     });
                 }
+                
                 // Track generated PDFs for cleanup
-                try {
-                    tempFiles.push(manuscriptPdfPath);
-                    tempFiles.push(coverLetterPdfPath);
-                    tempFiles.push(declarationPdfPath);
-                } catch (_) {}
+                tempFiles.push(manuscriptPdfPath);
+                tempFiles.push(coverLetterPdfPath);
+                tempFiles.push(declarationPdfPath);
+                
+                console.log("[createManuscript] PDF conversion completed for merging");
             } catch (err) {
-                console.error(
-                    "[createManuscript] DOCX to PDF conversion failed:",
-                    err
-                );
+                console.error("[createManuscript] DOCX to PDF conversion failed:", err);
                 return res.status(500).json({
                     success: false,
-                    // message: "DOCX to PDF conversion failed.",
                     message: err.message || "DOCX to PDF conversion failed.",
-
                 });
             }
 
-            // Generate custom manuscript ID first using title
+            // Generate custom manuscript ID using title
             let customManuscriptId;
             try {
-                const manuscriptTitle = req.body.title || "Untitled";
-                customManuscriptId = await generateUniqueManuscriptId(manuscriptTitle);
+                const manuscriptTitleForId = req.body.title || "Untitled";
+                customManuscriptId = await generateUniqueManuscriptId(manuscriptTitleForId);
                 console.log("[createManuscript] Generated custom ID:", customManuscriptId);
             } catch (err) {
                 console.error("[createManuscript] Custom ID generation failed:", err);
@@ -1136,57 +1090,60 @@ exports.createManuscript = async (req, res) => {
                 });
             }
 
-            // Upload individual PDFs to Cloudinary with custom filenames
-            let manuscriptUpload, coverLetterUpload, declarationUpload;
+            // ═══════════════════════════════════════════════════════════
+            // 🔥 UPDATED: Upload DOCX files to Google Drive (not PDF)
+            // Individual files are stored as DOCX format
+            // ═══════════════════════════════════════════════════════════
+            let manuscriptDriveMeta, coverLetterDriveMeta, declarationDriveMeta;
             try {
-                console.log(
-                    "[createManuscript] Uploading individual files to Cloudinary..."
-                );
-
-                [manuscriptUpload, coverLetterUpload, declarationUpload] = await Promise.all([
-                    uploadToCloudinary(
-                        manuscriptPdfPath,
-                        "manuscripts", // Folder in Cloudinary
-                        "raw", // Resource type
-                        `manuscript_${customManuscriptId}` // Custom filename
-                    ),
-                    uploadToCloudinary(
-                        coverLetterPdfPath,
-                        "coverLetters", // Folder in Cloudinary
-                        "raw", // Resource type
-                        `cover_letter_${customManuscriptId}` // Custom filename
-                    ),
-                    uploadToCloudinary(
-                        declarationPdfPath,
-                        "declarations", // Folder in Cloudinary
-                        "raw", // Resource type
-                        `declaration_${customManuscriptId}` // Custom filename
-                    ),
+                console.log("[createManuscript] Uploading DOCX files to Google Drive...");
+                
+                [manuscriptDriveMeta, coverLetterDriveMeta, declarationDriveMeta] = await Promise.all([
+                    // 🔥 Upload original DOCX files (not PDF)
+                    uploadFileToDrive(manuscriptDocxPath, { 
+                        filename: `manuscript_${customManuscriptId}.docx`  // 🔥 .docx extension
+                    }),
+                    uploadFileToDrive(coverLetterDocxPath, { 
+                        filename: `cover_letter_${customManuscriptId}.docx`  // 🔥 .docx extension
+                    }),
+                    uploadFileToDrive(declarationDocxPath, { 
+                        filename: `declaration_${customManuscriptId}.docx`  // 🔥 .docx extension
+                    }),
                 ]);
-
-                console.log(
-                    "[createManuscript] Individual files uploaded successfully to Cloudinary"
-                );
+                
+                console.log("[createManuscript] DOCX files uploaded to Drive", {
+                    manuscript: manuscriptDriveMeta.driveFileId,
+                    coverLetter: coverLetterDriveMeta.driveFileId,
+                    declaration: declarationDriveMeta.driveFileId,
+                });
             } catch (err) {
-                console.error(
-                    "[createManuscript] Cloudinary upload failed:",
-                    err
-                );
-                return res.status(500).json({
-                    success: false,
-                    message: "File upload to Cloudinary failed.",
+                console.error("[createManuscript] Drive upload failed:", err);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: "File upload to Google Drive failed." 
                 });
             }
 
-            // Create and save manuscript first to get the ID
+            // Create manuscript data object
             const manuscriptData = {
                 ...req.body,
                 customId: customManuscriptId,
                 authors: authorObjectIds,
                 correspondingAuthor: correspondingAuthorObjectId,
-                manuscriptFile: manuscriptUpload.secure_url,
-                coverLetterFile: coverLetterUpload.secure_url,
-                declarationFile: declarationUpload.secure_url,
+                
+                // 🔥 DOCX URLs for individual files
+                manuscriptFile: manuscriptDriveMeta.driveViewUrl,
+                coverLetterFile: coverLetterDriveMeta.driveViewUrl,
+                declarationFile: declarationDriveMeta.driveViewUrl,
+                
+                // Drive file IDs
+                manuscriptDriveFileId: manuscriptDriveMeta.driveFileId,
+                manuscriptDriveViewUrl: manuscriptDriveMeta.driveViewUrl,
+                coverLetterDriveFileId: coverLetterDriveMeta.driveFileId,
+                coverLetterDriveViewUrl: coverLetterDriveMeta.driveViewUrl,
+                declarationDriveFileId: declarationDriveMeta.driveFileId,
+                declarationDriveViewUrl: declarationDriveMeta.driveViewUrl,
+                
                 status: "Saved",
                 extractedText: manuscriptText,
                 coverLetterText: coverLetterText,
@@ -1196,57 +1153,58 @@ exports.createManuscript = async (req, res) => {
                 extractedKeywords: manuscriptKeywords,
             };
 
+            // Save manuscript to database
             let manuscript;
             try {
                 manuscript = new Manuscript(manuscriptData);
                 await manuscript.save();
                 console.log("[createManuscript] Manuscript saved with custom ID:", customManuscriptId);
             } catch (err) {
-                console.error(
-                    "[createManuscript] Manuscript save failed:",
-                    err
-                );
+                console.error("[createManuscript] Manuscript save failed:", err);
                 return res.status(500).json({
                     success: false,
                     message: "Manuscript save failed.",
                 });
             }
 
-            // Now create merged PDF with the manuscript ID
-            let mergedPdfResult, mergedUpload;
+            // ═══════════════════════════════════════════════════════════
+            // 🔥 Create merged PDF (using converted PDFs)
+            // Merged PDF is still in PDF format for proper merging
+            // ═══════════════════════════════════════════════════════════
+            let mergedPdfResult;
             try {
+                console.log("[createManuscript] Creating merged PDF...");
+                
                 mergedPdfResult = await createMergedPDFWithTable(
-                    manuscriptPdfPath,
-                    coverLetterPdfPath,
-                    declarationPdfPath,
+                    manuscriptPdfPath,      // PDF for merging
+                    coverLetterPdfPath,     // PDF for merging
+                    declarationPdfPath,     // PDF for merging
                     {
                         ...req.body,
                         authors: authorObjectIds,
                         correspondingAuthor: correspondingAuthorObjectId,
                     },
-                    customManuscriptId // Pass the custom manuscript ID for naming
+                    customManuscriptId
                 );
+                
                 // Track the merged PDF for cleanup
                 tempFiles.push(mergedPdfResult.localPath);
 
-                // Upload merged PDF to Cloudinary with custom filename
-                mergedUpload = await uploadToCloudinary(
-                    mergedPdfResult.localPath,
-                    "merged_manuscripts", // Folder in Cloudinary
-                    "raw", // Use 'raw' for PDF files to get a direct link
-                    `manuscript_${customManuscriptId}` // Custom filename using manuscript ID
+                // 🔥 Upload merged PDF to Google Drive (merged file stays as PDF)
+                const mergedDriveMeta = await uploadFileToDrive(
+                    mergedPdfResult.localPath, 
+                    { filename: `manuscript_${customManuscriptId}_merged.pdf` }  // Merged is PDF
                 );
 
-                // Update manuscript with merged PDF URL
-                manuscript.mergedFileUrl = mergedUpload.secure_url;
+                // Update manuscript with merged PDF Drive info
+                manuscript.mergedFileUrl = mergedDriveMeta.driveViewUrl;
+                manuscript.mergedDriveFileId = mergedDriveMeta.driveFileId;
+                manuscript.mergedDriveViewUrl = mergedDriveMeta.driveViewUrl;
                 await manuscript.save();
 
-                console.log("[createManuscript] Merged PDF created and uploaded successfully");
+                console.log("[createManuscript] Merged PDF created and uploaded:", mergedDriveMeta.driveViewUrl);
             } catch (err) {
-                console.error(
-                    "[createManuscript] Merged PDF creation failed:",
-                    err
-                );
+                console.error("[createManuscript] Merged PDF creation failed:", err);
                 return res.status(500).json({
                     success: false,
                     message: "Merged PDF creation failed.",
@@ -1261,10 +1219,9 @@ exports.createManuscript = async (req, res) => {
                         {
                             $addToSet: {
                                 manuscripts: manuscript._id,
-                                roles:
-                                    authorId === correspondingAuthorId
-                                        ? ["author", "corresponding_author"]
-                                        : ["author"],
+                                roles: authorId === correspondingAuthorId
+                                    ? ["author", "corresponding_author"]
+                                    : ["author"],
                             },
                         },
                         { new: true }
@@ -1277,7 +1234,7 @@ exports.createManuscript = async (req, res) => {
             // Clean up all temporary files
             try {
                 await cleanupFiles(tempFiles);
-                tempFiles = []; // Clear the array after successful cleanup
+                tempFiles = [];
             } catch (err) {
                 console.error("[createManuscript] Cleanup failed:", err);
             }
@@ -1297,13 +1254,9 @@ exports.createManuscript = async (req, res) => {
         });
     } catch (error) {
         console.error("[createManuscript] Error in createManuscript:", error);
-        // Clean up any remaining temporary files in case of error
         if (tempFiles.length > 0) {
             await cleanupFiles(tempFiles).catch((cleanupError) => {
-                console.error(
-                    "[createManuscript] Error during cleanup after failure:",
-                    cleanupError
-                );
+                console.error("[createManuscript] Error during cleanup after failure:", cleanupError);
             });
         }
         res.status(500).json({
@@ -2315,6 +2268,7 @@ const revisionUpload = multer({
 
 exports.uploadRevisionFiles = async (req, res) => {
     let tempFiles = [];
+    let uploadedDriveFileIds = [];
     
     revisionUpload(req, res, async (err) => {
         if (err) {
@@ -2327,7 +2281,7 @@ exports.uploadRevisionFiles = async (req, res) => {
 
         try {
             const { manuscriptId } = req.params;
-            const { fileType } = req.body; // 'docx' or 'latex'
+            const { fileType } = req.body;
 
             // Find manuscript
             const manuscript = await Manuscript.findById(manuscriptId)
@@ -2361,11 +2315,11 @@ exports.uploadRevisionFiles = async (req, res) => {
             if (!req.files || !req.files.responseSheet || !req.files.highlightedDoc || !req.files.withoutHighlightedDoc) {
                 return res.status(400).json({ 
                     success: false, 
-                    message: "All three files are required: Response Sheet (PDF), Highlighted Document (PDF), and Without Highlighted Document (DOCX/LaTeX)" 
+                    message: "All three files are required" 
                 });
             }
 
-            // Track temporary files for cleanup
+            // Track temporary files
             tempFiles = [
                 req.files.responseSheet[0].path,
                 req.files.highlightedDoc[0].path,
@@ -2375,212 +2329,159 @@ exports.uploadRevisionFiles = async (req, res) => {
             const customId = manuscript.customId || manuscript._id.toString();
             const timestamp = Date.now();
 
-            // Initialize authorResponse if it doesn't exist
+            // Initialize authorResponse
             if (!manuscript.authorResponse) {
-                manuscript.authorResponse = {
-                    submissionCount: 0
-                };
+                manuscript.authorResponse = { submissionCount: 0 };
             }
 
-            // 1. Upload Response Sheet (PDF only)
+            // ========== 1. Upload Response Sheet (PDF) ==========
             console.log("[uploadRevisionFiles] Uploading Response Sheet...");
-            const responseSheetUpload = await uploadToCloudinary(
-                req.files.responseSheet[0].path,
-                "author_responses",
-                "raw",
-                `response_sheet_${customId}_${timestamp}`
-            );
-            manuscript.authorResponse.docxUrl = responseSheetUpload.secure_url || responseSheetUpload.url;
-            manuscript.authorResponse.pdfUrl = responseSheetUpload.secure_url || responseSheetUpload.url;
-            manuscript.authorResponse.uploadedAt = new Date();
-            console.log("[uploadRevisionFiles] Response Sheet uploaded successfully");
-
-            // 2. Upload Highlighted Document (PDF only)
-            console.log("[uploadRevisionFiles] Uploading Highlighted Document...");
-            const highlightedUpload = await uploadToCloudinary(
-                req.files.highlightedDoc[0].path,
-                "highlighted_revisions",
-                "raw",
-                `highlighted_${customId}_${timestamp}`
-            );
-            manuscript.authorResponse.highlightedFileUrl = highlightedUpload.secure_url || highlightedUpload.url;
-            manuscript.authorResponse.highlightedUploadedAt = new Date();
-            console.log("[uploadRevisionFiles] Highlighted Document uploaded successfully");
-
-            // 3. Upload Without Highlighted Document (DOCX or LaTeX)
-            console.log("[uploadRevisionFiles] Uploading Without Highlighted Document...");
-            const withoutHighlightedFile = req.files.withoutHighlightedDoc[0];
-            const fileExtension = path.extname(withoutHighlightedFile.originalname);
             
-            const withoutHighlightedUpload = await uploadToCloudinary(
-                withoutHighlightedFile.path,
-                "clean_revisions",
-                "raw",
-                `clean_${customId}_${timestamp}${fileExtension}`
-            );
-            manuscript.authorResponse.withoutHighlightedFileUrl = withoutHighlightedUpload.secure_url || withoutHighlightedUpload.url;
+            const responseSheetResult = await uploadFileToDrive(req.files.responseSheet[0].path, {
+                filename: `response_sheet_${customId}_${timestamp}.pdf`,
+                mimeType: 'application/pdf',
+                makePublic: true,
+            });
+
+            if (!responseSheetResult?.success) {
+                throw new Error("Failed to upload Response Sheet");
+            }
+            uploadedDriveFileIds.push(responseSheetResult.driveFileId);
+            
+            manuscript.authorResponse.docxUrl = responseSheetResult.driveViewUrl;
+            manuscript.authorResponse.pdfUrl = responseSheetResult.driveViewUrl;
+            manuscript.authorResponse.responseDriveFileId = responseSheetResult.driveFileId;
+            manuscript.authorResponse.responseDriveViewUrl = responseSheetResult.driveViewUrl;
+            manuscript.authorResponse.uploadedAt = new Date();
+            
+            console.log("[uploadRevisionFiles] Response Sheet uploaded:", responseSheetResult.driveFileId);
+
+            // ========== 2. Upload Highlighted Document (PDF) ==========
+            console.log("[uploadRevisionFiles] Uploading Highlighted Document...");
+            
+            const highlightedResult = await uploadFileToDrive(req.files.highlightedDoc[0].path, {
+                filename: `highlighted_${customId}_${timestamp}.pdf`,
+                mimeType: 'application/pdf',
+                makePublic: true,
+            });
+
+            if (!highlightedResult?.success) {
+                throw new Error("Failed to upload Highlighted Document");
+            }
+            uploadedDriveFileIds.push(highlightedResult.driveFileId);
+            
+            // Store in existing field (URL contains file ID for download)
+            manuscript.authorResponse.highlightedFileUrl = highlightedResult.driveViewUrl;
+            manuscript.authorResponse.highlightedUploadedAt = new Date();
+            
+            console.log("[uploadRevisionFiles] Highlighted Document uploaded:", highlightedResult.driveFileId);
+
+            // ========== 3. Upload Without Highlighted Document (DOCX/LaTeX) ==========
+            console.log("[uploadRevisionFiles] Uploading Clean Document...");
+            
+            const withoutHighlightedFile = req.files.withoutHighlightedDoc[0];
+            const fileExtension = path.extname(withoutHighlightedFile.originalname) || '.docx';
+            
+            // Determine mime type
+            let mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            if (fileExtension === '.tex' || fileType === 'latex') {
+                mimeType = 'application/x-tex';
+            } else if (fileExtension === '.zip') {
+                mimeType = 'application/zip';
+            }
+
+            const withoutHighlightedResult = await uploadFileToDrive(withoutHighlightedFile.path, {
+                filename: `clean_${customId}_${timestamp}${fileExtension}`,
+                mimeType: mimeType,
+                makePublic: true,
+            });
+
+            if (!withoutHighlightedResult?.success) {
+                throw new Error("Failed to upload Clean Document");
+            }
+            uploadedDriveFileIds.push(withoutHighlightedResult.driveFileId);
+            
+            manuscript.authorResponse.withoutHighlightedFileUrl = withoutHighlightedResult.driveViewUrl;
             manuscript.authorResponse.withoutHighlightedUploadedAt = new Date();
             
-            // Store file type information
-            manuscript.authorResponse.fileType = fileType || 'docx';
-            
-            console.log("[uploadRevisionFiles] Without Highlighted Document uploaded successfully");
+            console.log("[uploadRevisionFiles] Clean Document uploaded:", withoutHighlightedResult.driveFileId);
 
-            // Update metadata
+            // ========== Update Metadata ==========
             manuscript.authorResponse.lastUpdated = new Date();
             manuscript.authorResponse.submissionCount = (manuscript.authorResponse.submissionCount || 0) + 1;
-            manuscript.updatedAt = new Date();
 
-            // Save manuscript
+            // Save
             await manuscript.save();
 
-            // Clean up temporary files
+            // Cleanup temp files
             await cleanupFiles(tempFiles);
             tempFiles = [];
 
-            console.log(`[uploadRevisionFiles] All revision files uploaded successfully for manuscript: ${customId}`);
+            console.log(`[uploadRevisionFiles] All files uploaded for: ${customId}`);
 
-            // ===================================
-            // 🔥 EMAIL NOTIFICATION TO EDITORS
-            // ===================================
+            // ========== EMAIL TO EDITORS ==========
             try {
-                // Import Editor model if not already imported at top
+                const editors = await User.find({ roles: "editor" }).select("firstName lastName email");
                 
-                
-                // Get all active editors
-                   const editors = await User.find({ roles: "editor" }).select(
-                    "firstName middleName lastName email title"
-                );
-                
-                if (editors && editors.length > 0) {
-                    // Get author information
+                if (editors?.length > 0) {
                     const authorName = manuscript.correspondingAuthor 
                         ? `${manuscript.correspondingAuthor.firstName || ''} ${manuscript.correspondingAuthor.lastName || ''}`.trim()
-                        : (manuscript.authors && manuscript.authors[0] 
-                            ? `${manuscript.authors[0].firstName || ''} ${manuscript.authors[0].lastName || ''}`.trim()
-                            : 'Author');
-                    
-                    const authorEmail = manuscript.correspondingAuthor?.email 
-                        || (manuscript.authors && manuscript.authors[0]?.email) 
-                        || 'Not provided';
+                        : 'Author';
 
-                    const submissionDate = new Date().toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZoneName: 'short'
-                    });
-
-                    const revisionNumber = manuscript.authorResponse.submissionCount || 1;
-                    const fileTypeDisplay = (fileType || 'docx').toUpperCase();
                     const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
 
-                    // Create email content for editors
-                    const emailSubject = `Revision Submitted - ${customId}: ${manuscript.title}`;
+                    const emailSubject = `Revision Submitted - ${customId}`;
                     
                     const emailHtml = `
-                         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">
-                
-                <!-- Header -->
-                <div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 25px; text-align: center;">
-                    <h1 style="margin: 0; font-size: 22px;">📄 Revision Submitted</h1>
-                </div>
-
-                <!-- Content -->
-                <div style="padding: 25px;">
-                    <p style="color: #374151; font-size: 15px; margin-bottom: 20px;">
-                        Dear Editor,
-                    </p>
-                    
-                    <p style="color: #374151; font-size: 15px; margin-bottom: 20px;">
-                        <strong>${authorName}</strong> has submitted <strong>Revision </strong> for the manuscript.
-                    </p>
-
-                    <!-- Manuscript Info -->
-                    <div style="background-color: #F0FDFA; padding: 15px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 20px;">
-                        <p style="margin: 0 0 8px 0; font-size: 14px;"><strong>ID:</strong> ${customId}</p>
-                        <p style="margin: 0; font-size: 14px;"><strong>Title:</strong> ${manuscript.title || 'Untitled'}</p>
-                    </div>
-
-                    <!-- Files -->
-                    <div style="margin-bottom: 20px;">
-                        <p style="font-weight: 600; color: #374151; margin-bottom: 10px;">📁 Submitted Files:</p>
-                        <ul style="color: #374151; font-size: 14px; padding-left: 20px; margin: 0;">
-                            <li style="margin-bottom: 5px;">
-                                <a href="${manuscript.authorResponse.pdfUrl}" style="color: #00796B;">Response Sheet (PDF)</a>
-                            </li>
-                            <li style="margin-bottom: 5px;">
-                                <a href="${manuscript.authorResponse.highlightedFileUrl}" style="color: #00796B;">Highlighted Document (PDF)</a>
-                            </li>
-                            <li>
-                                <a href="${manuscript.authorResponse.withoutHighlightedFileUrl}" style="color: #00796B;">Clean Document (${(fileType || 'docx').toUpperCase()})</a>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <!-- Action Button -->
-                    <div style="text-align: center; margin: 25px 0;">
-                        <a href="${frontendUrl}/journal/jics/editor/manuscripts/${manuscript._id}" 
-                           style="display: inline-block; background-color: #00796B; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">
-                            Review Manuscript
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Footer -->
-                <div style="background-color: #F3F4F6; padding: 15px; text-align: center; border-top: 1px solid #E5E7EB;">
-                    <p style="color: #6B7280; font-size: 12px; margin: 0;">
-                        Synergy World Press | <a href="mailto:support@synergyworldpress.com" style="color: #00796B;">support@synergyworldpress.com</a>
-                    </p>
-                </div>
-            </div>
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <div style="background: linear-gradient(135deg, #00796B, #00ACC1); color: white; padding: 25px; text-align: center;">
+                                <h1 style="margin: 0; font-size: 22px;">📄 Revision Submitted</h1>
+                            </div>
+                            <div style="padding: 25px;">
+                                <p><strong>${authorName}</strong> has submitted Revision #${manuscript.authorResponse.submissionCount}.</p>
+                                
+                                <div style="background: #F0FDFA; padding: 15px; border-left: 4px solid #00796B; margin: 20px 0;">
+                                    <p style="margin: 0 0 8px 0;"><strong>ID:</strong> ${customId}</p>
+                                    <p style="margin: 0;"><strong>Title:</strong> ${manuscript.title || 'Untitled'}</p>
+                                </div>
+                                
+                                <p><strong>📁 Submitted Files:</strong></p>
+                                <ul>
+                                    <li><a href="${responseSheetResult.driveViewUrl}">Response Sheet (PDF)</a></li>
+                                    <li><a href="${highlightedResult.driveViewUrl}">Highlighted Document (PDF)</a></li>
+                                    <li><a href="${withoutHighlightedResult.driveViewUrl}">Clean Document (${(fileType || 'docx').toUpperCase()})</a></li>
+                                </ul>
+                                
+                                <div style="text-align: center; margin: 25px 0;">
+                                    <a href="${frontendUrl}/editor-dashboard" 
+                                       style="background: #00796B; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px;">
+                                        Review Manuscript
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     `;
 
-                    // Send email to all editors
-                    const emailPromises = editors.map(async (editor) => {
+                    for (const editor of editors) {
                         try {
-                            await sendEmail({
-                                to: editor.email,
-                                subject: emailSubject,
-                                html: emailHtml,
-                            });
-                            console.log(`[uploadRevisionFiles] Revision notification sent to editor: ${editor.email}`);
-                            return { success: true, email: editor.email };
-                        } catch (emailError) {
-                            console.error(`[uploadRevisionFiles] Failed to send email to ${editor.email}:`, emailError);
-                            return { success: false, email: editor.email, error: emailError.message };
+                            await sendEmail({ to: editor.email, subject: emailSubject, html: emailHtml });
+                        } catch (e) {
+                            console.error(`Email failed for ${editor.email}:`, e);
                         }
-                    });
-
-                    const emailResults = await Promise.all(emailPromises);
-                    const successfulEmails = emailResults.filter(r => r.success).length;
-                    const failedEmails = emailResults.filter(r => !r.success).length;
-
-                    console.log(`[uploadRevisionFiles] Email notifications: ${successfulEmails} sent, ${failedEmails} failed`);
-
-                } else {
-                    console.log("[uploadRevisionFiles] No active editors found to notify");
+                    }
                 }
-
             } catch (emailError) {
-                // Don't fail the upload if email fails - just log the error
-                console.error("[uploadRevisionFiles] Error sending email notifications:", emailError);
+                console.error("[uploadRevisionFiles] Email error:", emailError);
             }
-            // ===================================
-            // END EMAIL NOTIFICATION
-            // ===================================
 
-            // Send success response
+            // ========== Success Response ==========
             return res.json({ 
                 success: true, 
-                message: "All revision files have been successfully uploaded and submitted to the editor",
+                message: "All revision files uploaded successfully",
                 data: {
                     responseSheetUrl: manuscript.authorResponse.docxUrl,
                     highlightedDocumentUrl: manuscript.authorResponse.highlightedFileUrl,
                     withoutHighlightedDocumentUrl: manuscript.authorResponse.withoutHighlightedFileUrl,
-                    fileType: manuscript.authorResponse.fileType,
                     submissionCount: manuscript.authorResponse.submissionCount,
                     uploadedAt: manuscript.authorResponse.uploadedAt
                 }
@@ -2589,16 +2490,23 @@ exports.uploadRevisionFiles = async (req, res) => {
         } catch (error) {
             console.error("[uploadRevisionFiles] Error:", error);
             
-            // Clean up temporary files on error
+            // Cleanup Drive files on error
+            for (const fileId of uploadedDriveFileIds) {
+                try {
+                    await deleteFileFromDrive(fileId);
+                } catch (e) {
+                    console.error(`Cleanup failed for ${fileId}:`, e);
+                }
+            }
+            
+            // Cleanup temp files
             if (tempFiles.length > 0) {
-                await cleanupFiles(tempFiles).catch((cleanupError) => {
-                    console.error("[uploadRevisionFiles] Cleanup error:", cleanupError);
-                });
+                await cleanupFiles(tempFiles).catch(console.error);
             }
             
             return res.status(500).json({ 
                 success: false, 
-                message: "Failed to upload revision files. Please try again.",
+                message: "Failed to upload revision files",
                 error: error.message
             });
         }
@@ -2644,7 +2552,15 @@ exports.uploadPublishedPdf = async (req, res) => {
             fileName
         );
 
-        if (!uploadedPdf?.secure_url) throw new Error("Cloudinary upload failed");
+        const driveResult = await uploadFileToDrive(req.file.path, {
+    filename: fileName,
+    mimeType: 'application/pdf',
+    makePublic: true,
+});
+
+if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
+    throw new Error("Google Drive upload failed");
+}
 
         // 🔥 Save published date in database
         const publishedDate = new Date();
@@ -3016,12 +2932,12 @@ async function processManuscriptJob(jobId, tempFiles) {
 
         updateJob(jobId, { progress: 65, step: 'Uploading files to cloud...' });
 
-        // Upload to Cloudinary
-        const [manuscriptUpload, coverLetterUpload, declarationUpload] = await Promise.all([
-            uploadToCloudinary(manuscriptPdfPath, "manuscripts", "raw", `manuscript_${customManuscriptId}`),
-            uploadToCloudinary(coverLetterPdfPath, "coverLetters", "raw", `cover_letter_${customManuscriptId}`),
-            uploadToCloudinary(declarationPdfPath, "declarations", "raw", `declaration_${customManuscriptId}`),
-        ]);
+        // Upload PDFs to Google Drive
+     const [manuscriptDrive, coverLetterDrive, declarationDrive] = await Promise.all([
+    uploadFileToDrive(files.manuscript, { filename: `manuscript_${customManuscriptId}.docx` }),
+    uploadFileToDrive(files.coverLetter, { filename: `cover_letter_${customManuscriptId}.docx` }),
+    uploadFileToDrive(files.declaration, { filename: `declaration_${customManuscriptId}.docx` }),
+]);
 
         updateJob(jobId, { progress: 75, step: 'Creating merged PDF...' });
 
@@ -3033,9 +2949,17 @@ async function processManuscriptJob(jobId, tempFiles) {
             customId: customManuscriptId,
             authors: authorObjectIds,
             correspondingAuthor: correspondingAuthorObjectId,
-            manuscriptFile: manuscriptUpload.secure_url,
-            coverLetterFile: coverLetterUpload.secure_url,
-            declarationFile: declarationUpload.secure_url,
+            // Legacy URL fields set to Drive view URLs
+            manuscriptFile: manuscriptDrive.driveViewUrl,
+            coverLetterFile: coverLetterDrive.driveViewUrl,
+            declarationFile: declarationDrive.driveViewUrl,
+            // New Drive fields
+            manuscriptDriveFileId: manuscriptDrive.driveFileId,
+            manuscriptDriveViewUrl: manuscriptDrive.driveViewUrl,
+            coverLetterDriveFileId: coverLetterDrive.driveFileId,
+            coverLetterDriveViewUrl: coverLetterDrive.driveViewUrl,
+            declarationDriveFileId: declarationDrive.driveFileId,
+            declarationDriveViewUrl: declarationDrive.driveViewUrl,
             status: "Saved",
             extractedText: manuscriptText,
             coverLetterText: coverLetterText,
@@ -3070,14 +2994,10 @@ async function processManuscriptJob(jobId, tempFiles) {
         updateJob(jobId, { progress: 90, step: 'Uploading merged PDF...' });
 
         // Upload merged PDF
-        const mergedUpload = await uploadToCloudinary(
-            mergedPdfResult.localPath,
-            "merged_manuscripts",
-            "raw",
-            `manuscript_${customManuscriptId}`
-        );
-
-        manuscript.mergedFileUrl = mergedUpload.secure_url;
+        const mergedDrive = await uploadFileToDrive(mergedPdfResult.localPath, { filename: `manuscript_${customManuscriptId}.pdf` });
+        manuscript.mergedFileUrl = mergedDrive.driveViewUrl;
+        manuscript.mergedDriveFileId = mergedDrive.driveFileId;
+        manuscript.mergedDriveViewUrl = mergedDrive.driveViewUrl;
         await manuscript.save();
 
         updateJob(jobId, { progress: 95, step: 'Updating author records...' });
@@ -3107,10 +3027,10 @@ async function processManuscriptJob(jobId, tempFiles) {
         completeJob(jobId, {
             manuscriptId: manuscript._id,
             customId: customManuscriptId,
-            mergedPdfUrl: manuscript.mergedFileUrl,
-            manuscriptFile: manuscript.manuscriptFile,
-            coverLetterFile: manuscript.coverLetterFile,
-            declarationFile: manuscript.declarationFile,
+            mergedPdfUrl: manuscript.mergedFileUrl, // Drive view URL
+            manuscriptFile: manuscript.manuscriptDriveViewUrl || manuscript.manuscriptFile,
+            coverLetterFile: manuscript.coverLetterDriveViewUrl || manuscript.coverLetterFile,
+            declarationFile: manuscript.declarationDriveViewUrl || manuscript.declarationFile,
             extractedTitle: manuscriptTitle,
             extractedAbstract: manuscriptAbstract,
             extractedKeywords: manuscriptKeywords,
@@ -3161,7 +3081,1309 @@ exports.getJobStatus = async (req, res) => {
         });
     }
 };
+exports.updateDraft = async (req, res) => {
+    let tempFiles = [];
 
+    try {
+        upload(req, res, async (err) => {
+            if (err) {
+                return res.status(400).json({ success: false, message: err.message });
+            }
+
+            try {
+                const { manuscriptId } = req.params;
+
+                const existingManuscript = await Manuscript.findById(manuscriptId);
+                if (!existingManuscript) {
+                    return res.status(404).json({ success: false, message: "Manuscript not found" });
+                }
+
+                const isAuthor =
+                    existingManuscript.authors.some(a => a.toString() === req.user._id.toString()) ||
+                    existingManuscript.correspondingAuthor?.toString() === req.user._id.toString();
+
+                if (!isAuthor) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "You don't have permission to edit this manuscript",
+                    });
+                }
+
+                if (!["Pending", "Saved"].includes(existingManuscript.status)) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "This manuscript cannot be edited anymore",
+                    });
+                }
+
+                if (req.files) {
+                    if (req.files["manuscript"]) tempFiles.push(req.files["manuscript"][0].path);
+                    if (req.files["coverLetter"]) tempFiles.push(req.files["coverLetter"][0].path);
+                    if (req.files["declaration"]) tempFiles.push(req.files["declaration"][0].path);
+                }
+
+                // --- Parse additional info ---
+                let additionalInfo = req.body.additionalInfo;
+                if (additionalInfo) {
+                    if (typeof additionalInfo === "string") {
+                        try {
+                            const parsed = JSON.parse(additionalInfo);
+                            additionalInfo = Array.isArray(parsed) ? parsed.join(", ") : additionalInfo;
+                        } catch {}
+                    } else if (Array.isArray(additionalInfo)) {
+                        additionalInfo = additionalInfo.join(", ");
+                    }
+                } else {
+                    additionalInfo = existingManuscript.additionalInfo || "";
+                }
+
+                // --- Parse billing info ---
+                let billingInfo = req.body.billingInfo;
+                if (billingInfo && typeof billingInfo === "string") {
+                    try {
+                        billingInfo = JSON.parse(billingInfo);
+                    } catch {
+                        billingInfo = existingManuscript.billingInfo || {};
+                    }
+                }
+                if (!billingInfo) {
+                    billingInfo = existingManuscript.billingInfo || {};
+                }
+
+                // --- Parse classification ---
+                let classification = req.body.classification;
+                if (classification) {
+                    if (typeof classification === "string") {
+                        try {
+                            const parsed = JSON.parse(classification);
+                            if (Array.isArray(parsed)) classification = parsed.join(", ");
+                        } catch {}
+                    } else if (Array.isArray(classification)) {
+                        classification = classification.join(", ");
+                    }
+                } else {
+                    classification = existingManuscript.classification || "";
+                }
+
+                // --- Parse authors ---
+                let authors = [];
+                if (req.body.authors) {
+                    try {
+                        authors = JSON.parse(req.body.authors);
+                    } catch {
+                        authors = [];
+                    }
+                }
+
+                const correspondingAuthorId = req.body.correspondingAuthorId || req.user._id;
+
+                if (!authors.includes(req.user._id.toString())) {
+                    authors.unshift(req.user._id.toString());
+                }
+
+                const authorObjectIds = authors
+                    .filter(id => mongoose.Types.ObjectId.isValid(id))
+                    .map(id => new mongoose.Types.ObjectId(id));
+
+                let correspondingAuthorObjectId =
+                    mongoose.Types.ObjectId.isValid(correspondingAuthorId)
+                        ? new mongoose.Types.ObjectId(correspondingAuthorId)
+                        : req.user._id;
+
+                const customManuscriptId = existingManuscript.customId;
+
+                // ═══════════════════════════════════════════════════════════
+                // 🔥 GOOGLE DRIVE UPLOAD WITH OLD FILE DELETE
+                // ═══════════════════════════════════════════════════════════
+
+                // 📄 Handle Manuscript File
+                let manuscriptFile = existingManuscript.manuscriptFile;
+                let manuscriptDriveFileId = existingManuscript.manuscriptDriveFileId;
+                let manuscriptDriveViewUrl = existingManuscript.manuscriptDriveViewUrl;
+
+                if (req.files?.manuscript) {
+                    console.log("[updateDraft] 📤 Uploading new manuscript to Google Drive...");
+                    
+                    // 🗑️ Delete old file from Drive
+                    if (existingManuscript.manuscriptDriveFileId) {
+                        try {
+                            await deleteFileFromDrive(existingManuscript.manuscriptDriveFileId);
+                            console.log("[updateDraft] 🗑️ Old manuscript deleted");
+                        } catch (deleteErr) {
+                            console.warn("[updateDraft] ⚠️ Could not delete old manuscript:", deleteErr.message);
+                        }
+                    }
+                    
+                    // 📤 Upload new file
+                    const manuscriptResult = await uploadFileToDrive(
+                        req.files.manuscript[0].path,
+                        {
+                            filename: `manuscript_${customManuscriptId}_updated_${Date.now()}_${req.files.manuscript[0].originalname}`,
+                            folderId: process.env.GOOGLE_DRIVE_MANUSCRIPTS_FOLDER_ID,
+                            makePublic: true
+                        }
+                    );
+                    
+                    manuscriptFile = manuscriptResult.webViewLink || manuscriptResult.driveViewUrl;
+                    manuscriptDriveFileId = manuscriptResult.driveFileId;
+                    manuscriptDriveViewUrl = manuscriptResult.driveViewUrl;
+                    
+                    console.log("[updateDraft] ✅ New manuscript uploaded:", manuscriptDriveViewUrl);
+                }
+
+                // 📄 Handle Cover Letter File
+                let coverLetterFile = existingManuscript.coverLetterFile;
+                let coverLetterDriveFileId = existingManuscript.coverLetterDriveFileId;
+                let coverLetterDriveViewUrl = existingManuscript.coverLetterDriveViewUrl;
+
+                if (req.files?.coverLetter) {
+                    console.log("[updateDraft] 📤 Uploading new cover letter to Google Drive...");
+                    
+                    // 🗑️ Delete old file from Drive
+                    if (existingManuscript.coverLetterDriveFileId) {
+                        try {
+                            await deleteFileFromDrive(existingManuscript.coverLetterDriveFileId);
+                            console.log("[updateDraft] 🗑️ Old cover letter deleted");
+                        } catch (deleteErr) {
+                            console.warn("[updateDraft] ⚠️ Could not delete old cover letter:", deleteErr.message);
+                        }
+                    }
+                    
+                    // 📤 Upload new file
+                    const coverLetterResult = await uploadFileToDrive(
+                        req.files.coverLetter[0].path,
+                        {
+                            filename: `cover_letter_${customManuscriptId}_updated_${Date.now()}_${req.files.coverLetter[0].originalname}`,
+                            folderId: process.env.GOOGLE_DRIVE_COVER_LETTERS_FOLDER_ID,
+                            makePublic: true
+                        }
+                    );
+                    
+                    coverLetterFile = coverLetterResult.webViewLink || coverLetterResult.driveViewUrl;
+                    coverLetterDriveFileId = coverLetterResult.driveFileId;
+                    coverLetterDriveViewUrl = coverLetterResult.driveViewUrl;
+                    
+                    console.log("[updateDraft] ✅ New cover letter uploaded:", coverLetterDriveViewUrl);
+                }
+
+                // 📄 Handle Declaration File
+                let declarationFile = existingManuscript.declarationFile;
+                let declarationDriveFileId = existingManuscript.declarationDriveFileId;
+                let declarationDriveViewUrl = existingManuscript.declarationDriveViewUrl;
+
+                if (req.files?.declaration) {
+                    console.log("[updateDraft] 📤 Uploading new declaration to Google Drive...");
+                    
+                    // 🗑️ Delete old file from Drive
+                    if (existingManuscript.declarationDriveFileId) {
+                        try {
+                            await deleteFileFromDrive(existingManuscript.declarationDriveFileId);
+                            console.log("[updateDraft] 🗑️ Old declaration deleted");
+                        } catch (deleteErr) {
+                            console.warn("[updateDraft] ⚠️ Could not delete old declaration:", deleteErr.message);
+                        }
+                    }
+                    
+                    // 📤 Upload new file
+                    const declarationResult = await uploadFileToDrive(
+                        req.files.declaration[0].path,
+                        {
+                            filename: `declaration_${customManuscriptId}_updated_${Date.now()}_${req.files.declaration[0].originalname}`,
+                            folderId: process.env.GOOGLE_DRIVE_DECLARATIONS_FOLDER_ID,
+                            makePublic: true
+                        }
+                    );
+                    
+                    declarationFile = declarationResult.webViewLink || declarationResult.driveViewUrl;
+                    declarationDriveFileId = declarationResult.driveFileId;
+                    declarationDriveViewUrl = declarationResult.driveViewUrl;
+                    
+                    console.log("[updateDraft] ✅ New declaration uploaded:", declarationDriveViewUrl);
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // 📝 UPDATE DATA (Schema ke according)
+                // ═══════════════════════════════════════════════════════════
+
+                const updateData = {
+                    type: req.body.type || existingManuscript.type,
+                    title: req.body.title || existingManuscript.title,
+                    abstract: req.body.abstract || existingManuscript.abstract,
+                    keywords: req.body.keywords || existingManuscript.keywords,
+                    classification,
+                    additionalInfo,
+                    comments: req.body.comments ?? existingManuscript.comments,
+                    funding: req.body.funding || existingManuscript.funding,
+                    billingInfo,
+                    authors: authorObjectIds,
+                    correspondingAuthor: correspondingAuthorObjectId,
+
+                    // 📁 Manuscript file fields
+                    manuscriptFile: manuscriptFile,
+                    manuscriptDriveFileId: manuscriptDriveFileId,
+                    manuscriptDriveViewUrl: manuscriptDriveViewUrl,
+                    
+                    // 📁 Cover letter file fields
+                    coverLetterFile: coverLetterFile,
+                    coverLetterDriveFileId: coverLetterDriveFileId,
+                    coverLetterDriveViewUrl: coverLetterDriveViewUrl,
+                    
+                    // 📁 Declaration file fields
+                    declarationFile: declarationFile,
+                    declarationDriveFileId: declarationDriveFileId,
+                    declarationDriveViewUrl: declarationDriveViewUrl,
+
+                    status: "Pending",
+                    updatedAt: new Date(),
+                };
+
+                const updatedManuscript = await Manuscript.findByIdAndUpdate(
+                    manuscriptId,
+                    updateData,
+                    { new: true }
+                );
+
+                // 🧹 Cleanup temp files
+                await cleanupFiles(tempFiles);
+                tempFiles = [];
+
+                console.log("[updateDraft] ✅ Draft updated successfully:", customManuscriptId);
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Draft updated successfully",
+                    data: updatedManuscript,
+                });
+
+            } catch (innerErr) {
+                console.error("[updateDraft] ❌ Inner error:", innerErr);
+                await cleanupFiles(tempFiles);
+                throw innerErr;
+            }
+        });
+    } catch (err) {
+        console.error("[updateDraft] ❌ Error:", err);
+        await cleanupFiles(tempFiles);
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+
+
+
+exports.saveDraft = async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        upload(req, res, async (err) => {
+            if (err) {
+                console.error("[saveDraft] Multer error:", err);
+                return res.status(400).json({ 
+                    success: false, 
+                    message: err.message 
+                });
+            }
+
+            try {
+                // Track temporary files
+                if (req.files) {
+                    if (req.files["manuscript"]) tempFiles.push(req.files["manuscript"][0].path);
+                    if (req.files["coverLetter"]) tempFiles.push(req.files["coverLetter"][0].path);
+                    if (req.files["declaration"]) tempFiles.push(req.files["declaration"][0].path);
+                }
+
+                // Parse form data
+                let additionalInfo = req.body.additionalInfo;
+                if (additionalInfo) {
+                    try {
+                        additionalInfo = JSON.parse(additionalInfo);
+                        if (Array.isArray(additionalInfo)) {
+                            additionalInfo = additionalInfo.join(", ");
+                        }
+                    } catch (e) {}
+                }
+
+                let billingInfo = req.body.billingInfo;
+                if (billingInfo && typeof billingInfo === 'string') {
+                    try {
+                        billingInfo = JSON.parse(billingInfo);
+                    } catch (e) {
+                        billingInfo = {};
+                    }
+                }
+
+                let classification = req.body.classification;
+                if (classification && typeof classification === 'string') {
+                    try {
+                        const parsed = JSON.parse(classification);
+                        if (Array.isArray(parsed)) {
+                            classification = parsed.join(", ");
+                        } else {
+                            classification = String(parsed);
+                        }   
+                    } catch (e) {
+                        classification = "";
+                    }
+                } else if (Array.isArray(classification)) {
+                    classification = classification.join(", ");
+                } else {
+                    classification = classification ? String(classification) : "";
+                }
+
+                // Parse authors
+                const authors = req.body.authors ? JSON.parse(req.body.authors) : [];
+                const correspondingAuthorId = req.body.correspondingAuthorId || req.user._id;
+
+                if (!authors.includes(req.user._id.toString())) {
+                    authors.unshift(req.user._id.toString());
+                }
+
+                const authorObjectIds = authors
+                    .filter(id => mongoose.Types.ObjectId.isValid(id))
+                    .map(id => new mongoose.Types.ObjectId(id));
+
+                let correspondingAuthorObjectId;
+                if (mongoose.Types.ObjectId.isValid(correspondingAuthorId)) {
+                    correspondingAuthorObjectId = new mongoose.Types.ObjectId(correspondingAuthorId);
+                } else {
+                    correspondingAuthorObjectId = req.user._id;
+                }
+
+                // Generate custom ID
+                const manuscriptTitle = req.body.title || "Untitled";
+                const customManuscriptId = await generateUniqueManuscriptId(manuscriptTitle);
+
+                // ═══════════════════════════════════════════════════════════
+                // 📝 BUILD MANUSCRIPT DATA (According to Schema)
+                // ═══════════════════════════════════════════════════════════
+                const manuscriptData = {
+                    customId: customManuscriptId,
+                    type: req.body.type || "Manuscript",
+                    title: req.body.title || "",
+                    abstract: req.body.abstract || "",
+                    keywords: req.body.keywords || "",
+                    classification: classification || "",
+                    additionalInfo: additionalInfo || "",
+                    comments: req.body.comments || "",
+                    funding: req.body.funding || "No",
+                    billingInfo: billingInfo || {},
+                    authors: authorObjectIds,
+                    correspondingAuthor: correspondingAuthorObjectId,
+                    status: "Saved",
+                    
+                    // 📁 Initialize file fields
+                    manuscriptFile: "",
+                    manuscriptDriveFileId: "",
+                    manuscriptDriveViewUrl: "",
+                    
+                    coverLetterFile: "",
+                    coverLetterDriveFileId: "",
+                    coverLetterDriveViewUrl: "",
+                    
+                    declarationFile: "",
+                    declarationDriveFileId: "",
+                    declarationDriveViewUrl: "",
+                };
+
+                // ═══════════════════════════════════════════════════════════
+                // 🔥 GOOGLE DRIVE UPLOAD
+                // ═══════════════════════════════════════════════════════════
+
+                // 📄 Handle Manuscript File
+                if (req.files && req.files["manuscript"]) {
+                    console.log("[saveDraft] 📤 Uploading manuscript to Google Drive...");
+                    
+                    const manuscriptResult = await uploadFileToDrive(
+                        req.files["manuscript"][0].path,
+                        {
+                            filename: `manuscript_${customManuscriptId}_${req.files["manuscript"][0].originalname}`,
+                            folderId: process.env.GOOGLE_DRIVE_MANUSCRIPTS_FOLDER_ID,
+                            makePublic: true
+                        }
+                    );
+                    
+                    // ✅ Schema ke according fields
+                    manuscriptData.manuscriptFile = manuscriptResult.webViewLink || manuscriptResult.driveViewUrl;
+                    manuscriptData.manuscriptDriveFileId = manuscriptResult.driveFileId;
+                    manuscriptData.manuscriptDriveViewUrl = manuscriptResult.driveViewUrl;
+                    
+                    console.log("[saveDraft] ✅ Manuscript uploaded:", manuscriptResult.driveViewUrl);
+                    
+                } else if (req.body.existingManuscriptFile) {
+                    manuscriptData.manuscriptFile = req.body.existingManuscriptFile;
+                    manuscriptData.manuscriptDriveFileId = req.body.existingManuscriptDriveFileId || "";
+                    manuscriptData.manuscriptDriveViewUrl = req.body.existingManuscriptDriveViewUrl || "";
+                }
+
+                // 📄 Handle Cover Letter File
+                if (req.files && req.files["coverLetter"]) {
+                    console.log("[saveDraft] 📤 Uploading cover letter to Google Drive...");
+                    
+                    const coverLetterResult = await uploadFileToDrive(
+                        req.files["coverLetter"][0].path,
+                        {
+                            filename: `cover_letter_${customManuscriptId}_${req.files["coverLetter"][0].originalname}`,
+                            folderId: process.env.GOOGLE_DRIVE_COVER_LETTERS_FOLDER_ID,
+                            makePublic: true
+                        }
+                    );
+                    
+                    // ✅ Schema ke according fields
+                    manuscriptData.coverLetterFile = coverLetterResult.webViewLink || coverLetterResult.driveViewUrl;
+                    manuscriptData.coverLetterDriveFileId = coverLetterResult.driveFileId;
+                    manuscriptData.coverLetterDriveViewUrl = coverLetterResult.driveViewUrl;
+                    
+                    console.log("[saveDraft] ✅ Cover letter uploaded:", coverLetterResult.driveViewUrl);
+                    
+                } else if (req.body.existingCoverLetterFile) {
+                    manuscriptData.coverLetterFile = req.body.existingCoverLetterFile;
+                    manuscriptData.coverLetterDriveFileId = req.body.existingCoverLetterDriveFileId || "";
+                    manuscriptData.coverLetterDriveViewUrl = req.body.existingCoverLetterDriveViewUrl || "";
+                }
+
+                // 📄 Handle Declaration File
+                if (req.files && req.files["declaration"]) {
+                    console.log("[saveDraft] 📤 Uploading declaration to Google Drive...");
+                    
+                    const declarationResult = await uploadFileToDrive(
+                        req.files["declaration"][0].path,
+                        {
+                            filename: `declaration_${customManuscriptId}_${req.files["declaration"][0].originalname}`,
+                            folderId: process.env.GOOGLE_DRIVE_DECLARATIONS_FOLDER_ID,
+                            makePublic: true
+                        }
+                    );
+                    
+                    // ✅ Schema ke according fields
+                    manuscriptData.declarationFile = declarationResult.webViewLink || declarationResult.driveViewUrl;
+                    manuscriptData.declarationDriveFileId = declarationResult.driveFileId;
+                    manuscriptData.declarationDriveViewUrl = declarationResult.driveViewUrl;
+                    
+                    console.log("[saveDraft] ✅ Declaration uploaded:", declarationResult.driveViewUrl);
+                    
+                } else if (req.body.existingDeclarationFile) {
+                    manuscriptData.declarationFile = req.body.existingDeclarationFile;
+                    manuscriptData.declarationDriveFileId = req.body.existingDeclarationDriveFileId || "";
+                    manuscriptData.declarationDriveViewUrl = req.body.existingDeclarationDriveViewUrl || "";
+                }
+
+                // Save manuscript
+                const manuscript = new Manuscript(manuscriptData);
+                await manuscript.save();
+
+                // Update user's manuscripts array
+                await User.findByIdAndUpdate(
+                    req.user._id,
+                    { $addToSet: { manuscripts: manuscript._id } },
+                    { new: true }
+                );
+
+                // Cleanup temp files
+                await cleanupFiles(tempFiles);
+                tempFiles = [];
+
+                console.log("[saveDraft] ✅ Draft saved successfully:", manuscript.customId);
+
+                res.status(201).json({
+                    success: true,
+                    message: "Draft saved successfully",
+                    data: manuscript,
+                });
+
+            } catch (innerError) {
+                console.error("[saveDraft] Inner error:", innerError);
+                await cleanupFiles(tempFiles);
+                throw innerError;
+            }
+        });
+    } catch (error) {
+        console.error("[saveDraft] Error:", error);
+        await cleanupFiles(tempFiles).catch(() => {});
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+
+exports.updateDraftAndBuildPdfAsync = async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        upload(req, res, async (err) => {
+            if (err) {
+                console.error("[updateDraftAndBuildPdfAsync] Multer error:", err);
+                return res.status(400).json({ 
+                    success: false, 
+                    message: err.message 
+                });
+            }
+
+            try {
+                const { manuscriptId } = req.params;
+
+                // ═══════════════════════════════════════════════════════════
+                // 🔥 QUICK VALIDATIONS (before creating job)
+                // ═══════════════════════════════════════════════════════════
+                
+                // Find existing manuscript
+                const existingManuscript = await Manuscript.findById(manuscriptId);
+                if (!existingManuscript) {
+                    return res.status(404).json({
+                        success: false,
+                        message: "Manuscript not found",
+                    });
+                }
+
+                // Check authorization
+                const isAuthor = existingManuscript.authors.some(
+                    (author) => author.toString() === req.user._id.toString()
+                ) || existingManuscript.correspondingAuthor?.toString() === req.user._id.toString();
+
+                if (!isAuthor) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "You don't have permission to edit this manuscript",
+                    });
+                }
+
+                // Check status
+                if (!["Pending", "Saved"].includes(existingManuscript.status)) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "This manuscript cannot be edited anymore",
+                    });
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // 🔥 TRACK TEMP FILES
+                // ═══════════════════════════════════════════════════════════
+                if (req.files) {
+                    if (req.files["manuscript"]) tempFiles.push(req.files["manuscript"][0].path);
+                    if (req.files["coverLetter"]) tempFiles.push(req.files["coverLetter"][0].path);
+                    if (req.files["declaration"]) tempFiles.push(req.files["declaration"][0].path);
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // 🔥 CREATE JOB
+                // ═══════════════════════════════════════════════════════════
+                const jobId = createJob({
+                    type: 'UPDATE_DRAFT',
+                    manuscriptId: manuscriptId,
+                    existingManuscript: {
+                        _id: existingManuscript._id,
+                        customId: existingManuscript.customId,
+                        manuscriptDriveFileId: existingManuscript.manuscriptDriveFileId,
+                        manuscriptFile: existingManuscript.manuscriptFile,
+                        coverLetterDriveFileId: existingManuscript.coverLetterDriveFileId,
+                        coverLetterFile: existingManuscript.coverLetterFile,
+                        declarationDriveFileId: existingManuscript.declarationDriveFileId,
+                        declarationFile: existingManuscript.declarationFile,
+                        mergedDriveFileId: existingManuscript.mergedDriveFileId,
+                        extractedText: existingManuscript.extractedText,
+                        coverLetterText: existingManuscript.coverLetterText,
+                        declarationText: existingManuscript.declarationText,
+                        extractedTitle: existingManuscript.extractedTitle,
+                        extractedAbstract: existingManuscript.extractedAbstract,
+                        extractedKeywords: existingManuscript.extractedKeywords,
+                    },
+                    files: {
+                        manuscript: req.files?.["manuscript"]?.[0]?.path || null,
+                        coverLetter: req.files?.["coverLetter"]?.[0]?.path || null,
+                        declaration: req.files?.["declaration"]?.[0]?.path || null,
+                        manuscriptOriginalName: req.files?.["manuscript"]?.[0]?.originalname || null,
+                        coverLetterOriginalName: req.files?.["coverLetter"]?.[0]?.originalname || null,
+                        declarationOriginalName: req.files?.["declaration"]?.[0]?.originalname || null,
+                    },
+                    body: req.body,
+                    user: req.user ? { _id: req.user._id } : null,
+                    editor: req.editor || null
+                });
+
+                // ═══════════════════════════════════════════════════════════
+                // ⚡ RESPOND IMMEDIATELY
+                // ═══════════════════════════════════════════════════════════
+                res.status(202).json({
+                    success: true,
+                    message: 'Draft update received, processing started',
+                    jobId: jobId,
+                    manuscriptId: manuscriptId
+                });
+
+                // ═══════════════════════════════════════════════════════════
+                // 🔥 PROCESS IN BACKGROUND
+                // ═══════════════════════════════════════════════════════════
+                setImmediate(() => {
+                    processUpdateDraftJob(jobId, tempFiles).catch(error => {
+                        console.error(`[updateDraftAndBuildPdfAsync] Background error:`, error);
+                        failJob(jobId, error);
+                    });
+                });
+
+            } catch (innerError) {
+                console.error("[updateDraftAndBuildPdfAsync] Inner error:", innerError);
+                if (tempFiles.length > 0) {
+                    await cleanupFiles(tempFiles).catch(() => {});
+                }
+                return res.status(500).json({
+                    success: false,
+                    message: innerError.message,
+                });
+            }
+        });
+
+    } catch (error) {
+        console.error("[updateDraftAndBuildPdfAsync] Error:", error);
+        if (tempFiles.length > 0) {
+            await cleanupFiles(tempFiles).catch(() => {});
+        }
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+
+async function processUpdateDraftJob(jobId, tempFiles) {
+  const job = getJob(jobId);
+    if (!job) return;
+
+    const { 
+        manuscriptId, 
+        existingManuscript, 
+        files, 
+        body, 
+        user, 
+        editor 
+    } = job.data;
+
+    try {
+        updateJob(jobId, { 
+            status: STATUS.PROCESSING, 
+            progress: 5, 
+            step: 'Starting draft update...' 
+        });
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 GET FILES - With proper validation
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 10, step: 'Preparing files...' });
+
+        let manuscriptDocxPath, coverLetterDocxPath, declarationDocxPath;
+        let hasNewManuscript = false, hasNewCoverLetter = false, hasNewDeclaration = false;
+
+        // 📄 Handle Manuscript File
+        console.log("[processUpdateDraftJob] Processing manuscript file...");
+        if (files.manuscript) {
+            // New file uploaded
+            manuscriptDocxPath = files.manuscript;
+            hasNewManuscript = true;
+            console.log("[processUpdateDraftJob] Using new manuscript:", manuscriptDocxPath);
+            
+            // Validate uploaded file
+            if (!fsSync.existsSync(manuscriptDocxPath)) {
+                throw new Error("Uploaded manuscript file not found");
+            }
+            
+        } else if (existingManuscript.manuscriptDriveFileId) {
+            // Download from Google Drive
+            updateJob(jobId, { progress: 12, step: 'Downloading manuscript from Drive...' });
+            console.log("[processUpdateDraftJob] Downloading manuscript from Drive:", existingManuscript.manuscriptDriveFileId);
+            
+            try {
+                const downloadResult = await downloadDriveFileToTemp(
+                    existingManuscript.manuscriptDriveFileId,
+                    `manuscript_${existingManuscript.customId}`
+                );
+                manuscriptDocxPath = downloadResult.localPath;
+                tempFiles.push(manuscriptDocxPath);
+                console.log("[processUpdateDraftJob] Downloaded manuscript:", manuscriptDocxPath, "Size:", downloadResult.size);
+            } catch (downloadErr) {
+                console.error("[processUpdateDraftJob] Manuscript download failed:", downloadErr);
+                throw new Error(`Failed to download manuscript: ${downloadErr.message}`);
+            }
+            
+        } else if (existingManuscript.manuscriptFile) {
+            // Fallback: Download from URL
+            updateJob(jobId, { progress: 12, step: 'Downloading manuscript...' });
+            console.log("[processUpdateDraftJob] Downloading manuscript from URL:", existingManuscript.manuscriptFile);
+            
+            try {
+                manuscriptDocxPath = await downloadFileToTemp(
+                    existingManuscript.manuscriptFile,
+                    "manuscript",
+                    ".docx"
+                );
+                tempFiles.push(manuscriptDocxPath);
+                
+                // Validate downloaded file
+                const stats = await fs.stat(manuscriptDocxPath);
+                if (stats.size < 100) {
+                    throw new Error("Downloaded manuscript is too small/empty");
+                }
+                console.log("[processUpdateDraftJob] Downloaded manuscript from URL, size:", stats.size);
+                
+            } catch (downloadErr) {
+                console.error("[processUpdateDraftJob] Manuscript URL download failed:", downloadErr);
+                throw new Error(`Failed to download manuscript from URL: ${downloadErr.message}`);
+            }
+        } else {
+            throw new Error("Manuscript file is required");
+        }
+
+        // 📄 Handle Cover Letter File
+        console.log("[processUpdateDraftJob] Processing cover letter file...");
+        if (files.coverLetter) {
+            coverLetterDocxPath = files.coverLetter;
+            hasNewCoverLetter = true;
+            console.log("[processUpdateDraftJob] Using new cover letter:", coverLetterDocxPath);
+            
+        } else if (existingManuscript.coverLetterDriveFileId) {
+            updateJob(jobId, { progress: 14, step: 'Downloading cover letter from Drive...' });
+            console.log("[processUpdateDraftJob] Downloading cover letter from Drive:", existingManuscript.coverLetterDriveFileId);
+            
+            try {
+                const downloadResult = await downloadDriveFileToTemp(
+                    existingManuscript.coverLetterDriveFileId,
+                    `coverLetter_${existingManuscript.customId}`
+                );
+                coverLetterDocxPath = downloadResult.localPath;
+                tempFiles.push(coverLetterDocxPath);
+                console.log("[processUpdateDraftJob] Downloaded cover letter:", coverLetterDocxPath);
+            } catch (downloadErr) {
+                console.error("[processUpdateDraftJob] Cover letter download failed:", downloadErr);
+                throw new Error(`Failed to download cover letter: ${downloadErr.message}`);
+            }
+            
+        } else if (existingManuscript.coverLetterFile) {
+            updateJob(jobId, { progress: 14, step: 'Downloading cover letter...' });
+            
+            try {
+                coverLetterDocxPath = await downloadFileToTemp(
+                    existingManuscript.coverLetterFile,
+                    "coverLetter",
+                    ".docx"
+                );
+                tempFiles.push(coverLetterDocxPath);
+            } catch (downloadErr) {
+                throw new Error(`Failed to download cover letter: ${downloadErr.message}`);
+            }
+        } else {
+            throw new Error("Cover letter file is required");
+        }
+
+        // 📄 Handle Declaration File
+        console.log("[processUpdateDraftJob] Processing declaration file...");
+        if (files.declaration) {
+            declarationDocxPath = files.declaration;
+            hasNewDeclaration = true;
+            console.log("[processUpdateDraftJob] Using new declaration:", declarationDocxPath);
+            
+        } else if (existingManuscript.declarationDriveFileId) {
+            updateJob(jobId, { progress: 16, step: 'Downloading declaration from Drive...' });
+            console.log("[processUpdateDraftJob] Downloading declaration from Drive:", existingManuscript.declarationDriveFileId);
+            
+            try {
+                const downloadResult = await downloadDriveFileToTemp(
+                    existingManuscript.declarationDriveFileId,
+                    `declaration_${existingManuscript.customId}`
+                );
+                declarationDocxPath = downloadResult.localPath;
+                tempFiles.push(declarationDocxPath);
+                console.log("[processUpdateDraftJob] Downloaded declaration:", declarationDocxPath);
+            } catch (downloadErr) {
+                console.error("[processUpdateDraftJob] Declaration download failed:", downloadErr);
+                throw new Error(`Failed to download declaration: ${downloadErr.message}`);
+            }
+            
+        } else if (existingManuscript.declarationFile) {
+            updateJob(jobId, { progress: 16, step: 'Downloading declaration...' });
+            
+            try {
+                declarationDocxPath = await downloadFileToTemp(
+                    existingManuscript.declarationFile,
+                    "declaration",
+                    ".docx"
+                );
+                tempFiles.push(declarationDocxPath);
+            } catch (downloadErr) {
+                throw new Error(`Failed to download declaration: ${downloadErr.message}`);
+            }
+        } else {
+            throw new Error("Declaration file is required");
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 VALIDATE ALL FILES BEFORE CONVERSION
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 18, step: 'Validating files...' });
+
+        const validateDocxFile = async (filePath, fileName) => {
+            if (!fsSync.existsSync(filePath)) {
+                throw new Error(`${fileName} file not found at ${filePath}`);
+            }
+            
+            const stats = await fs.stat(filePath);
+            if (stats.size < 100) {
+                throw new Error(`${fileName} file is too small (${stats.size} bytes)`);
+            }
+            
+            // Check DOCX signature (ZIP format)
+            const fd = fsSync.openSync(filePath, 'r');
+            const buffer = Buffer.alloc(4);
+            fsSync.readSync(fd, buffer, 0, 4, 0);
+            fsSync.closeSync(fd);
+            
+            // DOCX files are ZIP files - they start with PK (0x50 0x4B)
+            if (buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
+                // Check if it's a PDF
+                if (buffer.toString().startsWith('%PDF')) {
+                    console.log(`[validateDocxFile] ${fileName} is a PDF, not DOCX`);
+                    return { isDocx: false, isPdf: true };
+                }
+                throw new Error(`${fileName} is not a valid DOCX file (invalid signature: ${buffer.toString('hex')})`);
+            }
+            
+            console.log(`[validateDocxFile] ✅ ${fileName} is valid DOCX`);
+            return { isDocx: true, isPdf: false };
+        };
+
+        const manuscriptValidation = await validateDocxFile(manuscriptDocxPath, 'Manuscript');
+        const coverLetterValidation = await validateDocxFile(coverLetterDocxPath, 'Cover Letter');
+        const declarationValidation = await validateDocxFile(declarationDocxPath, 'Declaration');
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 PARSE FORM DATA
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 20, step: 'Parsing form data...' });
+
+        let additionalInfo = body.additionalInfo;
+        if (additionalInfo) {
+            try {
+                const arr = JSON.parse(additionalInfo);
+                additionalInfo = arr.join(", ");
+            } catch (e) {}
+        }
+
+        let billingInfo = body.billingInfo;
+        if (billingInfo && typeof billingInfo === 'string') {
+            try {
+                billingInfo = JSON.parse(billingInfo);
+            } catch (e) {
+                billingInfo = {};
+            }
+        }
+
+        const authors = body.authors ? JSON.parse(body.authors) : [];
+        const correspondingAuthorId = body.correspondingAuthorId;
+
+        const isEditorSubmitter = !!editor;
+        if (!isEditorSubmitter && user) {
+            if (!authors.includes(user._id.toString())) {
+                authors.unshift(user._id.toString());
+            }
+        }
+
+        const authorObjectIds = [];
+        for (const id of authors) {
+            if (mongoose.Types.ObjectId.isValid(id)) {
+                authorObjectIds.push(new mongoose.Types.ObjectId(id));
+            }
+        }
+
+        let correspondingAuthorObjectId;
+        if (mongoose.Types.ObjectId.isValid(correspondingAuthorId || (user && user._id))) {
+            correspondingAuthorObjectId = new mongoose.Types.ObjectId(
+                correspondingAuthorId || (user && user._id)
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 EXTRACT TEXT FROM DOCX (if new files and they are DOCX)
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 22, step: 'Extracting text from documents...' });
+
+        let manuscriptText = existingManuscript.extractedText || "";
+        let coverLetterText = existingManuscript.coverLetterText || "";
+        let declarationText = existingManuscript.declarationText || "";
+        let manuscriptTitle = existingManuscript.extractedTitle || "";
+        let manuscriptAbstract = existingManuscript.extractedAbstract || "";
+        let manuscriptKeywords = existingManuscript.extractedKeywords || "";
+
+        if (hasNewManuscript && manuscriptValidation.isDocx) {
+            try {
+                const result = await extractTextFromDocx(manuscriptDocxPath);
+                manuscriptText = result.full_text || "";
+                manuscriptTitle = result.title || "";
+                manuscriptAbstract = result.abstract || "";
+                manuscriptKeywords = result.keywords || "";
+                console.log("[processUpdateDraftJob] Extracted text from manuscript");
+            } catch (err) {
+                console.error("[processUpdateDraftJob] Manuscript text extraction failed:", err);
+            }
+        }
+
+        if (hasNewCoverLetter && coverLetterValidation.isDocx) {
+            try {
+                const result = await extractTextFromDocx(coverLetterDocxPath);
+                coverLetterText = result.full_text || "";
+            } catch (err) {}
+        }
+
+        if (hasNewDeclaration && declarationValidation.isDocx) {
+            try {
+                const result = await extractTextFromDocx(declarationDocxPath);
+                declarationText = result.full_text || "";
+            } catch (err) {}
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 CONVERT DOCX TO PDF
+        // ═══════════════════════════════════════════════════════════
+        let manuscriptPdfPath, coverLetterPdfPath, declarationPdfPath;
+
+        // Convert manuscript
+        updateJob(jobId, { progress: 25, step: 'Converting manuscript to PDF...' });
+        
+        if (manuscriptValidation.isPdf) {
+            // Already a PDF
+            manuscriptPdfPath = manuscriptDocxPath;
+            console.log("[processUpdateDraftJob] Manuscript is already PDF");
+        } else if (manuscriptValidation.isDocx) {
+            try {
+                manuscriptPdfPath = await convertDocxToPdf(manuscriptDocxPath, (p, step) => {
+                    const mapped = 25 + Math.round((p / 100) * 10);
+                    updateJob(jobId, { progress: mapped, step: step || 'Converting manuscript to PDF...' });
+                });
+                
+                if (!isValidPdf(manuscriptPdfPath)) {
+                    throw new Error("Manuscript PDF is invalid after conversion.");
+                }
+                tempFiles.push(manuscriptPdfPath);
+                console.log("[processUpdateDraftJob] Manuscript converted to PDF:", manuscriptPdfPath);
+            } catch (convErr) {
+                console.error("[processUpdateDraftJob] Manuscript conversion failed:", convErr);
+                throw new Error(`Manuscript PDF conversion failed: ${convErr.message}`);
+            }
+        }
+
+        // Convert cover letter
+        updateJob(jobId, { progress: 35, step: 'Converting cover letter to PDF...' });
+        
+        if (coverLetterValidation.isPdf) {
+            coverLetterPdfPath = coverLetterDocxPath;
+            console.log("[processUpdateDraftJob] Cover letter is already PDF");
+        } else if (coverLetterValidation.isDocx) {
+            try {
+                coverLetterPdfPath = await convertDocxToPdf(coverLetterDocxPath, (p, step) => {
+                    const mapped = 35 + Math.round((p / 100) * 10);
+                    updateJob(jobId, { progress: mapped, step: step || 'Converting cover letter to PDF...' });
+                });
+                
+                if (!isValidPdf(coverLetterPdfPath)) {
+                    throw new Error("Cover letter PDF is invalid after conversion.");
+                }
+                tempFiles.push(coverLetterPdfPath);
+            } catch (convErr) {
+                throw new Error(`Cover letter PDF conversion failed: ${convErr.message}`);
+            }
+        }
+
+        // Convert declaration
+        updateJob(jobId, { progress: 45, step: 'Converting declaration to PDF...' });
+        
+        if (declarationValidation.isPdf) {
+            declarationPdfPath = declarationDocxPath;
+            console.log("[processUpdateDraftJob] Declaration is already PDF");
+        } else if (declarationValidation.isDocx) {
+            try {
+                declarationPdfPath = await convertDocxToPdf(declarationDocxPath, (p, step) => {
+                    const mapped = 45 + Math.round((p / 100) * 10);
+                    updateJob(jobId, { progress: mapped, step: step || 'Converting declaration to PDF...' });
+                });
+                
+                if (!isValidPdf(declarationPdfPath)) {
+                    throw new Error("Declaration PDF is invalid after conversion.");
+                }
+                tempFiles.push(declarationPdfPath);
+            } catch (convErr) {
+                throw new Error(`Declaration PDF conversion failed: ${convErr.message}`);
+            }
+        }
+
+        const customManuscriptId = existingManuscript.customId;
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 UPLOAD DOCX FILES TO GOOGLE DRIVE
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 55, step: 'Uploading files to Google Drive...' });
+
+        // Initialize with existing values
+        let manuscriptFile = existingManuscript.manuscriptFile;
+        let manuscriptDriveFileId = existingManuscript.manuscriptDriveFileId;
+        let manuscriptDriveViewUrl = existingManuscript.manuscriptDriveViewUrl;
+
+        let coverLetterFile = existingManuscript.coverLetterFile;
+        let coverLetterDriveFileId = existingManuscript.coverLetterDriveFileId;
+        let coverLetterDriveViewUrl = existingManuscript.coverLetterDriveViewUrl;
+
+        let declarationFile = existingManuscript.declarationFile;
+        let declarationDriveFileId = existingManuscript.declarationDriveFileId;
+        let declarationDriveViewUrl = existingManuscript.declarationDriveViewUrl;
+
+        // Upload new manuscript
+        if (hasNewManuscript) {
+            updateJob(jobId, { progress: 58, step: 'Uploading manuscript to Drive...' });
+            
+            // Delete old file
+            if (existingManuscript.manuscriptDriveFileId) {
+                try {
+                    await deleteFileFromDrive(existingManuscript.manuscriptDriveFileId);
+                    console.log("[processUpdateDraftJob] Deleted old manuscript from Drive");
+                } catch (delErr) {
+                    console.warn("[processUpdateDraftJob] Could not delete old manuscript:", delErr.message);
+                }
+            }
+            
+            const manuscriptResult = await uploadFileToDrive(
+                manuscriptDocxPath,
+                { filename: `manuscript_${customManuscriptId}_updated_${Date.now()}.docx` }
+            );
+            
+            manuscriptFile = manuscriptResult.driveViewUrl;
+            manuscriptDriveFileId = manuscriptResult.driveFileId;
+            manuscriptDriveViewUrl = manuscriptResult.driveViewUrl;
+            
+            console.log("[processUpdateDraftJob] Uploaded new manuscript");
+        }
+
+        // Upload new cover letter
+        if (hasNewCoverLetter) {
+            updateJob(jobId, { progress: 62, step: 'Uploading cover letter to Drive...' });
+            
+            // Delete old file
+            if (existingManuscript.coverLetterDriveFileId) {
+                try {
+                    await deleteFileFromDrive(existingManuscript.coverLetterDriveFileId);
+                } catch (delErr) {}
+            }
+            
+            const coverLetterResult = await uploadFileToDrive(
+                coverLetterDocxPath,
+                { filename: `cover_letter_${customManuscriptId}_updated_${Date.now()}.docx` }
+            );
+            
+            coverLetterFile = coverLetterResult.driveViewUrl;
+            coverLetterDriveFileId = coverLetterResult.driveFileId;
+            coverLetterDriveViewUrl = coverLetterResult.driveViewUrl;
+            
+            console.log("[processUpdateDraftJob] Uploaded new cover letter");
+        }
+
+        // Upload new declaration
+        if (hasNewDeclaration) {
+            updateJob(jobId, { progress: 66, step: 'Uploading declaration to Drive...' });
+            
+            // Delete old file
+            if (existingManuscript.declarationDriveFileId) {
+                try {
+                    await deleteFileFromDrive(existingManuscript.declarationDriveFileId);
+                } catch (delErr) {}
+            }
+            
+            const declarationResult = await uploadFileToDrive(
+                declarationDocxPath,
+                { filename: `declaration_${customManuscriptId}_updated_${Date.now()}.docx` }
+            );
+            
+            declarationFile = declarationResult.driveViewUrl;
+            declarationDriveFileId = declarationResult.driveFileId;
+            declarationDriveViewUrl = declarationResult.driveViewUrl;
+            
+            console.log("[processUpdateDraftJob] Uploaded new declaration");
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 CREATE MERGED PDF
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 70, step: 'Creating merged PDF...' });
+
+        const mergedPdfResult = await createMergedPDFWithTable(
+            manuscriptPdfPath,
+            coverLetterPdfPath,
+            declarationPdfPath,
+            {
+                ...body,
+                billingInfo: billingInfo,
+                authors: authorObjectIds,
+                correspondingAuthor: correspondingAuthorObjectId,
+            },
+            customManuscriptId
+        );
+        
+        tempFiles.push(mergedPdfResult.localPath);
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 UPLOAD MERGED PDF
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 80, step: 'Uploading merged PDF...' });
+
+        // Delete old merged file
+        if (existingManuscript.mergedDriveFileId) {
+            try {
+                await deleteFileFromDrive(existingManuscript.mergedDriveFileId);
+                console.log("[processUpdateDraftJob] Deleted old merged PDF");
+            } catch (delErr) {}
+        }
+
+        const mergedResult = await uploadFileToDrive(
+            mergedPdfResult.localPath,
+            { filename: `merged_${customManuscriptId}_${Date.now()}.pdf` }
+        );
+
+        const mergedFileUrl = mergedResult.driveViewUrl;
+        const mergedDriveFileId = mergedResult.driveFileId;
+        const mergedDriveViewUrl = mergedResult.driveViewUrl;
+
+        console.log("[processUpdateDraftJob] Uploaded merged PDF");
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 UPDATE MANUSCRIPT IN DATABASE
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 90, step: 'Updating manuscript in database...' });
+
+        const updateData = {
+            type: body.type || undefined,
+            title: body.title || undefined,
+            abstract: body.abstract || undefined,
+            keywords: body.keywords || undefined,
+            classification: body.classification || undefined,
+            additionalInfo: additionalInfo || undefined,
+            comments: body.comments ?? undefined,
+            funding: body.funding || undefined,
+            billingInfo: billingInfo || undefined,
+            authors: authorObjectIds,
+            correspondingAuthor: correspondingAuthorObjectId,
+            
+            // File URLs
+            manuscriptFile: manuscriptFile,
+            manuscriptDriveFileId: manuscriptDriveFileId,
+            manuscriptDriveViewUrl: manuscriptDriveViewUrl,
+            
+            coverLetterFile: coverLetterFile,
+            coverLetterDriveFileId: coverLetterDriveFileId,
+            coverLetterDriveViewUrl: coverLetterDriveViewUrl,
+            
+            declarationFile: declarationFile,
+            declarationDriveFileId: declarationDriveFileId,
+            declarationDriveViewUrl: declarationDriveViewUrl,
+            
+            mergedFileUrl: mergedFileUrl,
+            mergedDriveFileId: mergedDriveFileId,
+            mergedDriveViewUrl: mergedDriveViewUrl,
+            
+            // Extracted text
+            extractedText: manuscriptText,
+            coverLetterText: coverLetterText,
+            declarationText: declarationText,
+            extractedTitle: manuscriptTitle,
+            extractedAbstract: manuscriptAbstract,
+            extractedKeywords: manuscriptKeywords,
+            
+            status: "Saved",
+            updatedAt: new Date(),
+        };
+
+        // Remove undefined values
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] === undefined) {
+                delete updateData[key];
+            }
+        });
+
+        const updatedManuscript = await Manuscript.findByIdAndUpdate(
+            manuscriptId,
+            updateData,
+            { new: true }
+        );
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 UPDATE AUTHORS
+        // ═══════════════════════════════════════════════════════════
+        updateJob(jobId, { progress: 95, step: 'Updating author records...' });
+
+        for (const authorId of authors) {
+            if (mongoose.Types.ObjectId.isValid(authorId)) {
+                await User.findByIdAndUpdate(
+                    authorId,
+                    {
+                        $addToSet: {
+                            manuscripts: updatedManuscript._id,
+                            roles: authorId === correspondingAuthorId
+                                ? ["author", "corresponding_author"]
+                                : ["author"],
+                        },
+                    },
+                    { new: true }
+                );
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // 🔥 CLEANUP & COMPLETE
+        // ═══════════════════════════════════════════════════════════
+        await cleanupFiles(tempFiles);
+
+        completeJob(jobId, {
+            manuscriptId: updatedManuscript._id,
+            customId: customManuscriptId,
+            manuscriptDriveViewUrl: manuscriptDriveViewUrl,
+            coverLetterDriveViewUrl: coverLetterDriveViewUrl,
+            declarationDriveViewUrl: declarationDriveViewUrl,
+            mergedDriveViewUrl: mergedDriveViewUrl,
+            extractedTitle: manuscriptTitle,
+            extractedAbstract: manuscriptAbstract,
+            extractedKeywords: manuscriptKeywords,
+        });
+
+        console.log("[processUpdateDraftJob] ✅ Job completed successfully");
+
+    } catch (error) {
+        console.error(`[processUpdateDraftJob] Error:`, error);
+        
+        // Cleanup on error
+        await cleanupFiles(tempFiles).catch(() => {});
+        
+        failJob(jobId, error);
+    }
+}
+
+exports.deleteManuscript = async (req, res) => {
+	try {
+		const { id } = req.params;
+
+		
+		const manuscript = await Manuscript.findById(id);
+		if (!manuscript) {
+			return res.status(404).json({ message: "Manuscript not found" });
+		}
+
+		
+		await Manuscript.findByIdAndDelete(id);
+
+		return res.status(200).json({
+			message: "Manuscript deleted successfully",
+		});
+	} catch (error) {
+		console.error("Delete Error:", error);
+		return res.status(500).json({
+			message: "Server error while deleting manuscript",
+		});
+	}
+};
 
 module.exports.convertDocxToPdf = convertDocxToPdf;
 module.exports.isValidPdf = isValidPdf;
+    

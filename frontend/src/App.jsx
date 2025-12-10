@@ -283,7 +283,7 @@ function AppContent() {
             )
           }
         />
-
+        <Route path="/journal/jics/edit-manuscript/:manuscriptId" element={<ManuscriptPage />} />
         <Route
           path={`${JICS_URL}/my-submissions`}
           element={<MySubmissions />}

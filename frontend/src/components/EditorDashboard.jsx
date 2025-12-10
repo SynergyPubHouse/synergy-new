@@ -49,8 +49,19 @@ function EditorDashboard() {
 	const [filterValue, setFilterValue] = useState(""); // The specific status or activity to filter by
 	const [showPdfUploadDialog, setShowPdfUploadDialog] = useState(false);
 	const [uploadManuscript, setUploadManuscript] = useState(null);
+	// Statistics Modal States
+	const [showStatisticsModal, setShowStatisticsModal] = useState(false);
+	const [statisticsDateRange, setStatisticsDateRange] = useState({
+		startDate: "",
+		endDate: "",
+	});
+	const [statisticsData, setStatisticsData] = useState(null);
 	// Simple toast system to replace browser alerts
 	const [toasts, setToasts] = useState([]);
+
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+	const [deleteManuscript, setDeleteManuscript] = useState(null);
+	const [isDeleting, setIsDeleting] = useState(false);
 
 	const addToast = (message, type = "info", duration = 6000) => {
 		const id = Date.now() + Math.random();
@@ -864,6 +875,195 @@ function EditorDashboard() {
 		setFilterValue("");
 	};
 
+
+
+	// Calculate Statistics based on date range
+	const calculateStatistics = useCallback(() => {
+		const allManuscripts = users.flatMap((user) => user.manuscripts || []);
+
+		let filteredManuscripts = allManuscripts;
+
+		// Apply date filter if dates are selected
+		if (statisticsDateRange.startDate && statisticsDateRange.endDate) {
+			const startDate = new Date(statisticsDateRange.startDate);
+			startDate.setHours(0, 0, 0, 0);
+
+			const endDate = new Date(statisticsDateRange.endDate);
+			endDate.setHours(23, 59, 59, 999);
+
+			filteredManuscripts = allManuscripts.filter((manuscript) => {
+				const manuscriptDate = new Date(manuscript.submissionDate || manuscript.createdAt);
+				return manuscriptDate >= startDate && manuscriptDate <= endDate;
+			});
+		}
+
+		// Calculate status counts
+		const statusCounts = filteredManuscripts.reduce((acc, manuscript) => {
+			acc[manuscript.status] = (acc[manuscript.status] || 0) + 1;
+			return acc;
+		}, {});
+
+		// Calculate type counts
+		const typeCounts = filteredManuscripts.reduce((acc, manuscript) => {
+			const type = manuscript.type || "Unknown";
+			acc[type] = (acc[type] || 0) + 1;
+			return acc;
+		}, {});
+
+		// Calculate monthly submissions
+		const monthlySubmissions = filteredManuscripts.reduce((acc, manuscript) => {
+			const date = new Date(manuscript.submissionDate || manuscript.createdAt);
+			const monthYear = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`;
+			acc[monthYear] = (acc[monthYear] || 0) + 1;
+			return acc;
+		}, {});
+
+		// Calculate author statistics
+		const authorStats = filteredManuscripts.reduce((acc, manuscript) => {
+			const authorName = manuscript.authorName || "Unknown";
+			if (!acc[authorName]) {
+				acc[authorName] = { total: 0, accepted: 0, rejected: 0, pending: 0 };
+			}
+			acc[authorName].total += 1;
+			if (manuscript.status === "Accepted" || manuscript.status === "Published") {
+				acc[authorName].accepted += 1;
+			} else if (manuscript.status === "Rejected") {
+				acc[authorName].rejected += 1;
+			} else {
+				acc[authorName].pending += 1;
+			}
+			return acc;
+		}, {});
+
+		// Calculate average processing time (for accepted/rejected manuscripts)
+		const processedManuscripts = filteredManuscripts.filter(
+			(m) => m.status === "Accepted" || m.status === "Rejected" || m.status === "Published"
+		);
+
+		let avgProcessingDays = 0;
+		if (processedManuscripts.length > 0) {
+			const totalDays = processedManuscripts.reduce((sum, m) => {
+				const start = new Date(m.submissionDate || m.createdAt);
+				const end = new Date(m.updatedAt);
+				const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+				return sum + days;
+			}, 0);
+			avgProcessingDays = Math.round(totalDays / processedManuscripts.length);
+		}
+
+		// Revision statistics
+		const revisionStats = filteredManuscripts.reduce((acc, manuscript) => {
+			if (manuscript.revisionAttempts > 0) {
+				acc.totalRevisions += manuscript.revisionAttempts;
+				acc.manuscriptsWithRevisions += 1;
+			}
+			return acc;
+		}, { totalRevisions: 0, manuscriptsWithRevisions: 0 });
+
+		// Daily submissions for the selected range
+		const dailySubmissions = filteredManuscripts.reduce((acc, manuscript) => {
+			const date = new Date(manuscript.submissionDate || manuscript.createdAt);
+			const dateStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+			acc[dateStr] = (acc[dateStr] || 0) + 1;
+			return acc;
+		}, {});
+
+		setStatisticsData({
+			totalManuscripts: filteredManuscripts.length,
+			statusCounts,
+			typeCounts,
+			monthlySubmissions,
+			authorStats,
+			avgProcessingDays,
+			revisionStats,
+			dailySubmissions,
+			filteredManuscripts, // For detailed table
+			dateRange: {
+				start: statisticsDateRange.startDate,
+				end: statisticsDateRange.endDate,
+			},
+		});
+	}, [users, statisticsDateRange]);
+
+	// Open statistics modal
+	const handleOpenStatistics = () => {
+		// Set default date range (last 30 days)
+		const today = new Date();
+		const thirtyDaysAgo = new Date();
+		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+		setStatisticsDateRange({
+			startDate: thirtyDaysAgo.toISOString().split('T')[0],
+			endDate: today.toISOString().split('T')[0],
+		});
+
+		setShowStatisticsModal(true);
+	};
+
+	// Effect to recalculate when date range changes
+	useEffect(() => {
+		if (showStatisticsModal) {
+			calculateStatistics();
+		}
+	}, [showStatisticsModal, statisticsDateRange, calculateStatistics]);
+
+
+
+	const handleDeleteClick = (manuscript) => {
+		setDeleteManuscript(manuscript);
+		setShowDeleteConfirm(true);
+	};
+
+	const handleConfirmDelete = async () => {
+		if (!deleteManuscript) return;
+
+		setIsDeleting(true);
+		try {
+			await axios.delete(
+				`${import.meta.env.VITE_BACKEND_URL}/api/${deleteManuscript._id}`,
+				{
+					headers: {
+						Authorization: `Bearer ${user.token}`,
+					},
+				}
+			);
+
+			// Update local state - remove deleted manuscript
+			setManuscripts((prev) => prev.filter((m) => m._id !== deleteManuscript._id));
+
+			// Also update users state
+			setUsers((prevUsers) =>
+				prevUsers.map((u) => ({
+					...u,
+					manuscripts: (u.manuscripts || []).filter((m) => m._id !== deleteManuscript._id),
+				}))
+			);
+
+			addToast(`Manuscript "${deleteManuscript.title}" deleted successfully!`, "success");
+
+			// Reset states
+			setShowDeleteConfirm(false);
+			setDeleteManuscript(null);
+
+			// Refresh data
+			await fetchUsers();
+
+		} catch (error) {
+			console.error("Error deleting manuscript:", error);
+			addToast(
+				error.response?.data?.message || "Failed to delete manuscript",
+				"error"
+			);
+		} finally {
+			setIsDeleting(false);
+		}
+	};
+
+	const handleCancelDelete = () => {
+		setShowDeleteConfirm(false);
+		setDeleteManuscript(null);
+	}
+
 	return (
 		<div className="min-h-screen bg-[#f8fafc] p-6">
 			{/* Toast container */}
@@ -900,7 +1100,16 @@ function EditorDashboard() {
 						<h2 className="text-2xl font-semibold text-[#496580] mb-4">
 							📊 Manuscript Status Overview
 						</h2>
-						<div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+
+						<button
+							onClick={handleOpenStatistics}
+							className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-md flex items-center space-x-2"
+						>
+							<span>📈</span>
+							<span>View Statistics</span>
+						</button>
+
+						{/* <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
 							<p className="text-sm text-yellow-800">
 								<strong>📝 Note:</strong> Rejected manuscripts
 								are not displayed in the editor dashboard. Once
@@ -908,7 +1117,7 @@ function EditorDashboard() {
 								immutable and it&apos;s removed from editor
 								view.
 							</p>
-						</div>
+						</div> */}
 						{(() => {
 							// Calculate status counts from all users' manuscripts
 							// Note: Rejected manuscripts are not fetched for editors, so they won't appear in counts
@@ -931,6 +1140,8 @@ function EditorDashboard() {
 								"Reviewed",
 								"Revision Required",
 								"Accepted",
+								"Rejected",
+								"Published",
 							];
 							const statusColors = {
 								Pending: "bg-blue-500",
@@ -938,11 +1149,13 @@ function EditorDashboard() {
 								Reviewed: "bg-purple-500",
 								"Revision Required": "bg-orange-500",
 								Accepted: "bg-green-500",
+								Rejected: "bg-red-500",
+								Published: "bg-teal-600",
 							};
 
 							return (
 								<div>
-									<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+									<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 mt-6">
 										{statusOrder.map((status) => (
 											<button
 												key={status}
@@ -1588,6 +1801,43 @@ function EditorDashboard() {
 												</button>
 											)}
 
+											{manuscript.manuscriptFile && (
+												<button
+													onClick={() => {
+														let fileUrl = manuscript.manuscriptFile;
+
+														// Google Drive view → direct download
+														if (fileUrl.includes("drive.google.com/file/d/")) {
+															const fileId = fileUrl.split("/d/")[1].split("/")[0];
+															fileUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+														}
+
+														// Google Docs → export as DOCX
+														if (fileUrl.includes("docs.google.com/document/d/")) {
+															const fileId = fileUrl.split("/d/")[1].split("/")[0];
+															fileUrl = `https://docs.google.com/document/d/${fileId}/export?format=docx`;
+														}
+
+														const link = document.createElement("a");
+														link.href = fileUrl;
+
+														// Get extension (fallback DOCX)
+														const extension = 'docx';
+														link.download = `${manuscript.customId || manuscript._id}-manuscript.${extension}`;
+														link.target = "_blank";
+
+														document.body.appendChild(link);
+														link.click();
+														document.body.removeChild(link);
+													}}
+													className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2"
+													title="Download Manuscript File"
+												>
+													<span>⬇️</span>
+													<span>Download Manuscript</span>
+												</button>
+											)}
+
 											{/* Response Sheet (PDF) */}
 											{manuscript.authorResponse?.docxUrl && (
 												<button
@@ -1615,23 +1865,48 @@ function EditorDashboard() {
 												<button
 													onClick={() => {
 														const url = manuscript.authorResponse.withoutHighlightedFileUrl;
-														const isZip = url.toLowerCase().includes('.zip');
 
-														if (isZip) {
+														// Check if Google Drive URL
+														if (url.includes('drive.google.com')) {
+															// Extract file ID
+															const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+															const fileId = match?.[1];
 
-															const link = document.createElement('a');
-															link.href = url;
-															link.download = 'clean-document.zip';
-															link.target = '_blank';
-															document.body.appendChild(link);
-															link.click();
-															document.body.removeChild(link);
+															if (fileId) {
+																// Check if ZIP file - Download it
+																const isZip = url.toLowerCase().includes('.zip');
+
+																if (isZip) {
+																	// Download ZIP
+																	const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+																	window.open(downloadUrl, '_blank');
+																	addToast("ZIP download started!", "success");
+																} else {
+																	// View DOC/DOCX in Google Drive Preview
+																	const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+																	window.open(previewUrl, '_blank');
+																}
+															} else {
+																window.open(url, '_blank');
+															}
 														} else {
-															// Existing logic for other file types
+															// Non-Google Drive URL
+															const isZip = url.toLowerCase().includes('.zip');
 															const isPdf = url.toLowerCase().includes('.pdf');
-															if (isPdf) {
+
+															if (isZip) {
+																// Download ZIP
+																const link = document.createElement('a');
+																link.href = url;
+																link.download = 'clean-document.zip';
+																link.target = '_blank';
+																document.body.appendChild(link);
+																link.click();
+																document.body.removeChild(link);
+															} else if (isPdf) {
 																window.open(url, "_blank");
 															} else {
+																// View DOC in Google Docs Viewer
 																const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
 																window.open(viewerUrl, "_blank");
 															}
@@ -1826,6 +2101,13 @@ function EditorDashboard() {
 														disabled={manuscript.status === "Published"}
 													>
 														{manuscript.status === "Published" ? "✓ Published" : "Publish"}
+													</button>
+													<button
+														onClick={() => handleDeleteClick(manuscript)}
+														className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700 mt-2 flex items-center justify-center space-x-1"
+													>
+														<span>🗑️</span>
+														<span>Delete Manuscript</span>
 													</button>
 
 												</div>
@@ -2740,6 +3022,558 @@ function EditorDashboard() {
 					fetchUsers(); // Data refresh karo
 				}}
 			/>
+
+
+			{/* Statistics Modal */}
+			{showStatisticsModal && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+					<div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+						{/* Modal Header */}
+						<div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
+							<div className="flex justify-between items-center">
+								<div>
+									<h2 className="text-2xl font-bold flex items-center space-x-2">
+										<span>📊</span>
+										<span>Manuscript Statistics Dashboard</span>
+									</h2>
+									<p className="text-indigo-100 mt-1">
+										Comprehensive analytics and insights
+									</p>
+								</div>
+								<button
+									onClick={() => setShowStatisticsModal(false)}
+									className="p-2 hover:bg-white/20 rounded-full transition-colors"
+								>
+									<span className="text-2xl">✕</span>
+								</button>
+							</div>
+
+							{/* Date Range Filter */}
+							<div className="mt-4 flex flex-wrap items-center gap-4 bg-white/10 p-4 rounded-lg">
+								<div className="flex items-center space-x-2">
+									<label className="text-sm font-medium">📅 From:</label>
+									<input
+										type="date"
+										value={statisticsDateRange.startDate}
+										onChange={(e) =>
+											setStatisticsDateRange((prev) => ({
+												...prev,
+												startDate: e.target.value,
+											}))
+										}
+										className="px-3 py-2 rounded-lg text-gray-800 border-0 focus:ring-2 focus:ring-indigo-300"
+									/>
+								</div>
+								<div className="flex items-center space-x-2">
+									<label className="text-sm font-medium">📅 To:</label>
+									<input
+										type="date"
+										value={statisticsDateRange.endDate}
+										onChange={(e) =>
+											setStatisticsDateRange((prev) => ({
+												...prev,
+												endDate: e.target.value,
+											}))
+										}
+										className="px-3 py-2 rounded-lg text-gray-800 border-0 focus:ring-2 focus:ring-indigo-300"
+									/>
+								</div>
+								{/* Quick Date Filters */}
+								<div className="flex space-x-2">
+									<button
+										onClick={() => {
+											const today = new Date();
+											const weekAgo = new Date();
+											weekAgo.setDate(weekAgo.getDate() - 7);
+											setStatisticsDateRange({
+												startDate: weekAgo.toISOString().split('T')[0],
+												endDate: today.toISOString().split('T')[0],
+											});
+										}}
+										className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition-colors"
+									>
+										Last 7 Days
+									</button>
+									<button
+										onClick={() => {
+											const today = new Date();
+											const monthAgo = new Date();
+											monthAgo.setDate(monthAgo.getDate() - 30);
+											setStatisticsDateRange({
+												startDate: monthAgo.toISOString().split('T')[0],
+												endDate: today.toISOString().split('T')[0],
+											});
+										}}
+										className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition-colors"
+									>
+										Last 30 Days
+									</button>
+									<button
+										onClick={() => {
+											const today = new Date();
+											const yearAgo = new Date();
+											yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+											setStatisticsDateRange({
+												startDate: yearAgo.toISOString().split('T')[0],
+												endDate: today.toISOString().split('T')[0],
+											});
+										}}
+										className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition-colors"
+									>
+										Last Year
+									</button>
+									<button
+										onClick={() => {
+											setStatisticsDateRange({
+												startDate: "",
+												endDate: "",
+											});
+										}}
+										className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition-colors"
+									>
+										All Time
+									</button>
+								</div>
+							</div>
+						</div>
+
+						{/* Modal Body */}
+						<div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+							{statisticsData ? (
+								<div className="space-y-6">
+									{/* Summary Cards */}
+									<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+										<div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-xl shadow-lg">
+											<div className="text-3xl font-bold">{statisticsData.totalManuscripts}</div>
+											<div className="text-blue-100">Total Manuscripts</div>
+											<div className="text-xs text-blue-200 mt-1">
+												{statisticsData.dateRange.start && statisticsData.dateRange.end
+													? `${statisticsData.dateRange.start} to ${statisticsData.dateRange.end}`
+													: "All Time"}
+											</div>
+										</div>
+										<div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-xl shadow-lg">
+											<div className="text-3xl font-bold">
+												{(statisticsData.statusCounts["Accepted"] || 0) + (statisticsData.statusCounts["Published"] || 0)}
+											</div>
+											<div className="text-green-100">Accepted/Published</div>
+											<div className="text-xs text-green-200 mt-1">
+												{statisticsData.totalManuscripts > 0
+													? `${Math.round((((statisticsData.statusCounts["Accepted"] || 0) + (statisticsData.statusCounts["Published"] || 0)) / statisticsData.totalManuscripts) * 100)}% acceptance rate`
+													: "0% acceptance rate"}
+											</div>
+										</div>
+										<div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-4 rounded-xl shadow-lg">
+											<div className="text-3xl font-bold">{statisticsData.avgProcessingDays}</div>
+											<div className="text-orange-100">Avg. Processing Days</div>
+											<div className="text-xs text-orange-200 mt-1">From submission to decision</div>
+										</div>
+										<div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-4 rounded-xl shadow-lg">
+											<div className="text-3xl font-bold">{statisticsData.revisionStats.manuscriptsWithRevisions}</div>
+											<div className="text-purple-100">With Revisions</div>
+											<div className="text-xs text-purple-200 mt-1">
+												{statisticsData.revisionStats.totalRevisions} total revision attempts
+											</div>
+										</div>
+									</div>
+
+									{/* Status Breakdown */}
+									<div className="bg-gray-50 rounded-xl p-6">
+										<h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+											<span>📋</span>
+											<span>Status Breakdown</span>
+										</h3>
+										<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+											{[
+												{ status: "Pending", color: "bg-blue-500", icon: "⏳" },
+												{ status: "Under Review", color: "bg-yellow-500", icon: "🔍" },
+												{ status: "Reviewed", color: "bg-purple-500", icon: "✅" },
+												{ status: "Revision Required", color: "bg-orange-500", icon: "📝" },
+												{ status: "Accepted", color: "bg-green-500", icon: "🎉" },
+												{ status: "Rejected", color: "bg-red-500", icon: "❌" },
+												{ status: "Published", color: "bg-teal-600", icon: "📰" },
+											].map(({ status, color, icon }) => (
+												<div
+													key={status}
+													className={`${color} text-white p-4 rounded-lg text-center`}
+												>
+													<div className="text-lg">{icon}</div>
+													<div className="text-2xl font-bold">
+														{statisticsData.statusCounts[status] || 0}
+													</div>
+													<div className="text-xs font-medium truncate">{status}</div>
+													<div className="text-xs opacity-75">
+														{statisticsData.totalManuscripts > 0
+															? `${Math.round(((statisticsData.statusCounts[status] || 0) / statisticsData.totalManuscripts) * 100)}%`
+															: "0%"}
+													</div>
+												</div>
+											))}
+										</div>
+									</div>
+
+									{/* Two Column Layout */}
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+										{/* Manuscript Types */}
+										<div className="bg-gray-50 rounded-xl p-6">
+											<h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+												<span>📁</span>
+												<span>By Manuscript Type</span>
+											</h3>
+											<div className="space-y-3">
+												{Object.entries(statisticsData.typeCounts)
+													.sort((a, b) => b[1] - a[1])
+													.map(([type, count]) => (
+														<div key={type} className="flex items-center justify-between">
+															<span className="text-gray-700">{type}</span>
+															<div className="flex items-center space-x-2">
+																<div className="w-32 bg-gray-200 rounded-full h-2">
+																	<div
+																		className="bg-indigo-500 h-2 rounded-full"
+																		style={{
+																			width: `${(count / statisticsData.totalManuscripts) * 100}%`,
+																		}}
+																	></div>
+																</div>
+																<span className="text-sm font-semibold text-gray-600 w-8">
+																	{count}
+																</span>
+															</div>
+														</div>
+													))}
+											</div>
+										</div>
+
+										{/* Monthly Submissions */}
+										<div className="bg-gray-50 rounded-xl p-6">
+											<h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+												<span>📅</span>
+												<span>Monthly Submissions</span>
+											</h3>
+											<div className="space-y-3 max-h-60 overflow-y-auto">
+												{Object.entries(statisticsData.monthlySubmissions)
+													.sort((a, b) => {
+														const dateA = new Date(a[0]);
+														const dateB = new Date(b[0]);
+														return dateB - dateA;
+													})
+													.map(([month, count]) => (
+														<div key={month} className="flex items-center justify-between">
+															<span className="text-gray-700">{month}</span>
+															<div className="flex items-center space-x-2">
+																<div className="w-32 bg-gray-200 rounded-full h-2">
+																	<div
+																		className="bg-green-500 h-2 rounded-full"
+																		style={{
+																			width: `${(count / Math.max(...Object.values(statisticsData.monthlySubmissions))) * 100}%`,
+																		}}
+																	></div>
+																</div>
+																<span className="text-sm font-semibold text-gray-600 w-8">
+																	{count}
+																</span>
+															</div>
+														</div>
+													))}
+											</div>
+										</div>
+									</div>
+
+									{/* Top Authors Table */}
+									<div className="bg-gray-50 rounded-xl p-6">
+										<h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center space-x-2">
+											<span>👥</span>
+											<span>Author Statistics</span>
+										</h3>
+										<div className="overflow-x-auto">
+											<table className="w-full text-sm">
+												<thead>
+													<tr className="bg-gray-200">
+														<th className="px-4 py-3 text-left font-semibold text-gray-700">Author</th>
+														<th className="px-4 py-3 text-center font-semibold text-gray-700">Total</th>
+														<th className="px-4 py-3 text-center font-semibold text-gray-700">Accepted</th>
+														<th className="px-4 py-3 text-center font-semibold text-gray-700">Rejected</th>
+														<th className="px-4 py-3 text-center font-semibold text-gray-700">Pending</th>
+														<th className="px-4 py-3 text-center font-semibold text-gray-700">Success Rate</th>
+													</tr>
+												</thead>
+												<tbody>
+													{Object.entries(statisticsData.authorStats)
+														.sort((a, b) => b[1].total - a[1].total)
+														.slice(0, 10)
+														.map(([author, stats], index) => (
+															<tr key={author} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+																<td className="px-4 py-3 text-gray-800 font-medium">{author}</td>
+																<td className="px-4 py-3 text-center">
+																	<span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold">
+																		{stats.total}
+																	</span>
+																</td>
+																<td className="px-4 py-3 text-center">
+																	<span className="px-2 py-1 bg-green-100 text-green-800 rounded-full font-semibold">
+																		{stats.accepted}
+																	</span>
+																</td>
+																<td className="px-4 py-3 text-center">
+																	<span className="px-2 py-1 bg-red-100 text-red-800 rounded-full font-semibold">
+																		{stats.rejected}
+																	</span>
+																</td>
+																<td className="px-4 py-3 text-center">
+																	<span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full font-semibold">
+																		{stats.pending}
+																	</span>
+																</td>
+																<td className="px-4 py-3 text-center">
+																	<span className={`px-2 py-1 rounded-full font-semibold ${stats.total > 0 && (stats.accepted / stats.total) >= 0.5
+																		? "bg-green-100 text-green-800"
+																		: "bg-gray-100 text-gray-800"
+																		}`}>
+																		{stats.total > 0
+																			? `${Math.round((stats.accepted / stats.total) * 100)}%`
+																			: "0%"}
+																	</span>
+																</td>
+															</tr>
+														))}
+												</tbody>
+											</table>
+										</div>
+									</div>
+
+									{/* Detailed Manuscripts Table */}
+									<div className="bg-gray-50 rounded-xl p-6">
+										<h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center justify-between">
+											<div className="flex items-center space-x-2">
+												<span>📄</span>
+												<span>Detailed Manuscript List</span>
+											</div>
+											<span className="text-sm font-normal text-gray-500">
+												{statisticsData.filteredManuscripts.length} manuscripts
+											</span>
+										</h3>
+										<div className="overflow-x-auto max-h-96">
+											<table className="w-full text-sm">
+												<thead className="sticky top-0 bg-gray-200">
+													<tr>
+														<th className="px-3 py-3 text-left font-semibold text-gray-700">ID</th>
+														<th className="px-3 py-3 text-left font-semibold text-gray-700">Title</th>
+														<th className="px-3 py-3 text-left font-semibold text-gray-700">Author</th>
+														<th className="px-3 py-3 text-left font-semibold text-gray-700">Type</th>
+														<th className="px-3 py-3 text-center font-semibold text-gray-700">Status</th>
+														<th className="px-3 py-3 text-left font-semibold text-gray-700">Submitted</th>
+														<th className="px-3 py-3 text-left font-semibold text-gray-700">Updated</th>
+													</tr>
+												</thead>
+												<tbody>
+													{statisticsData.filteredManuscripts
+														.sort((a, b) => new Date(b.submissionDate || b.createdAt) - new Date(a.submissionDate || a.createdAt))
+														.map((manuscript, index) => (
+															<tr key={manuscript._id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+																<td className="px-3 py-2 text-gray-600 font-mono text-xs">
+																	{manuscript.customId || manuscript._id.slice(-6).toUpperCase()}
+																</td>
+																<td className="px-3 py-2 text-gray-800 font-medium max-w-xs truncate" title={manuscript.title}>
+																	{manuscript.title}
+																</td>
+																<td className="px-3 py-2 text-gray-600">
+																	{manuscript.authorName || "Unknown"}
+																</td>
+																<td className="px-3 py-2 text-gray-600">
+																	{manuscript.type || "N/A"}
+																</td>
+																<td className="px-3 py-2 text-center">
+																	<span className={`px-2 py-1 rounded text-xs font-semibold ${manuscript.status === "Pending"
+																		? "bg-blue-100 text-blue-800"
+																		: manuscript.status === "Under Review"
+																			? "bg-yellow-100 text-yellow-800"
+																			: manuscript.status === "Reviewed"
+																				? "bg-purple-100 text-purple-800"
+																				: manuscript.status === "Revision Required"
+																					? "bg-orange-100 text-orange-800"
+																					: manuscript.status === "Accepted"
+																						? "bg-green-100 text-green-800"
+																						: manuscript.status === "Rejected"
+																							? "bg-red-100 text-red-800"
+																							: manuscript.status === "Published"
+																								? "bg-teal-100 text-teal-800"
+																								: "bg-gray-100 text-gray-800"
+																		}`}>
+																		{manuscript.status}
+																	</span>
+																</td>
+																<td className="px-3 py-2 text-gray-600 text-xs">
+																	{new Date(manuscript.submissionDate || manuscript.createdAt).toLocaleDateString()}
+																</td>
+																<td className="px-3 py-2 text-gray-600 text-xs">
+																	{new Date(manuscript.updatedAt).toLocaleDateString()}
+																</td>
+															</tr>
+														))}
+												</tbody>
+											</table>
+										</div>
+									</div>
+
+									{/* Export Button */}
+									<div className="flex justify-end space-x-3">
+										<button
+											onClick={() => {
+												// Export to CSV
+												const headers = ["ID", "Title", "Author", "Type", "Status", "Submitted", "Updated"];
+												const rows = statisticsData.filteredManuscripts.map((m) => [
+													m.customId || m._id.slice(-6).toUpperCase(),
+													`"${m.title.replace(/"/g, '""')}"`,
+													m.authorName || "Unknown",
+													m.type || "N/A",
+													m.status,
+													new Date(m.submissionDate || m.createdAt).toLocaleDateString(),
+													new Date(m.updatedAt).toLocaleDateString(),
+												]);
+
+												const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+												const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+												const link = document.createElement("a");
+												link.href = URL.createObjectURL(blob);
+												link.download = `manuscript-statistics-${new Date().toISOString().split("T")[0]}.csv`;
+												link.click();
+
+												addToast("Statistics exported to CSV!", "success");
+											}}
+											className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
+										>
+											<span>📥</span>
+											<span>Export to CSV</span>
+										</button>
+										<button
+											onClick={() => setShowStatisticsModal(false)}
+											className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+										>
+											Close
+										</button>
+									</div>
+								</div>
+							) : (
+								<div className="flex items-center justify-center py-12">
+									<div className="text-center">
+										<div className="animate-spin text-4xl mb-4">⏳</div>
+										<p className="text-gray-600">Calculating statistics...</p>
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+			)}
+
+
+			{/* Delete Confirmation Modal - Add before closing </div> of component */}
+			{showDeleteConfirm && deleteManuscript && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+					<div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+						{/* Header */}
+						<div className="bg-red-500 text-white p-6">
+							<div className="flex items-center space-x-3">
+								<div className="text-4xl">⚠️</div>
+								<div>
+									<h2 className="text-xl font-bold">Delete Manuscript</h2>
+									<p className="text-red-100 text-sm">This action cannot be undone</p>
+								</div>
+							</div>
+						</div>
+
+						{/* Body */}
+						<div className="p-6">
+							<div className="mb-4">
+								<p className="text-gray-700 mb-4">
+									Are you sure you want to delete this manuscript?
+								</p>
+
+								{/* Manuscript Details */}
+								<div className="bg-gray-50 rounded-lg p-4 border">
+									<div className="space-y-2">
+										<div className="flex items-start">
+											<span className="text-gray-500 w-20 text-sm">ID:</span>
+											<span className="text-gray-800 font-mono text-sm">
+												{deleteManuscript.customId || deleteManuscript._id.slice(-6).toUpperCase()}
+											</span>
+										</div>
+										<div className="flex items-start">
+											<span className="text-gray-500 w-20 text-sm">Title:</span>
+											<span className="text-gray-800 font-medium text-sm">
+												{deleteManuscript.title}
+											</span>
+										</div>
+										<div className="flex items-start">
+											<span className="text-gray-500 w-20 text-sm">Status:</span>
+											<span className={`px-2 py-0.5 rounded text-xs font-semibold ${deleteManuscript.status === "Pending"
+												? "bg-blue-100 text-blue-800"
+												: deleteManuscript.status === "Under Review"
+													? "bg-yellow-100 text-yellow-800"
+													: deleteManuscript.status === "Reviewed"
+														? "bg-purple-100 text-purple-800"
+														: deleteManuscript.status === "Accepted"
+															? "bg-green-100 text-green-800"
+															: deleteManuscript.status === "Rejected"
+																? "bg-red-100 text-red-800"
+																: deleteManuscript.status === "Published"
+																	? "bg-teal-100 text-teal-800"
+																	: "bg-gray-100 text-gray-800"
+												}`}>
+												{deleteManuscript.status}
+											</span>
+										</div>
+										<div className="flex items-start">
+											<span className="text-gray-500 w-20 text-sm">Author:</span>
+											<span className="text-gray-800 text-sm">
+												{deleteManuscript.authorName || "Unknown"}
+											</span>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							{/* Warning */}
+							<div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+								<p className="text-red-700 text-sm flex items-start space-x-2">
+									<span>⚠️</span>
+									<span>
+										<strong>Warning:</strong> All associated files, notes, and review history will be permanently deleted.
+									</span>
+								</p>
+							</div>
+						</div>
+
+						{/* Footer */}
+						<div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3">
+							<button
+								onClick={handleCancelDelete}
+								disabled={isDeleting}
+								className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors disabled:opacity-50"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={handleConfirmDelete}
+								disabled={isDeleting}
+								className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+							>
+								{isDeleting ? (
+									<>
+										<span className="animate-spin">⏳</span>
+										<span>Deleting...</span>
+									</>
+								) : (
+									<>
+										<span>🗑️</span>
+										<span>Delete Permanently</span>
+									</>
+								)}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

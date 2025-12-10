@@ -497,17 +497,15 @@ exports.getManuscriptsByAuthor = async (req, res) => {
         console.log("=== getManuscriptsByAuthor Debug ===");
         console.log("Author ID:", author);
         
-        const manuscripts = await Manuscript.find({
-            $and: [
-                { status: { $nin: ["Saved", "Rejected"] } },
-                { $or: [
-                    { correspondingAuthor: author },
-                    { authors: author },
-                ] },
-            ],
-        })
+       const manuscripts = await Manuscript.find({
+    status: { $nin: ["Saved", "Pending"] },
+    $or: [
+        { correspondingAuthor: author },
+        { authors: author },
+    ],
+})
             .select(
-                "customId title type status submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked reviewDocxUrl authorResponse revisedPdfBuiltAt revisionCombinedPdfUrl highlightedRevisionFileUrl authors correspondingAuthor invitations"
+                "customId title type status submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked reviewDocxUrl authorResponse revisedPdfBuiltAt revisionCombinedPdfUrl highlightedRevisionFileUrl authors correspondingAuthor invitations manuscriptFile"
             )
             .populate("authors", "firstName lastName middleName email")
             .populate("correspondingAuthor", "firstName lastName middleName email")
@@ -536,9 +534,9 @@ exports.getUsersWithManuscripts = async (req, res) => {
 	try {
 		// Find all manuscripts (excluding "Saved" and "Rejected" status)
 		const manuscripts = await Manuscript.find({
-			status: { $nin: ["Saved", "Rejected"] },
+			status: { $nin: ["Saved",  "Pending"] },	
 		})
-			.select("authors correspondingAuthor customId title type status submissionDate mergedFileUrl invitations")
+			.select("authors correspondingAuthor customId title type status submissionDate mergedFileUrl invitations manuscriptFile updatedAt")
 			.populate("authors", "firstName lastName middleName email")
 			.populate("correspondingAuthor", "firstName lastName middleName email")
 			.lean();
@@ -1377,11 +1375,17 @@ exports.sendInvitation = async (req, res) => {
         console.log("✅ Invitations saved to database successfully");
 
         // Check if author has submitted revision response
-        const hasRevisionResponse = !!(
-            manuscript.authorResponse?.pdfUrl ||
-            manuscript.authorResponse?.highlightedFileUrl ||
-            manuscript.authorResponse?.withoutHighlightedFileUrl
-        );
+      const hasAuthorResponseFiles = !!(
+    manuscript.authorResponse?.pdfUrl ||
+    manuscript.authorResponse?.docxUrl ||
+    manuscript.authorResponse?.highlightedFileUrl ||
+    manuscript.authorResponse?.withoutHighlightedFileUrl
+);
+
+// Keep old variable for backward compatibility
+const hasRevisionResponse = hasAuthorResponseFiles;
+
+console.log("Author Response Files Available:", hasAuthorResponseFiles);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 📧 SEND EMAILS - Non-blocking

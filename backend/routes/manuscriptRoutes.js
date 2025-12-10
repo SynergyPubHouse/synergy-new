@@ -101,4 +101,22 @@ router.post("/manuscripts/async", auth, manuscriptController.createManuscriptAsy
 
 // 🔥 NEW: Get job status
 router.get("/jobs/:jobId", auth, manuscriptController.getJobStatus);
+
+router.post('/draft', auth, manuscriptController.saveDraft);
+router.put("/manuscripts/:manuscriptId/draft", auth, manuscriptController.updateDraft);
+router.get("/manuscripts/:manuscriptId", auth, manuscriptController.getManuscriptById);
+router.delete("/:id", manuscriptController.deleteManuscript);
+
+router.put(
+    "/manuscripts/:manuscriptId/update-and-build",
+    auth,
+    manuscriptController.updateDraftAndBuildPdfAsync
+);
+
+// Async version (new)
+router.put(
+    "/manuscripts/:manuscriptId/update-async",
+    auth,
+    manuscriptController.updateDraftAndBuildPdfAsync
+);
 module.exports = router;

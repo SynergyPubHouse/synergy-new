@@ -289,31 +289,34 @@ exports.getAssignedManuscripts = async (req, res) => {
             // ═══════════════════════════════════════════════════════════════════
             // 👇 CONDITIONAL: Only include authorResponse if allowed
             // ═══════════════════════════════════════════════════════════════════
-            let authorResponseData = null;
-            
-            if (canSeeRevisionFiles && manuscript.authorResponse) {
-                const ar = manuscript.authorResponse;
-                
-                if (ar.pdfUrl || ar.docxUrl || ar.highlightedFileUrl || ar.withoutHighlightedFileUrl) {
-                    authorResponseData = {
-                        responseSheet: {
-                            pdfUrl: ar.pdfUrl || null,
-                            docxUrl: ar.docxUrl || null,
-                            uploadedAt: ar.uploadedAt || null,
-                        },
-                        highlightedDocument: {
-                            url: ar.highlightedFileUrl || null,
-                            uploadedAt: ar.highlightedUploadedAt || null,
-                        },
-                        cleanDocument: {
-                            url: ar.withoutHighlightedFileUrl || null,
-                            uploadedAt: ar.withoutHighlightedUploadedAt || null,
-                        },
-                        submissionCount: ar.submissionCount || 1,
-                        lastUpdated: ar.lastUpdated || null,
-                    };
-                }
-            }
+          let authorResponseData = null;
+
+if (manuscript.authorResponse) {
+    const ar = manuscript.authorResponse;
+    
+    // Check if any file exists
+    const hasFiles = ar.pdfUrl || ar.docxUrl || ar.highlightedFileUrl || ar.withoutHighlightedFileUrl;
+    
+    if (hasFiles) {
+        authorResponseData = {
+            responseSheet: {
+                pdfUrl: ar.pdfUrl || null,
+                docxUrl: ar.docxUrl || null,
+                uploadedAt: ar.uploadedAt || null,
+            },
+            highlightedDocument: {
+                url: ar.highlightedFileUrl || null,
+                uploadedAt: ar.highlightedUploadedAt || null,
+            },
+            cleanDocument: {
+                url: ar.withoutHighlightedFileUrl || null,
+                uploadedAt: ar.withoutHighlightedUploadedAt || null,
+            },
+            submissionCount: ar.submissionCount || 0,
+            lastUpdated: ar.lastUpdated || null,
+        };
+    }
+}
 
             const authorsFull = (manuscript.authors || []).map((au) => ({
                 _id: au._id,
@@ -336,7 +339,7 @@ exports.getAssignedManuscripts = async (req, res) => {
                 isRevisionReview: isRevisionReview,
                 canSeeRevisionFiles: canSeeRevisionFiles,
                 currentRevisionRound: currentRevisionRound,
-                
+                hasAuthorResponseFiles: !!authorResponseData,  
                 // 👇 Only if allowed
                 authorResponse: authorResponseData,
                 revisionCombinedPdfUrl: canSeeRevisionFiles ? (manuscript.revisionCombinedPdfUrl || null) : null,
@@ -635,27 +638,30 @@ exports.getPendingInvitations = async (req, res) => {
             // ═══════════════════════════════════════════════════════════════════
             // 👇 INCLUDE AUTHOR RESPONSE ONLY FOR REVISION REVIEWS
             // ═══════════════════════════════════════════════════════════════════
-            let authorResponseData = null;
+          let authorResponseData = null;
+
+if (manuscript.authorResponse) {
+    const ar = manuscript.authorResponse;
+    
+    // Check if any file exists
+    const hasFiles = ar.pdfUrl || ar.docxUrl || ar.highlightedFileUrl || ar.withoutHighlightedFileUrl;
+    
+    if (hasFiles) {
+        authorResponseData = {
+            responseSheetUrl: ar.pdfUrl || ar.docxUrl || null,
+            responseSheetUploadedAt: ar.uploadedAt || null,
             
-            if (isRevisionReview && manuscript.authorResponse) {
-                const ar = manuscript.authorResponse;
-                
-                if (ar.pdfUrl || ar.docxUrl || ar.highlightedFileUrl || ar.withoutHighlightedFileUrl) {
-                    authorResponseData = {
-                        responseSheetUrl: ar.pdfUrl || ar.docxUrl || null,
-                        responseSheetUploadedAt: ar.uploadedAt || null,
-                        
-                        highlightedFileUrl: ar.highlightedFileUrl || null,
-                        highlightedUploadedAt: ar.highlightedUploadedAt || null,
-                        
-                        withoutHighlightedFileUrl: ar.withoutHighlightedFileUrl || null,
-                        withoutHighlightedUploadedAt: ar.withoutHighlightedUploadedAt || null,
-                        
-                        submissionCount: ar.submissionCount || currentRevisionRound,
-                        lastUpdated: ar.lastUpdated || null,
-                    };
-                }
-            }
+            highlightedFileUrl: ar.highlightedFileUrl || null,
+            highlightedUploadedAt: ar.highlightedUploadedAt || null,
+            
+            withoutHighlightedFileUrl: ar.withoutHighlightedFileUrl || null,
+            withoutHighlightedUploadedAt: ar.withoutHighlightedUploadedAt || null,
+            
+            submissionCount: ar.submissionCount || 0,
+            lastUpdated: ar.lastUpdated || null,
+        };
+    }
+}
 
             return {
                 _id: manuscript._id,
@@ -672,7 +678,7 @@ exports.getPendingInvitations = async (req, res) => {
                 reviewRound: relevantInvitation?.reviewRound || 1,
                 revisionRound: invitationRevisionRound,
                 isRevisionReview: isRevisionReview,
-                
+                hasAuthorResponseFiles: !!authorResponseData,
                 // Original manuscript
                 mergedFileUrl: manuscript.mergedFileUrl,
                 

@@ -96,19 +96,29 @@ const manuscriptSchema = new mongoose.Schema(
 			country: { type: String, default: "" },
 			awardNumber: { type: String, default: "" },
 			grantRecipient: { type: String, default: "" },
+			findFunder: { type: String, default: "" },
 		},
 		manuscriptFile: {
 			type: String,
 			required: true,
 		},
+		// Google Drive fields for manuscript PDF
+		manuscriptDriveFileId: { type: String, default: "" },
+		manuscriptDriveViewUrl: { type: String, default: "" },
 		coverLetterFile: {
 			type: String,
 			required: true,
 		},
+		// Google Drive fields for cover letter PDF
+		coverLetterDriveFileId: { type: String, default: "" },
+		coverLetterDriveViewUrl: { type: String, default: "" },
 		declarationFile: {
 			type: String,
 			required: true,
 		},
+		// Google Drive fields for declaration PDF
+		declarationDriveFileId: { type: String, default: "" },
+		declarationDriveViewUrl: { type: String, default: "" },
 		mergedFile: {
 			type: String,
 			required: false,
@@ -117,6 +127,9 @@ const manuscriptSchema = new mongoose.Schema(
 			type: String,
 			required: false,
 		},
+		// Google Drive fields for merged PDF (table + docs)
+		mergedDriveFileId: { type: String, default: "" },
+		mergedDriveViewUrl: { type: String, default: "" },
 		submissionDate: {
 			type: Date,
 			default: Date.now,
@@ -135,6 +148,9 @@ const manuscriptSchema = new mongoose.Schema(
 			],
 			default: "Saved",
 		},
+		
+
+		
        revisionAttempts: {
             type: Number,
             default: 0,
@@ -207,6 +223,9 @@ const manuscriptSchema = new mongoose.Schema(
 		// Response Sheet (Author Response) - now stored as PDF
 		docxUrl: { type: String, default: "" },
 		pdfUrl: { type: String, default: "" },
+		// Google Drive fields for response PDF
+		responseDriveFileId: { type: String, default: "" },
+		responseDriveViewUrl: { type: String, default: "" },
 		uploadedAt: { type: Date },
 		
 		// Highlighted Document - PDF format
@@ -223,11 +242,17 @@ const manuscriptSchema = new mongoose.Schema(
 	},
 
 		revisionCombinedPdfUrl: { type: String, default: "" },
+		// Google Drive fields for combined revision PDF
+		revisionCombinedDriveFileId: { type: String, default: "" },
+		revisionCombinedDriveViewUrl: { type: String, default: "" },
 		highlightedRevisionFileUrl: { type: String, default: "" },
 publishedFileUrl: {
     type: String,
     default: "",
 },
+	// Google Drive fields for published PDF
+	publishedDriveFileId: { type: String, default: "" },
+	publishedDriveViewUrl: { type: String, default: "" },
 	publishedAt: {
 			type: Date,
 			default: null,

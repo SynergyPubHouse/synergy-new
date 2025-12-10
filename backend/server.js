@@ -1,15 +1,12 @@
-process.stdout._handle.setBlocking(true);
-
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const path = require("path");
 const multer = require("multer");  // 🔥 ADD THIS
 const os = require("os");          // 🔥 ADD THIS
-const axios = require("axios");
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 const connectDB = require("./config/db");
-
+const googleAuthRoutes = require('./routes/googleAuthRoutes');
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, os.tmpdir()),
     filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
@@ -98,17 +95,16 @@ app.use("/api/auth/editor", require("./routes/editorRoutes"));
 app.use("/api/auth/reviewer", require("./routes/reviewerRoutes"));
 app.use("/api/institutions", require("./routes/institutionRoutes"));
 app.use("/api/send-email", require("./routes/emailRoutes"));
-
-// Conversion-related routes
+app.use('/auth', googleAuthRoutes);
+// 🔥 NEW: Conversion routes (add this BEFORE manuscriptRoutes)
 app.use("/api/convert", require("./routes/conversionRoutes"));
-app.use("/api/documents", require("./routes/documentRoutes"));
 
 // Root route
 app.get('/', (req, res) => {
   res.send('Backend is working');
 });
 
-// NEW: Health check endpoint
+// 🔥 NEW: Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -120,76 +116,6 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     uptime: Math.round(process.uptime())
-  });
-});
-
-app.get('/api/debug/log-test', (req, res) => {
-  const now = new Date().toISOString();
-  const envSnapshot = {
-    LIBREOFFICE_SERVICE_URL: process.env.LIBREOFFICE_SERVICE_URL || null,
-    CONVERTER_URL: process.env.CONVERTER_URL || null,
-    DOCX_CONVERTER_URL: process.env.DOCX_CONVERTER_URL || null,
-    USE_REMOTE_CONVERTER: process.env.USE_REMOTE_CONVERTER || null,
-  };
-
-  console.log('[debug/log-test] Hit at', now, envSnapshot);
-
-  res.json({
-    ok: true,
-    at: now,
-    env: envSnapshot,
-  });
-});
-
-app.get('/api/debug/libreoffice', async (req, res) => {
-  const serviceUrl = (
-    process.env.LIBREOFFICE_SERVICE_URL ||
-    process.env.CONVERTER_URL ||
-    process.env.DOCX_CONVERTER_URL ||
-    ''
-  ).trim();
-
-  if (!serviceUrl) {
-    console.error('[debug/libreoffice] No LibreOffice service URL configured');
-    return res.status(400).json({
-      ok: false,
-      message:
-        'No LibreOffice service URL configured (LIBREOFFICE_SERVICE_URL / CONVERTER_URL / DOCX_CONVERTER_URL)',
-    });
-  }
-
-  const timeoutMs = 5000;
-  console.log('[debug/libreoffice] Probing converter URL', { serviceUrl, timeoutMs });
-
-  const probe = {
-    reachable: false,
-    httpStatus: null,
-    error: null,
-  };
-
-  try {
-    const resp = await axios.get(serviceUrl, {
-      timeout: timeoutMs,
-      validateStatus: () => true,
-    });
-    probe.reachable = true;
-    probe.httpStatus = resp.status;
-    console.log('[debug/libreoffice] Probe response', {
-      status: resp.status,
-      statusText: resp.statusText,
-    });
-  } catch (err) {
-    probe.error = err.message;
-    console.error('[debug/libreoffice] Probe failed', {
-      message: err.message,
-      code: err.code,
-    });
-  }
-
-  return res.json({
-    ok: true,
-    serviceUrl,
-    probe,
   });
 });
 
