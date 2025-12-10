@@ -75,6 +75,25 @@ const CurrentIssue = () => {
   return (
     <div className="min-h-screen bg-[#f9f9f9] text-[#212121] py-12 mt-[20PX]">
       <div className="container mx-auto px-6 md:px-20">
+        <button
+          onClick={() => navigate('/journal/jics/about/overview')}
+          className="mb-6 flex items-center text-[#00796b] hover:text-[#00acc1] font-medium transition-colors mt-[20px]"
+        >
+          <svg
+            className="w-5 h-5 mr-2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          Back to Overview
+        </button>
         <h1 className="text-2xl font-extrabold text-[#00796b] mb-8">Articles</h1>
 
         <div className="space-y-6">

@@ -57,55 +57,204 @@ const mergeDocs = async (files, formData) => {
 };
 
 // Function to create a PDF with the table data
-const createTablePdf = async (formData) => {
-	// Implement the logic to create a PDF with the table data
-	// This can be similar to the createMergedPDFWithTable function you already have
-	// For simplicity, let's assume it creates a PDF and returns the file path
-	const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
-	const pdfDoc = await PDFDocument.create();
-	const page = pdfDoc.addPage([612, 792]); // US Letter size
-	const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-	const margin = 50;
-	let currentY = page.getHeight() - margin;
+const createTablePdf = async (formData, manuscriptId = null) => {
+    const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([612, 792]); // US Letter size
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const margin = 50;
+    let currentY = page.getHeight() - margin;
 
-	// Draw title
-	page.drawText("Manuscript Submission Details", {
-		x: margin,
-		y: currentY,
-		size: 18,
-		font: font,
-		color: rgb(0, 0, 0),
-	});
-	currentY -= 40;
+    console.log('[createTablePdf] Creating table PDF with form data...');
 
-	// Draw table rows
-	const drawRow = (label, value) => {
-		page.drawText(`${label}: ${value}`, {
-			x: margin,
-			y: currentY,
-			size: 12,
-			font: font,
-			color: rgb(0, 0, 0),
-		});
-		currentY -= 20; // Move down for the next row
-	};
+    // 🔥 Helper function to sanitize text for PDF (remove special characters)
+    const sanitizeText = (text) => {
+        if (!text) return "";
+        if (typeof text !== 'string') {
+            text = String(text);
+        }
+        return text
+            .replace(/\r\n/g, ' ')           // Windows line endings
+            .replace(/\r/g, ' ')              // Carriage returns
+            .replace(/\n/g, ' ')              // Newlines
+            .replace(/\t/g, ' ')              // Tabs
+            .replace(/[\x00-\x1F\x7F]/g, '')  // All control characters
+            .replace(/\s+/g, ' ')             // Multiple spaces to single space
+            .trim();
+    };
 
-	// Draw each form field
-	drawRow("Type", formData.type);
-	drawRow("Title", formData.title);
-	drawRow("Authors", formData.authors.map((a) => a.authorId).join(", "));
-	drawRow("Keywords", formData.keywords);
-	drawRow("Abstract", formData.abstract);
-	drawRow("Classification", formData.classification);
-	drawRow("Comments", formData.comments);
-	drawRow("Funding", formData.funding);
-	drawRow("Submission Date", new Date().toLocaleString());
+    // 🔥 Safely get and sanitize values
+    const safeGet = (value, fallback = '', maxLength = null) => {
+        if (value === null || value === undefined) return fallback;
+        let result = sanitizeText(String(value));
+        if (maxLength && result.length > maxLength) {
+            result = result.substring(0, maxLength) + '...';
+        }
+        return result;
+    };
 
-	const tablePdfPath = `uploads/table_${Date.now()}.pdf`;
-	const pdfBytes = await pdfDoc.save();
-	await fs.writeFile(tablePdfPath, pdfBytes); // Save the table PDF
+    // Draw title
+    page.drawText("Manuscript Submission Details", {
+        x: margin,
+        y: currentY,
+        size: 18,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+    });
+    currentY -= 40;
 
-	return tablePdfPath; // Return the path of the created table PDF
+    // 🔥 Updated drawRow function with error handling
+    const drawRow = (label, value) => {
+        try {
+            // Sanitize both label and value
+            const sanitizedLabel = sanitizeText(label) || 'Unknown';
+            let sanitizedValue = '';
+
+            // Handle different value types
+            if (Array.isArray(value)) {
+                sanitizedValue = value.map(v => sanitizeText(String(v))).join(", ");
+            } else if (typeof value === 'object' && value !== null) {
+                sanitizedValue = sanitizeText(JSON.stringify(value));
+            } else {
+                sanitizedValue = sanitizeText(value);
+            }
+
+            // Truncate if too long (to prevent overflow)
+            const maxLength = 80;
+            if (sanitizedValue.length > maxLength) {
+                sanitizedValue = sanitizedValue.substring(0, maxLength) + '...';
+            }
+
+            const text = `${sanitizedLabel}: ${sanitizedValue}`;
+            
+            page.drawText(text, {
+                x: margin,
+                y: currentY,
+                size: 12,
+                font: font,
+                color: rgb(0, 0, 0),
+            });
+            currentY -= 20;
+        } catch (error) {
+            console.error(`[createTablePdf] Error drawing row for ${label}:`, error);
+            // Skip this row if error occurs
+            currentY -= 20;
+        }
+    };
+
+    // 🔥 Draw each form field with safe values
+    drawRow("Type", safeGet(formData.type));
+    drawRow("Title", safeGet(formData.title, '', 100));
+    
+    // 🔥 Handle authors properly
+    let authorsText = '';
+    if (formData.authorNamesForPdf) {
+        authorsText = safeGet(formData.authorNamesForPdf);
+    } else if (formData.authorsForPdf) {
+        try {
+            const authorsArray = typeof formData.authorsForPdf === 'string' 
+                ? JSON.parse(formData.authorsForPdf) 
+                : formData.authorsForPdf;
+            authorsText = authorsArray.map(a => {
+                const name = a.fullName || `${a.firstName || ''} ${a.lastName || ''}`.trim();
+                return sanitizeText(name);
+            }).join(", ");
+        } catch (e) {
+            console.error('[createTablePdf] Error parsing authorsForPdf:', e);
+        }
+    } else if (formData.authorsData) {
+        try {
+            const authorsArray = typeof formData.authorsData === 'string' 
+                ? JSON.parse(formData.authorsData) 
+                : formData.authorsData;
+            authorsText = authorsArray.map(a => {
+                const name = `${a.firstName || ''} ${a.lastName || ''}`.trim();
+                return sanitizeText(name);
+            }).join(", ");
+        } catch (e) {
+            console.error('[createTablePdf] Error parsing authorsData:', e);
+        }
+    } else if (Array.isArray(formData.authors)) {
+        // Handle old format where authors might be ObjectIds or objects
+        authorsText = formData.authors.map(a => {
+            if (typeof a === 'string') return a;
+            if (a.authorId) return sanitizeText(a.authorId);
+            if (a.firstName) return sanitizeText(`${a.firstName} ${a.lastName || ''}`);
+            return '';
+        }).filter(Boolean).join(", ");
+    }
+    drawRow("Authors", authorsText || 'Not specified');
+
+    // 🔥 Handle corresponding author
+    let correspondingText = '';
+    if (formData.correspondingNamesForPdf) {
+        correspondingText = safeGet(formData.correspondingNamesForPdf);
+    } else if (formData.correspondingAuthorsForPdf) {
+        try {
+            const corrArray = typeof formData.correspondingAuthorsForPdf === 'string'
+                ? JSON.parse(formData.correspondingAuthorsForPdf)
+                : formData.correspondingAuthorsForPdf;
+            correspondingText = corrArray.map(a => {
+                const name = a.fullName || `${a.firstName || ''} ${a.lastName || ''}`.trim();
+                const email = a.email ? ` (${a.email})` : '';
+                return sanitizeText(`${name}${email}`);
+            }).join(", ");
+        } catch (e) {
+            console.error('[createTablePdf] Error parsing correspondingAuthorsForPdf:', e);
+        }
+    }
+    if (correspondingText) {
+        drawRow("Corresponding Author", correspondingText);
+    }
+
+    drawRow("Keywords", safeGet(formData.keywords, '', 150));
+    drawRow("Abstract", safeGet(formData.abstract, '', 200));
+    
+    // 🔥 Handle classification (could be array or string)
+    let classificationText = '';
+    if (Array.isArray(formData.classification)) {
+        classificationText = formData.classification.map(c => sanitizeText(c)).join(", ");
+    } else {
+        classificationText = safeGet(formData.classification);
+    }
+    drawRow("Classification", classificationText);
+    
+    drawRow("Additional Info", safeGet(formData.additionalInfo, '', 100));
+    drawRow("Comments", safeGet(formData.comments, '', 100));
+    drawRow("Funding", safeGet(formData.funding));
+    
+    // 🔥 Handle billing info if funding is Yes
+    if (formData.funding === "Yes" && formData.billingInfo) {
+        let billingInfo = formData.billingInfo;
+        if (typeof billingInfo === 'string') {
+            try {
+                billingInfo = JSON.parse(billingInfo);
+            } catch (e) {
+                billingInfo = {};
+            }
+        }
+        if (billingInfo.findFunder) {
+            drawRow("Funder", safeGet(billingInfo.findFunder));
+        }
+        if (billingInfo.awardNumber) {
+            drawRow("Award Number", safeGet(billingInfo.awardNumber));
+        }
+        if (billingInfo.grantRecipient) {
+            drawRow("Grant Recipient", safeGet(billingInfo.grantRecipient));
+        }
+    }
+    
+    drawRow("Submission Date", new Date().toLocaleString());
+
+    // 🔥 Save to temp directory instead of uploads folder
+    const tableFileName = manuscriptId ? `table_${manuscriptId}.pdf` : `table_${Date.now()}.pdf`;
+    const tablePdfPath = path.join(os.tmpdir(), tableFileName);
+    
+    const pdfBytes = await pdfDoc.save();
+    await fs.writeFile(tablePdfPath, pdfBytes);
+
+    console.log('[createTablePdf] Table PDF created:', tablePdfPath);
+    return tablePdfPath;
 };
-
 module.exports = mergeDocs;

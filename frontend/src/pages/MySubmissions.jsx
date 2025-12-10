@@ -58,7 +58,13 @@ const MySubmissions = () => {
       setLoading(false);
     }
   };
+  const handleEditDraft = (manuscriptId) => {
+    navigate(`${BASE_URL}/edit-manuscript/${manuscriptId}`);
+  };
 
+  const canEditManuscript = (manuscript) => {
+    return ["Pending", "Saved"].includes(manuscript.status);
+  };
   const handleViewPdf = (manuscriptId, mergedFileUrl) => {
     if (mergedFileUrl) {
       window.open(mergedFileUrl, "_blank");
@@ -635,21 +641,51 @@ const MySubmissions = () => {
                                 <button
                                   onClick={() => {
                                     const url = manuscript.authorResponse.withoutHighlightedFileUrl;
-                                    const isZip = url.toLowerCase().includes('.zip');
 
-                                    if (isZip) {
+                                    // Check if it's a Google Drive URL
+                                    if (url.includes('drive.google.com')) {
+                                      // Extract file ID from Google Drive URL
+                                      const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                                      const fileIdMatch2 = url.match(/id=([a-zA-Z0-9_-]+)/);
+                                      const fileId = fileIdMatch?.[1] || fileIdMatch2?.[1];
 
-                                      const link = document.createElement('a');
-                                      link.href = url;
-                                      link.download = 'clean-document.zip';
-                                      link.target = '_blank';
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
+                                      if (fileId) {
+                                        // Check file type from URL or use preview
+                                        const isZip = url.toLowerCase().includes('.zip');
+                                        const isDocx = url.toLowerCase().includes('.docx') || url.toLowerCase().includes('.doc');
+                                        const isTex = url.toLowerCase().includes('.tex');
+
+                                        if (isZip) {
+                                          // Download ZIP directly
+                                          const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                                          window.open(downloadUrl, '_blank');
+                                        } else if (isDocx || isTex) {
+                                          // Preview DOCX/TEX in Google Docs Viewer
+                                          const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+                                          window.open(previewUrl, '_blank');
+                                        } else {
+                                          // Default: Open Google Drive view
+                                          const viewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+                                          window.open(viewUrl, '_blank');
+                                        }
+                                      } else {
+                                        // Fallback: Open original URL
+                                        window.open(url, '_blank');
+                                      }
                                     } else {
-
+                                      // Non-Google Drive URL
+                                      const isZip = url.toLowerCase().includes('.zip');
                                       const isPdf = url.toLowerCase().includes('.pdf');
-                                      if (isPdf) {
+
+                                      if (isZip) {
+                                        const link = document.createElement('a');
+                                        link.href = url;
+                                        link.download = 'clean-document.zip';
+                                        link.target = '_blank';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      } else if (isPdf) {
                                         window.open(url, "_blank");
                                       } else {
                                         const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
@@ -720,75 +756,40 @@ const MySubmissions = () => {
                           </td>
 
                           {/* Response Column */}
+                          {/* Actions Column */}
                           <td className="px-4 py-3">
-                            {!["Accepted", "Rejected", "Withdrawn", "Under Review", "Published"].includes(manuscript.status) && !attemptsExhausted && (
-                              <div className="space-y-2 min-w-[140px]">
-                                {/* <div className="text-xs font-medium text-gray-700 border-b border-gray-200 pb-1">Response Upload</div> */}
-                                {/* <input
-                                  type="file"
-                                  accept=".docx"
-                                  onChange={(e) => {
-                                    handleResponseUpload(manuscript._id, e.target.files?.[0]);
-                                    e.target.value = null;
-                                  }}
-                                  disabled={uploadingResponseFor === manuscript._id || attemptsExhausted}
-                                  className="w-full text-xs text-gray-500 border border-dashed border-gray-300 rounded p-1 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
-                                />
-                                {manuscript.authorResponse?.docxUrl && (
-                                  <a
-                                    href={manuscript.authorResponse.docxUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="block text-xs text-blue-600 hover:text-blue-800 underline text-center"
-                                  >
-                                    View Response
-                                  </a>
-                                )}
+                            <div className="flex flex-col space-y-2 min-w-[140px]">
 
-                                <div className="text-xs font-medium text-gray-700 border-b border-gray-200 pb-1">Highlighted File</div>
-                                <input
-                                  type="file"
-                                  accept=".docx,.pdf"
-                                  onChange={(e) => {
-                                    handleUploadHighlightedFile(manuscript._id, e.target.files?.[0]);
-                                    e.target.value = null;
-                                  }}
-                                  disabled={uploadingHighlightedFor === manuscript._id || attemptsExhausted}
-                                  className="w-full text-xs text-gray-500 border border-dashed border-gray-300 rounded p-1 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
-                                />
-                                {manuscript.authorResponse?.highlightedFileUrl && (
-                                  <a
-                                    href={manuscript.authorResponse.highlightedFileUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="block text-xs text-blue-600 hover:text-blue-800 underline text-center"
-                                  >
-                                    View Highlighted
-                                  </a>
-                                )}
-
-                                {uploadingResponseFor === manuscript._id && (
-                                  <p className="text-xs text-blue-600 text-center bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                                    Uploading response...
-                                  </p>
-                                )}
-                                {uploadingHighlightedFor === manuscript._id && (
-                                  <p className="text-xs text-blue-600 text-center bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                                    Uploading highlighted...
-                                  </p>
-                                )} */}
+                              {/* 🔥 NEW: Edit Button - Only for Pending/Saved */}
+                              {canEditManuscript(manuscript) && (
                                 <button
-                                  onClick={() => setShowUploadModal(manuscript._id)}
-                                  disabled={attemptsExhausted}
-                                  className="w-full px-3 py-2 text-sm font-medium text-white bg-[#00796b] rounded-lg hover:bg-[#00acc1] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                                  onClick={() => handleEditDraft(manuscript._id)}
+                                  className="w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                   </svg>
-                                  <span>Upload Files</span>
+                                  <span>Edit Draft</span>
                                 </button>
-                              </div>
-                            )}
+                              )}
+
+                              {/* Existing Upload Files Button - keep as is but add condition */}
+                              {!canEditManuscript(manuscript) &&
+                                !["Accepted", "Rejected", "Published", "Under Review"].includes(manuscript.status) &&
+                                !attemptsExhausted && (
+                                  <button
+                                    onClick={() => setShowUploadModal(manuscript._id)}
+                                    disabled={attemptsExhausted}
+                                    className="w-full px-3 py-2 text-sm font-medium text-white bg-[#00796b] rounded-lg hover:bg-[#00acc1] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                    <span>Upload Files</span>
+                                  </button>
+                                )}
+
+                            </div>
                           </td>
                         </tr>
                       );
@@ -858,6 +859,12 @@ const MySubmissions = () => {
                     {manuscripts.filter(m => m.status === "Accepted").length}
                   </div>
                   <div className="text-gray-600">Accepted</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-teal-600">
+                    {manuscripts.filter(m => m.status === "Published").length}
+                  </div>
+                  <div className="text-gray-600">Published</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-red-600">

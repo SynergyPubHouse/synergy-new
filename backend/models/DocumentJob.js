@@ -24,6 +24,9 @@ const DocumentJobSchema = new mongoose.Schema(
 
     pdfPath: { type: String },
     pdfUrl: { type: String },
+    // Google Drive fields for the generated PDF
+    driveFileId: { type: String },
+    driveViewUrl: { type: String },
 
     converterMeta: { type: mongoose.Schema.Types.Mixed },
 
