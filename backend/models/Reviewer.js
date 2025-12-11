@@ -38,16 +38,16 @@ const reviewerSchema = new mongoose.Schema({
 		type: String,
 		required: true,
 	},
-	specialization: {
-		type: String,
-		required: true,
-		trim: true,
-	},
-	experience: {
-		type: Number,
-		required: true,
-		min: 0,
-	},
+	specialization: { 
+  type: String, 
+  required: false,  // ✅ Fixed
+  default: null
+},
+experience: { 
+  type: Number, 
+  required: false,  // ✅ Fixed
+  default: null
+},
 	assignedManuscripts: [
 		{
 			type: mongoose.Schema.Types.ObjectId,

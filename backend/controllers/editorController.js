@@ -1397,7 +1397,7 @@ console.log("Author Response Files Available:", hasAuthorResponseFiles);
         for (const email of emails) {
             try {
                 const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-                const registrationUrl = `${baseUrl}/journal/jics/reviewer/register`;
+                const registrationUrl = `${baseUrl}/register`;
 
                 // Build editor note section
                 const editorNoteSection = editorNoteAdded
