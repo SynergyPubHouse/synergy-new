@@ -162,7 +162,73 @@ app.get('/test-libreoffice', async (req, res) => {
         res.status(500).json(results);
     }
 });
-
+// Add this route in your server
+app.get('/debug-libreoffice', async (req, res) => {
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    
+    const results = {
+        timestamp: new Date().toISOString(),
+        platform: process.platform,
+        tests: []
+    };
+    
+    try {
+        // Test 1: Check LibreOffice version
+        const { stdout: version } = await execPromise('/usr/bin/libreoffice --version', { timeout: 10000 });
+        results.tests.push({ test: 'version', success: true, output: version.trim() });
+    } catch (e) {
+        results.tests.push({ test: 'version', success: false, error: e.message });
+    }
+    
+    try {
+        // Test 2: Create a test DOCX and convert
+        const testDir = path.join(os.tmpdir(), `lo-test-${Date.now()}`);
+        fs.mkdirSync(testDir, { recursive: true });
+        
+        // Create minimal DOCX (actually just a text file for testing)
+        const testFile = path.join(testDir, 'test.txt');
+        fs.writeFileSync(testFile, 'Hello World Test');
+        
+        const profileDir = path.join(os.tmpdir(), `lo-profile-${Date.now()}`);
+        
+        const command = `/usr/bin/libreoffice --headless --nofirststartwizard --norestore "-env:UserInstallation=file://${profileDir}" --convert-to pdf --outdir "${testDir}" "${testFile}"`;
+        
+        results.tests.push({ test: 'command', command });
+        
+        const { stdout, stderr } = await execPromise(command, { 
+            timeout: 60000,
+            env: { ...process.env, HOME: '/tmp' }
+        });
+        
+        results.tests.push({ 
+            test: 'conversion', 
+            success: true, 
+            stdout: stdout.trim(),
+            stderr: stderr.trim(),
+            files: fs.readdirSync(testDir)
+        });
+        
+        // Cleanup
+        fs.rmSync(testDir, { recursive: true, force: true });
+        fs.rmSync(profileDir, { recursive: true, force: true });
+        
+    } catch (e) {
+        results.tests.push({ 
+            test: 'conversion', 
+            success: false, 
+            error: e.message,
+            stderr: e.stderr,
+            stdout: e.stdout
+        });
+    }
+    
+    res.json(results);
+});
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
