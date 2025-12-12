@@ -19,7 +19,7 @@ const FormData = require("form-data");
 const { uploadToCloudinary } = require("../utils/cloudinary");
 const { uploadFileToDrive,deleteFileFromDrive, downloadDriveFileToTemp   } = require('../services/googleDriveOAuth');
 const sendEmail = require("../utils/sendEmail");
-const { console } = require("inspector");
+// const { console } = require("inspector");
 const { 
     createJob, 
     getJob, 
@@ -161,233 +161,195 @@ function isValidPdf(filePath) {
 	}
 }
 
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
+
 async function convertDocxToPdf(docxPath, onProgress) {
-console.log("convertDocxToPdf")
-	const errors = [];
-	const progress = (percent, step) => {
-		try {
-			if (typeof onProgress === "function") {
-				onProgress(
-					Math.max(0, Math.min(100, Math.round(percent))),
-					step || "Converting..."
-				);
-			}
-		} catch (_) {}
-	};
+    console.log("===========================================");
+    console.log("[convertDocxToPdf] FUNCTION STARTED");
+    console.log("[convertDocxToPdf] Input file:", docxPath);
+    console.log("===========================================");
+    
+    if (!fsSync.existsSync(docxPath)) {
+        console.error("[convertDocxToPdf] FILE DOES NOT EXIST:", docxPath);
+        throw new Error(`File not found: ${docxPath}`);
+    }
+    
+    const fileStats = fsSync.statSync(docxPath);
+    console.log("[convertDocxToPdf] File size:", (fileStats.size / 1024).toFixed(2), "KB");
+    
+    const errors = [];
+    const progress = (percent, step) => {
+        console.log(`[convertDocxToPdf] Progress: ${percent}% - ${step}`);
+        try {
+            if (typeof onProgress === "function") {
+                onProgress(Math.max(0, Math.min(100, Math.round(percent))), step || "Converting...");
+            }
+        } catch (_) {}
+    };
 
-	// Hard-coded external LibreOffice HTTP service base + endpoints (no env lookup)
-	const CONVERTER_BASE = "https://doc-converter-kypa.onrender.com";
-	const CONVERTER_ENDPOINTS = [
-		"/convert",
-		"/api/convert/docx-to-pdf",
-		"/api/convert",
-		"/convert/docx-to-pdf",
-	];
-	const useRemote = (process.env.USE_REMOTE_CONVERTER || "true").toLowerCase() !== "false";
+    // =====================================================
+    // 🥇 METHOD 1: LOCAL LibreOffice (BEST - Full support!)
+    // =====================================================
+    console.log("\n[convertDocxToPdf] ═══ METHOD 1: LOCAL LibreOffice ═══");
+    progress(10, "Trying LibreOffice conversion...");
+    
+    try {
+        const outputDir = path.dirname(docxPath);
+        const fileName = path.basename(docxPath, path.extname(docxPath));
+        const expectedPdfPath = path.join(outputDir, `${fileName}.pdf`);
+        
+        console.log("[convertDocxToPdf] Output dir:", outputDir);
+        console.log("[convertDocxToPdf] Expected PDF:", expectedPdfPath);
+        
+        // LibreOffice paths for Windows
+        const libreOfficePaths = [
+            'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+            'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+            'libreoffice',
+            'soffice',
+        ];
+        
+        for (const loPath of libreOfficePaths) {
+            let command;
+            if (loPath.includes(' ') || loPath.includes('\\')) {
+                command = `"${loPath}" --headless --convert-to pdf --outdir "${outputDir}" "${docxPath}"`;
+            } else {
+                command = `${loPath} --headless --convert-to pdf --outdir "${outputDir}" "${docxPath}"`;
+            }
+            
+            console.log("[convertDocxToPdf] Trying:", command.substring(0, 80) + "...");
+            
+            try {
+                const { stdout, stderr } = await execPromise(command, {
+                    timeout: 120000,
+                    windowsHide: true,
+                    maxBuffer: 10 * 1024 * 1024,
+                });
+                
+                if (stdout) console.log("[convertDocxToPdf] stdout:", stdout.trim().substring(0, 200));
+                if (stderr) console.log("[convertDocxToPdf] stderr:", stderr.trim().substring(0, 200));
+                
+                // Wait for file system
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                if (fsSync.existsSync(expectedPdfPath)) {
+                    const pdfStats = fsSync.statSync(expectedPdfPath);
+                    console.log("[convertDocxToPdf] ✅ LOCAL LibreOffice SUCCESS!");
+                    console.log("[convertDocxToPdf] PDF size:", (pdfStats.size / 1024).toFixed(2), "KB");
+                    
+                    if (isValidPdf(expectedPdfPath)) {
+                        progress(100, "Conversion complete");
+                        return expectedPdfPath;
+                    }
+                }
+            } catch (cmdError) {
+                if (cmdError.message.includes('ENOENT') || 
+                    cmdError.message.includes('not found') ||
+                    cmdError.message.includes('not recognized')) {
+                    console.log("[convertDocxToPdf] Path not found:", loPath);
+                    continue;
+                }
+                console.log("[convertDocxToPdf] Command error:", cmdError.message.substring(0, 100));
+                continue;
+            }
+        }
+        
+        errors.push("local-libreoffice: Not found or failed");
+        console.log("[convertDocxToPdf] ❌ Local LibreOffice not available");
+    } catch (error) {
+        console.error("[convertDocxToPdf] ❌ Local LibreOffice error:", error.message);
+        errors.push(`local-libreoffice: ${error.message}`);
+    }
 
-	if (useRemote) {
-		const timeoutMs = Math.max(
-			60000,
-			parseInt(
-				process.env.LIBREOFFICE_SERVICE_TIMEOUT_MS ||
-					process.env.CONVERTER_TIMEOUT_MS ||
-					"120000",
-				10
-			)
-		);
-		const maxContentLength = 100 * 1024 * 1024;
-		const maxBodyLength = 100 * 1024 * 1024;
+    // =====================================================
+    // 🥈 METHOD 2: REMOTE LibreOffice Service
+    // =====================================================
+    const useRemote = (process.env.USE_REMOTE_CONVERTER || "true").toLowerCase() !== "false";
+    console.log("\n[convertDocxToPdf] ═══ METHOD 2: REMOTE LibreOffice ═══");
+    console.log("[convertDocxToPdf] USE_REMOTE_CONVERTER:", useRemote);
 
-		let sizeBytes = null;
-		let sizeMB = null;
-		try {
-			const stat = fsSync.statSync(docxPath);
-			sizeBytes = stat.size;
-			sizeMB = Math.round((stat.size / (1024 * 1024)) * 100) / 100;
-		} catch (e) {}
+    if (useRemote) {
+        const CONVERTER_BASE = "https://doc-converter-kypa.onrender.com";
+        const CONVERTER_ENDPOINTS = ["/convert", "/api/convert/docx-to-pdf", "/api/convert", "/convert/docx-to-pdf"];
+        const timeoutMs = 120000;
+        
+        for (const endpoint of CONVERTER_ENDPOINTS) {
+            const url = `${CONVERTER_BASE}${endpoint}`;
+            console.log(`[convertDocxToPdf] Trying endpoint: ${url}`);
+            
+            try {
+                const FormData = require('form-data');
+                const formData = new FormData();
+                formData.append("file", fsSync.createReadStream(docxPath), path.basename(docxPath));
 
-		let meta = {
-			serviceUrl: `${CONVERTER_BASE}${CONVERTER_ENDPOINTS[0]}`,
-			timeoutMs,
-			maxContentLength,
-			maxBodyLength,
-			sizeBytes,
-			sizeMB,
-			fileName: path.basename(docxPath),
-		};
+                const requestStart = Date.now();
+                
+                const response = await axios.post(url, formData, {
+                    headers: { ...formData.getHeaders(), Accept: "application/pdf" },
+                    responseType: "stream",
+                    timeout: timeoutMs,
+                });
 
-		const fileName = meta.fileName;
-		const requestStartedAt = Date.now();
-		try {
-			let response;
-			const attempted = [];
-			for (const endpoint of CONVERTER_ENDPOINTS) {
-				const url = `${CONVERTER_BASE}${endpoint}`;
-				attempted.push(url);
-				meta.serviceUrl = url;
-				
-				const formData = new FormData();
-				formData.append("file", fsSync.createReadStream(docxPath), fileName);
+                console.log(`[convertDocxToPdf] Response in ${Date.now() - requestStart}ms`);
+                console.log(`[convertDocxToPdf] Status: ${response.status}`);
+                console.log(`[convertDocxToPdf] Content-Type: ${response.headers['content-type']}`);
 
-				const config = {
-					headers: {
-						...(typeof formData.getHeaders === "function"
-							? formData.getHeaders()
-							: {}),
-						Accept: "application/pdf",
-					},
-					responseType: "stream",
-					timeout: timeoutMs,
-					maxContentLength,
-					maxBodyLength,
-				};
+                const contentType = (response.headers?.["content-type"] || "").toLowerCase();
+                if (!contentType.includes("application/pdf")) {
+                    throw new Error(`Expected application/pdf but got ${contentType}`);
+                }
 
-				console.log("[convertDocxToPdf] Remote request config", {
-					method: "POST",
-					url,
-					timeoutMs: config.timeout,
-					maxContentLength,
-					maxBodyLength,
-				});
+                const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+                
+                await new Promise((resolve, reject) => {
+                    const writeStream = fsSync.createWriteStream(pdfPath);
+                    response.data.on("error", reject);
+                    writeStream.on("error", reject);
+                    writeStream.on("finish", resolve);
+                    response.data.pipe(writeStream);
+                });
 
-				console.log('[LO-HTTP][manuscript] Calling converter at', url, 'for', docxPath);
-				try {
-					response = await axios.post(url, formData, config);
-					meta.serviceUrl = url;
-					// success
-					const requestDurationMs = Date.now() - requestStartedAt;
-					const contentType = (response.headers?.["content-type"] || "").toLowerCase();
-					const contentLengthHeader = response.headers?.["content-length"];
-					const contentLength = contentLengthHeader
-						? parseInt(contentLengthHeader, 10) || null
-						: null;
+                if (isValidPdf(pdfPath)) {
+                    console.log("[convertDocxToPdf] ✅ REMOTE CONVERSION SUCCESSFUL");
+                    return pdfPath;
+                }
+                
+            } catch (error) {
+                console.error(`[convertDocxToPdf] ❌ Endpoint ${url} failed:`, error.message);
+                errors.push(`remote:${endpoint}:${error.message}`);
+                continue;
+            }
+        }
+        
+        console.log("[convertDocxToPdf] All remote endpoints failed");
+    }
 
-					console.log("[convertDocxToPdf] Remote response received", {
-						status: response.status,
-						statusText: response.statusText,
-						requestDurationMs,
-						contentType,
-						contentLength,
-					});
+    // =====================================================
+    // 🥉 METHOD 3: Puppeteer/Mammoth (LAST RESORT)
+    // =====================================================
+    console.log("\n[convertDocxToPdf] ═══ METHOD 3: PUPPETEER/MAMMOTH ═══");
+    console.log("[convertDocxToPdf] ⚠️ WARNING: Images and tables may be MISSING!");
+    
+    try {
+        const pdfPath = await convertDocxToPdfNode(docxPath, null, progress);
+        
+        if (!isValidPdf(pdfPath)) {
+            throw new Error("Puppeteer returned invalid PDF");
+        }
+        
+        console.log("[convertDocxToPdf] ✅ PUPPETEER CONVERSION SUCCESSFUL");
+        return pdfPath;
+        
+    } catch (error) {
+        console.error("[convertDocxToPdf] ❌ Puppeteer fallback failed:", error.message);
+        errors.push(`puppeteer:${error.message}`);
+    }
 
-					if (!contentType.includes("application/pdf")) {
-						throw new Error(
-							`Expected application/pdf but got ${contentType || "unknown"}`
-						);
-					}
-
-					const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-					const writeStartedAt = Date.now();
-					let downloadedBytes = 0;
-
-					await new Promise((resolve, reject) => {
-						const writeStream = fsSync.createWriteStream(pdfPath);
-						response.data.on("data", (chunk) => {
-							downloadedBytes += chunk.length;
-							if (downloadedBytes < 1024 * 1024) {
-								progress(10, "Downloading PDF from converter...");
-							} else if (downloadedBytes < 10 * 1024 * 1024) {
-								progress(40, "Downloading PDF from converter...");
-							} else {
-								progress(70, "Downloading PDF from converter...");
-							}
-						});
-						response.data.on("error", (err) => reject(err));
-						writeStream.on("error", (err) => reject(err));
-						writeStream.on("finish", () => resolve());
-						response.data.pipe(writeStream);
-					});
-
-					console.log("[convertDocxToPdf] PDF stream written", {
-						writeDurationMs: Date.now() - writeStartedAt,
-						bytes: downloadedBytes,
-					});
-
-					if (!isValidPdf(pdfPath)) {
-						throw new Error("Remote converter returned invalid PDF");
-					}
-
-					progress(100, "Conversion complete");
-					console.log("[convertDocxToPdf] Remote LibreOffice conversion successful", {
-						pdfPath,
-						requestDurationMs,
-					});
-					return pdfPath;
-				} catch (error) {
-					const status = error.response?.status;
-					if (status === 404 || status === 405) {
-						console.error('[convertDocxToPdf] Converter endpoint not found/allowed', { status, url });
-						continue; // try next endpoint
-					}
-					throw error;
-				}
-			}
-			throw new Error(`No converter endpoint available (tried: ${attempted.join(', ')})`);
-		} catch (error) {
-			const durationMs = Date.now() - requestStartedAt;
-			const isTimeout =
-				error.code === "ECONNABORTED" || /timeout/i.test(error.message || "");
-
-			let responseSnippet = null;
-			try {
-				if (error.response && error.response.data) {
-					if (Buffer.isBuffer(error.response.data)) {
-						responseSnippet = `Binary data length=${error.response.data.length}`;
-					} else if (typeof error.response.data === "string") {
-						responseSnippet = error.response.data.substring(0, 500);
-					} else {
-						responseSnippet = JSON.stringify(error.response.data).substring(
-							0,
-							500
-						);
-					}
-				}
-			} catch (_) {}
-
-			console.error("[convertDocxToPdf] Remote LibreOffice service call failed", {
-				...meta,
-				durationMs,
-				isTimeout,
-				message: error.message,
-				code: error.code,
-				status: error.response?.status,
-				statusText: error.response?.statusText,
-				responseHeaders: error.response?.headers,
-				responseSnippet,
-				stack: error.stack,
-			});
-			errors.push(`remote:${error.message}`);
-		}
-	} else {
-		console.log(
-			"[convertDocxToPdf] Remote converter disabled via USE_REMOTE_CONVERTER; skipping remote HTTP call"
-		);
-		errors.push("remote:disabled");
-	}
-
-	try {
-		console.log("[convertDocxToPdf] Falling back to internal Puppeteer/Mammoth converter");
-		const pdfPath = await convertDocxToPdfNode(
-			docxPath,
-			null,
-			(percent, step) => progress(percent, step)
-		);
-		if (!isValidPdf(pdfPath)) throw new Error("Puppeteer returned invalid PDF");
-		console.log("[convertDocxToPdf] Puppeteer conversion successful");
-		return pdfPath;
-	} catch (error) {
-		console.error("[convertDocxToPdf] Puppeteer fallback error", {
-			message: error.message,
-			stack: error.stack,
-		});
-		errors.push(`puppeteer:${error.message}`);
-	}
-
-	throw new Error(
-		`DOCX to PDF conversion failed. Attempts: ${errors.join(" | ")}`
-	);
+    console.error("[convertDocxToPdf] ❌ ALL CONVERSION METHODS FAILED");
+    throw new Error(`DOCX to PDF conversion failed: ${errors.join(" | ")}`);
 }
-
 // Helper function to extract abstract from text
 function extractAbstract(text) {
 	const lines = text.split('\n').filter(line => line.trim());
