@@ -4,39 +4,15 @@ services:
     env: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    
-    # 🔥 Important environment variables
+    dockerfile:
+      context: .
+      dockerfile: ./Dockerfile
     envVars:
       - key: NODE_ENV
         value: production
-      
-      - key: NODE_OPTIONS
-        value: --max-old-space-size=512  # Free plan has limited memory
-      
-      - key: LIBREOFFICE_PATH
-        value: /usr/bin/libreoffice
-      
-      - key: LIBREOFFICE_BIN
-        value: /usr/bin/soffice
-      
       - key: USE_PUPPETEER_FALLBACK
         value: "false"
-      
+      - key: LIBREOFFICE_BIN
+        value: /usr/bin/soffice
       - key: PYTHONUNBUFFERED
         value: "1"
-      
-      - key: HOME
-        value: /tmp
-      
-      - key: TMPDIR
-        value: /tmp
-      
-      # 🔥 Timeout settings for large files
-      - key: CONVERTER_TIMEOUT_MS
-        value: "300000"
-    
-    # Health check path
-    healthCheckPath: /health
-    
-    # Auto-deploy when pushing to main branch
-    autoDeploy: true
