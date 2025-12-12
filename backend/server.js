@@ -112,6 +112,57 @@ app.get('/health', (req, res) => {
   });
 });
 
+// 🔥 ADD THIS - LibreOffice Test Route
+app.get('/test-libreoffice', async (req, res) => {
+    const results = {
+        timestamp: new Date().toISOString(),
+        platform: process.platform,
+        nodeEnv: process.env.NODE_ENV,
+        home: process.env.HOME,
+        libreoffice: null,
+        path: null,
+        error: null
+    };
+    
+    try {
+        const { execSync } = require('child_process');
+        
+        // Try libreoffice --version
+        try {
+            results.libreoffice = execSync('libreoffice --version 2>&1', { 
+                timeout: 15000, 
+                encoding: 'utf8' 
+            }).trim();
+        } catch (e) {
+            // Try soffice --version
+            try {
+                results.libreoffice = execSync('soffice --version 2>&1', { 
+                    timeout: 15000, 
+                    encoding: 'utf8' 
+                }).trim();
+            } catch (e2) {
+                results.libreoffice = "NOT FOUND: " + e2.message;
+            }
+        }
+        
+        // Try which
+        try {
+            results.path = execSync('which libreoffice || which soffice || echo "not found"', { 
+                timeout: 5000, 
+                encoding: 'utf8' 
+            }).trim();
+        } catch (e) {
+            results.path = "which failed: " + e.message;
+        }
+        
+        res.json(results);
+        
+    } catch (error) {
+        results.error = error.message;
+        res.status(500).json(results);
+    }
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
