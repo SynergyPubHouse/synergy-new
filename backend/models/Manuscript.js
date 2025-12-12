@@ -258,6 +258,35 @@ publishedFileUrl: {
 			default: null,
 		},
 
+		issueVolume: {
+    type: Number,
+    default: null,
+},
+issueNumber: {
+    type: Number,
+    default: null,
+},
+issueYear: {
+    type: Number,
+    default: null,
+},
+issueTitle: {
+    type: String,
+    default: "",
+},
+pageStart: {
+    type: Number,
+    default: null,
+},
+pageEnd: {
+    type: Number,
+    default: null,
+},
+section: {
+    type: String,
+    default: "Manuscript",
+},
+
 
 	},
 	{ timestamps: true }

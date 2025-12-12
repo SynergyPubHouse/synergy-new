@@ -455,11 +455,11 @@ function Login() {
                 rights reserved.
               </p>
             </div>
-            {error && (
+            {/* {error && (
               <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
                 {error}
               </div>
-            )}
+            )} */}
 
             {/* Add this NEW block right after the error block: */}
             {needsVerification && (

@@ -162,6 +162,7 @@ function isValidPdf(filePath) {
 }
 
 async function convertDocxToPdf(docxPath, onProgress) {
+console.log("convertDocxToPdf")
 	const errors = [];
 	const progress = (percent, step) => {
 		try {
@@ -432,6 +433,7 @@ function extractKeywords(text) {
 
 // Helper: Extract text from DOCX using Python (original working version)
 async function extractTextFromDocx(docxPath) {
+    console.log("extractTextFromDocx");
 	const pythonPath = "python3"; // Use python3 for production compatibility
 	return new Promise((resolve, reject) => {
 		const scriptPath = path.join(__dirname, "../utils/textExtractor.py");
@@ -2519,6 +2521,19 @@ exports.uploadPublishedPdf = async (req, res) => {
     try {
         const { manuscriptId } = req.params;
 
+        // ═══════════════════════════════════════════════════════
+        // NEW: Extract Issue Info from request body
+        // ═══════════════════════════════════════════════════════
+        const {
+            issueVolume,
+            issueNumber,
+            issueYear,
+            issueTitle,
+            pageStart,
+            pageEnd,
+            section
+        } = req.body;
+
         if (!req.file) {
             return res.status(400).json({
                 success: false,
@@ -2553,30 +2568,45 @@ exports.uploadPublishedPdf = async (req, res) => {
         );
 
         const driveResult = await uploadFileToDrive(req.file.path, {
-    filename: fileName,
-    mimeType: 'application/pdf',
-    makePublic: true,
-});
+            filename: fileName,
+            mimeType: 'application/pdf',
+            makePublic: true,
+        });
 
-if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
-    throw new Error("Google Drive upload failed");
-}
+        if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
+            throw new Error("Google Drive upload failed");
+        }
 
-        // 🔥 Save published date in database
+        // 🔥 Save published date
         const publishedDate = new Date();
-        
+
+        // Update manuscript with PDF URLs
         manuscript.publishedFileUrl = uploadedPdf.secure_url;
+        manuscript.publishedDriveFileId = driveResult.driveFileId;
+        manuscript.publishedDriveViewUrl = driveResult.webViewLink || "";
         manuscript.status = "Published";
-        manuscript.publishedAt = publishedDate;  // ✅ Saved to database
+        manuscript.publishedAt = publishedDate;
+
+        // ═══════════════════════════════════════════════════════
+        // NEW: Save Issue Info to manuscript
+        // ═══════════════════════════════════════════════════════
+        if (issueVolume) manuscript.issueVolume = parseInt(issueVolume);
+        if (issueNumber) manuscript.issueNumber = parseInt(issueNumber);
+        if (issueYear) manuscript.issueYear = parseInt(issueYear);
+        if (issueTitle) manuscript.issueTitle = issueTitle;
+        if (pageStart) manuscript.pageStart = parseInt(pageStart);
+        if (pageEnd) manuscript.pageEnd = parseInt(pageEnd);
+        if (section) manuscript.section = section;
+
         await manuscript.save();
 
         // Cleanup temp file
         await cleanupFiles(tempFiles);
         tempFiles = [];
 
-        // ===================================
-        // EMAIL NOTIFICATION TO AUTHORS
-        // ===================================
+        // ═══════════════════════════════════════════════════════
+        // EMAIL NOTIFICATION TO AUTHORS (Updated with Issue Info)
+        // ═══════════════════════════════════════════════════════
         const authorEmails = new Set();
 
         if (manuscript.correspondingAuthor?.email) {
@@ -2593,7 +2623,7 @@ if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
 
         if (authorEmails.size > 0) {
             const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
-            
+
             // Format date for email display
             const formattedDate = publishedDate.toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -2601,58 +2631,94 @@ if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
                 day: 'numeric'
             });
 
-          const emailSubject = 'Congratulations! Your Manuscript Has Been Published - ' + customId;
+            // ═══════════════════════════════════════════════════════
+            // NEW: Issue info for email
+            // ═══════════════════════════════════════════════════════
+            const hasIssueInfo = manuscript.issueVolume && manuscript.issueNumber && manuscript.issueYear;
+            
+            const issueInfoText = hasIssueInfo
+                ? 'Vol ' + manuscript.issueVolume + ', No ' + manuscript.issueNumber + ', ' + manuscript.issueYear + (manuscript.issueTitle ? ' - ' + manuscript.issueTitle : '')
+                : '';
 
-const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">' +
-    
-    // Header
-    '<div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 30px; text-align: center;">' +
-    '<h1 style="margin: 0; font-size: 24px; color: #1c1c1cff;">Congratulations!</h1>' +
-    '<p style="margin: 10px 0 0 0; font-size: 16px; color: #1c1c1cff;">Your Manuscript Has Been Published</p>' +
-    '</div>' +
+            const pageInfoText = (manuscript.pageStart && manuscript.pageEnd)
+                ? 'Pages ' + manuscript.pageStart + '-' + manuscript.pageEnd
+                : '';
 
-    // Content
-    '<div style="padding: 30px;">' +
-    
-    '<p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Dear Author,</p>' +
-    
-    '<p style="color: #374151; font-size: 16px; margin-bottom: 20px; line-height: 1.6;">' +
-    'We are pleased to inform you that your manuscript has been <strong>successfully published</strong> in the Journal of Innovative Computer Science (JICS).' +
-    '</p>' +
+            const sectionText = manuscript.section || 'Research Article';
 
-    // Manuscript Details
-    '<div style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 25px;">' +
-    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Manuscript ID:</strong></p>' +
-    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + customId + '</p>' +
-    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Title:</strong></p>' +
-    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + (manuscript.title || 'Untitled') + '</p>' +
-    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published Date:</strong></p>' +
-    '<p style="margin: 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + formattedDate + '</p>' +
-    '</div>' +
+            const emailSubject = 'Congratulations! Your Manuscript Has Been Published - ' + customId;
 
-    // Download Button
-    '<div style="text-align: center; margin: 30px 0;">' +
-    '<a href="' + manuscript.publishedFileUrl + '" style="display: inline-block; background-color: #00796B; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Download Published PDF</a>' +
-    '</div>' +
+            const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">' +
 
-    '<p style="color: #374151; font-size: 15px; line-height: 1.6;">' +
-    'Thank you for choosing <strong>Synergy World Press</strong> for publishing your research.' +
-    '</p>' +
+                // Header
+                '<div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 30px; text-align: center;">' +
+                '<h1 style="margin: 0; font-size: 24px; color: #1c1c1cff;">Congratulations!</h1>' +
+                '<p style="margin: 10px 0 0 0; font-size: 16px; color: #1c1c1cff;">Your Manuscript Has Been Published</p>' +
+                '</div>' +
 
-    '<p style="color: #374151; font-size: 15px; margin-top: 25px;">Best regards,<br><strong>Synergy World Press Editorial Team</strong></p>' +
+                // Content
+                '<div style="padding: 30px;">' +
 
-    '</div>' +
+                '<p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Dear Author,</p>' +
 
-    // Footer
-    '<div style="background-color: #F3F4F6; padding: 20px; text-align: center; border-top: 1px solid #E5E7EB;">' +
-    '<p style="color: #6B7280; font-size: 12px; margin: 0 0 5px 0;">Journal of Innovative Computer Science (JICS)</p>' +
-    '<p style="color: #6B7280; font-size: 12px; margin: 0;">' +
-    '<a href="' + frontendUrl + '" style="color: #00796B; text-decoration: none;">synergyworldpress.com</a> | ' +
-    '<a href="mailto:support@synergyworldpress.com" style="color: #00796B; text-decoration: none;">support@synergyworldpress.com</a>' +
-    '</p>' +
-    '</div>' +
+                '<p style="color: #374151; font-size: 16px; margin-bottom: 20px; line-height: 1.6;">' +
+                'We are pleased to inform you that your manuscript has been <strong>successfully published</strong> in the Journal of Innovative Computer Science (JICS).' +
+                '</p>' +
 
-    '</div>';
+                // Manuscript Details
+                '<div style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 25px;">' +
+                
+                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Manuscript ID:</strong></p>' +
+                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + customId + '</p>' +
+                
+                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Title:</strong></p>' +
+                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + (manuscript.title || 'Untitled') + '</p>' +
+                
+                // NEW: Issue Info in Email
+                (hasIssueInfo ? (
+                    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published In:</strong></p>' +
+                    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + issueInfoText + '</p>'
+                ) : '') +
+
+                // NEW: Section
+                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Section:</strong></p>' +
+                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + sectionText + '</p>' +
+
+                // NEW: Page Numbers
+                (pageInfoText ? (
+                    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Page Numbers:</strong></p>' +
+                    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + pageInfoText + '</p>'
+                ) : '') +
+                
+                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published Date:</strong></p>' +
+                '<p style="margin: 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + formattedDate + '</p>' +
+                
+                '</div>' +
+
+                // Download Button
+                '<div style="text-align: center; margin: 30px 0;">' +
+                '<a href="' + manuscript.publishedFileUrl + '" style="display: inline-block; background-color: #00796B; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Download Published PDF</a>' +
+                '</div>' +
+
+                '<p style="color: #374151; font-size: 15px; line-height: 1.6;">' +
+                'Thank you for choosing <strong>Synergy World Press</strong> for publishing your research.' +
+                '</p>' +
+
+                '<p style="color: #374151; font-size: 15px; margin-top: 25px;">Best regards,<br><strong>Synergy World Press Editorial Team</strong></p>' +
+
+                '</div>' +
+
+                // Footer
+                '<div style="background-color: #F3F4F6; padding: 20px; text-align: center; border-top: 1px solid #E5E7EB;">' +
+                '<p style="color: #6B7280; font-size: 12px; margin: 0 0 5px 0;">Journal of Innovative Computer Science (JICS)</p>' +
+                '<p style="color: #6B7280; font-size: 12px; margin: 0;">' +
+                '<a href="' + frontendUrl + '" style="color: #00796B; text-decoration: none;">synergyworldpress.com</a> | ' +
+                '<a href="mailto:support@synergyworldpress.com" style="color: #00796B; text-decoration: none;">support@synergyworldpress.com</a>' +
+                '</p>' +
+                '</div>' +
+
+                '</div>';
+
             // Send email to all authors
             const emailPromises = Array.from(authorEmails).map(email => {
                 return sendEmail({
@@ -2666,7 +2732,9 @@ const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px;
             console.log('[uploadPublishedPdf] Emails sent to ' + authorEmails.size + ' author(s)');
         }
 
-        // 🔥 Return published date in response
+        // ═══════════════════════════════════════════════════════
+        // NEW: Return issue info in response
+        // ═══════════════════════════════════════════════════════
         return res.json({
             success: true,
             message: "Published PDF uploaded and emails sent successfully",
@@ -2674,8 +2742,16 @@ const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px;
                 manuscriptId: manuscript._id,
                 customId: customId,
                 publishedFileUrl: manuscript.publishedFileUrl,
-                publishedAt: manuscript.publishedAt,  // ✅ Return in response
-                status: manuscript.status
+                publishedAt: manuscript.publishedAt,
+                status: manuscript.status,
+                // Issue Info
+                issueVolume: manuscript.issueVolume,
+                issueNumber: manuscript.issueNumber,
+                issueYear: manuscript.issueYear,
+                issueTitle: manuscript.issueTitle,
+                section: manuscript.section,
+                pageStart: manuscript.pageStart,
+                pageEnd: manuscript.pageEnd,
             }
         });
 
@@ -2695,7 +2771,6 @@ const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px;
         });
     }
 };
-
 
 // Controller
 exports.getPublishedManuscripts = async (req, res) => {
@@ -2737,6 +2812,8 @@ exports.getPublishedManuscripts = async (req, res) => {
  * Returns immediately with jobId, processes in background
  */
 exports.createManuscriptAsync = async (req, res) => {
+
+    console.log("createManuscriptAsync");
     let tempFiles = [];
 
     try {
@@ -2808,6 +2885,7 @@ exports.createManuscriptAsync = async (req, res) => {
  * 🔥 Process manuscript in background
  */
 async function processManuscriptJob(jobId, tempFiles) {
+    console.log("processManuscriptJob");
     const job = getJob(jobId);
     if (!job) return;
 

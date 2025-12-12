@@ -675,9 +675,7 @@ exports.googleAuth = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    const { sub: googleId, email, given_name, family_name, picture } = payload; // Use given_name and family_name
-
-    // const { sub: googleId, email, name, picture } = payload;
+    const { sub: googleId, email, given_name, family_name, picture } = payload;
 
     // Check if user exists
     let user = await User.findOne({
@@ -688,24 +686,48 @@ exports.googleAuth = async (req, res) => {
       // Create new user with Google info
       user = await User.create({
         firstName: given_name,
-        // Use family_name, but if it's missing, use a placeholder (like a period)
-        // to satisfy the 'required' rule.
         lastName: family_name || ".",
         email,
         googleId,
         username: email.split("@")[0] + "_" + googleId.slice(0, 4),
         password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10),
+        // ═══════════════════════════════════════════════════════════
+        // 🆕 NEW: Add these fields
+        // ═══════════════════════════════════════════════════════════
+        roles: ["author", "reviewer"],
+        isEditor: false,
         isVerified: true,
+        emailVerified: true,
       });
+
+      // 🆕 NEW: Save to Reviewer collection also
+      await Reviewer.create({
+        firstName: given_name,
+        lastName: family_name || ".",
+        email,
+        username: email.split("@")[0] + "_" + googleId.slice(0, 4),
+        password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10),
+        roles: ["author", "reviewer"],
+      });
+
     } else if (!user.googleId) {
       // Update existing user with Google ID
       user.googleId = googleId;
+      user.isVerified = true;
+      user.emailVerified = true;
+      
+      // 🆕 NEW: Add reviewer role if not present
+      if (!user.roles.includes("reviewer")) {
+        user.roles.push("reviewer");
+      }
+      
       await user.save();
     }
 
     // Generate JWT
     const authToken = generateToken(user._id);
 
+    // 🔄 CHANGED: Updated response with roles
     res.json({
       _id: user._id,
       firstName: user.firstName,
@@ -713,6 +735,13 @@ exports.googleAuth = async (req, res) => {
       email: user.email,
       username: user.username,
       token: authToken,
+      // ═══════════════════════════════════════════════════════════
+      // 🆕 NEW: Add these to response
+      // ═══════════════════════════════════════════════════════════
+      roles: user.roles,
+      availableRoles: user.roles,
+      isEditor: user.isEditor || false,
+      isVerified: user.isVerified,
     });
   } catch (error) {
     console.error("Google auth error:", error);
@@ -758,10 +787,9 @@ exports.getOrcidLoginUrl = async (req, res) => {
 // @access  Public
 exports.orcidCallback = async (req, res) => {
   try {
-    const code = req.query.code; // GET request parameter
+    const code = req.query.code;
     if (!code) return res.status(400).json({ message: "No code provided" });
     
-    // prefer env, fallback to your deployed render url if needed
     const ORCID_REDIRECT_URI = process.env.ORCID_REDIRECT_URI ||
       "https://synergy-world-press-pq5k.onrender.com/api/auth/orcid/callback";
     
@@ -789,12 +817,12 @@ exports.orcidCallback = async (req, res) => {
     }
     const orcid = orcidFromToken;
 
-    // Validate ORCID format (basic validation)
+    // Validate ORCID format
     if (!orcid.match(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/)) {
       return res.status(400).json({ message: "Invalid ORCID format" });
     }
 
-    // Get user info from ORCID (public API v3)
+    // Get user info from ORCID
     const userResponse = await axios.get(
       `https://pub.orcid.org/v3.0/${encodeURIComponent(orcid)}/person`,
       {
@@ -807,7 +835,7 @@ exports.orcidCallback = async (req, res) => {
 
     const orcidData = userResponse.data;
 
-    // Extract available names with fallbacks
+    // Extract names with fallbacks
     const givenName = orcidData.name?.["given-names"]?.value?.trim() || 
                      orcidData.name?.givenNames?.value?.trim() || 
                      orcidData.name?.["given-names"]?.trim() || 
@@ -818,9 +846,9 @@ exports.orcidCallback = async (req, res) => {
                       orcidData.name?.familyName?.value?.trim() || 
                       orcidData.name?.["family-name"]?.trim() || 
                       orcidData.name?.familyName?.trim() || 
-                      orcid.slice(-4); // Use last 4 digits of ORCID as fallback
+                      orcid.slice(-4);
 
-    // Generate username from available names (clean and unique)
+    // Generate username
     let username;
     try {
       const cleanGivenName = givenName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -832,7 +860,6 @@ exports.orcidCallback = async (req, res) => {
         username = `orcid_${orcid.slice(-6)}`;
       }
       
-      // Ensure username uniqueness
       const existingUsername = await User.findOne({ username });
       if (existingUsername) {
         username = `${username}_${orcid.slice(-4)}`;
@@ -841,7 +868,7 @@ exports.orcidCallback = async (req, res) => {
       username = `orcid_${orcid.slice(-6)}`;
     }
 
-    // Try to get real email from ORCID (optional)
+    // Try to get email from ORCID
     let primaryEmail = null;
     let emailVerified = false;
     
@@ -868,7 +895,6 @@ exports.orcidCallback = async (req, res) => {
       console.log("ORCID email not available:", emailErr.message);
     }
 
-    // Use fallback email if no verified email (required by schema)
     if (!primaryEmail || !emailVerified) {
       primaryEmail = `orcid_${orcid.slice(-6)}@example.com`;
       emailVerified = false;
@@ -876,42 +902,70 @@ exports.orcidCallback = async (req, res) => {
 
     console.log(`ORCID Login: ${orcid} -> ${username} (${givenName} ${familyName})`);
 
-    // Check if user exists by ORCID iD (primary identifier)
+    // Check if user exists by ORCID iD
     let user = await User.findOne({ orcidId: orcid });
 
     if (!user) {
-      // Check if user exists with same email (merge accounts)
+      // Check if user exists with same email
       if (primaryEmail && !primaryEmail.includes('@example.com')) {
         const existingEmailUser = await User.findOne({ email: primaryEmail });
         if (existingEmailUser && !existingEmailUser.orcidId) {
           // Link ORCID to existing account
           existingEmailUser.orcidId = orcid;
           existingEmailUser.orcidVerified = true;
+          existingEmailUser.isVerified = true;
+          
+          // 🆕 Add reviewer role if not present
+          if (!existingEmailUser.roles.includes("reviewer")) {
+            existingEmailUser.roles.push("reviewer");
+          }
+          
           user = await existingEmailUser.save();
         }
       }
       
       if (!user) {
-        // Create new user with ORCID as primary identifier
+        // Create new user with ORCID
         const userData = {
           firstName: givenName,
           lastName: familyName,
           email: primaryEmail,
           username: username,
           password: await bcrypt.hash(orcid + (process.env.JWT_SECRET || "secret"), 10),
-          roles: ["author"],
-          isVerified: emailVerified,
+          // 🆕 Both roles assigned
+          roles: ["author", "reviewer"],
+          isEditor: false,
+          isVerified: true,
+          emailVerified: emailVerified,
           orcidId: orcid,
           orcidVerified: true,
-          profileCompleted: emailVerified // Mark as complete only if email verified
+          profileCompleted: emailVerified
         };
 
         user = await User.create(userData);
+
+        // 🆕 Save to Reviewer collection also
+        await Reviewer.create({
+          firstName: givenName,
+          lastName: familyName,
+          email: primaryEmail,
+          username: username,
+          password: await bcrypt.hash(orcid + (process.env.JWT_SECRET || "secret"), 10),
+          roles: ["author", "reviewer"],
+          orcidId: orcid,
+        });
+
         console.log(`Created new user: ${username} with ORCID ${orcid}`);
       }
     } else {
       // Update last login
       user.lastLogin = new Date();
+      
+      // 🆕 Add reviewer role if not present
+      if (!user.roles.includes("reviewer")) {
+        user.roles.push("reviewer");
+      }
+      
       await user.save();
     }
 
@@ -930,6 +984,7 @@ exports.orcidCallback = async (req, res) => {
       accountType: "author",
       currentRole: "author",
       availableRoles: user.roles,
+      isEditor: user.isEditor || false,
       orcidId: user.orcidId,
       isVerified: user.isVerified,
       orcidVerified: user.orcidVerified,
@@ -937,13 +992,11 @@ exports.orcidCallback = async (req, res) => {
       needsProfileCompletion: !emailVerified
     };
 
-    // Check if request expects HTML (browser redirect) or JSON (API call)
+    // Check if request expects HTML or JSON
     if (req.headers.accept && req.headers.accept.includes('text/html')) {
-      // Redirect to frontend with user data
       const frontendUrl = process.env.FRONTEND_URL || 'https://synergyworldpress.com';
       const redirectUrl = `${frontendUrl}/orcid-callback?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
       
-      // Send HTML page that redirects
       res.send(`
         <!DOCTYPE html>
         <html>
@@ -962,7 +1015,6 @@ exports.orcidCallback = async (req, res) => {
         </html>
       `);
     } else {
-      // Return JSON for API calls
       res.json(userData);
     }
 
