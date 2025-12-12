@@ -169,6 +169,7 @@ async function convertDocxToPdf(docxPath, onProgress) {
     console.log("===========================================");
     console.log("[convertDocxToPdf] FUNCTION STARTED");
     console.log("[convertDocxToPdf] Input file:", docxPath);
+    console.log("[convertDocxToPdf] Platform:", process.platform);
     console.log("===========================================");
     
     if (!fsSync.existsSync(docxPath)) {
@@ -203,61 +204,110 @@ async function convertDocxToPdf(docxPath, onProgress) {
         console.log("[convertDocxToPdf] Output dir:", outputDir);
         console.log("[convertDocxToPdf] Expected PDF:", expectedPdfPath);
         
-        // LibreOffice paths for Windows
-        const libreOfficePaths = [
-            'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
-            'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
-            'libreoffice',
-            'soffice',
-        ];
+        // 🔥 FIXED: Platform-specific LibreOffice paths
+        let libreOfficePaths = [];
+        
+        if (process.platform === 'win32') {
+            // Windows paths
+            libreOfficePaths = [
+                'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+                'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+                process.env.LIBREOFFICE_PATH,
+                'soffice',
+                'libreoffice',
+            ].filter(Boolean);
+        } else {
+            // Linux/Mac paths (for Render, Heroku, etc.)
+            libreOfficePaths = [
+                '/usr/bin/libreoffice',      // 🔥 Most common Linux path
+                '/usr/bin/soffice',
+                '/usr/local/bin/libreoffice',
+                '/usr/local/bin/soffice',
+                '/opt/libreoffice/program/soffice',
+                '/opt/libreoffice7.4/program/soffice',
+                process.env.LIBREOFFICE_PATH,
+                'libreoffice',
+                'soffice',
+            ].filter(Boolean);
+        }
+        
+        console.log("[convertDocxToPdf] Platform:", process.platform);
+        console.log("[convertDocxToPdf] LibreOffice paths to try:", libreOfficePaths.length);
         
         for (const loPath of libreOfficePaths) {
+            // Build command based on path type
             let command;
-            if (loPath.includes(' ') || loPath.includes('\\')) {
+            
+            if (process.platform === 'win32' && (loPath.includes(' ') || loPath.includes('\\'))) {
+                // Windows with spaces
                 command = `"${loPath}" --headless --convert-to pdf --outdir "${outputDir}" "${docxPath}"`;
             } else {
+                // Linux or simple path
                 command = `${loPath} --headless --convert-to pdf --outdir "${outputDir}" "${docxPath}"`;
             }
             
-            console.log("[convertDocxToPdf] Trying:", command.substring(0, 80) + "...");
+            console.log("[convertDocxToPdf] Trying command:", command.substring(0, 100) + "...");
             
             try {
                 const { stdout, stderr } = await execPromise(command, {
-                    timeout: 120000,
-                    windowsHide: true,
+                    timeout: 120000,  // 2 minutes
                     maxBuffer: 10 * 1024 * 1024,
+                    env: {
+                        ...process.env,
+                        HOME: process.env.HOME || '/tmp',
+                        DISPLAY: process.env.DISPLAY || ':99',
+                    }
                 });
                 
                 if (stdout) console.log("[convertDocxToPdf] stdout:", stdout.trim().substring(0, 200));
                 if (stderr) console.log("[convertDocxToPdf] stderr:", stderr.trim().substring(0, 200));
                 
                 // Wait for file system
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 
+                // Check if PDF was created
                 if (fsSync.existsSync(expectedPdfPath)) {
                     const pdfStats = fsSync.statSync(expectedPdfPath);
-                    console.log("[convertDocxToPdf] ✅ LOCAL LibreOffice SUCCESS!");
+                    console.log("[convertDocxToPdf] ✅ PDF FILE CREATED!");
                     console.log("[convertDocxToPdf] PDF size:", (pdfStats.size / 1024).toFixed(2), "KB");
                     
                     if (isValidPdf(expectedPdfPath)) {
+                        console.log("[convertDocxToPdf] ✅ PDF IS VALID!");
+                        console.log("[convertDocxToPdf] 🎉🎉🎉 LOCAL LibreOffice SUCCESS! 🎉🎉🎉");
                         progress(100, "Conversion complete");
                         return expectedPdfPath;
+                    } else {
+                        console.log("[convertDocxToPdf] ❌ PDF is invalid (corrupted?)");
                     }
+                } else {
+                    console.log("[convertDocxToPdf] ❌ PDF file not found at:", expectedPdfPath);
+                    
+                    // Try to find PDF in output directory
+                    const files = fsSync.readdirSync(outputDir);
+                    const pdfFiles = files.filter(f => f.endsWith('.pdf'));
+                    console.log("[convertDocxToPdf] PDF files in directory:", pdfFiles);
                 }
+                
             } catch (cmdError) {
-                if (cmdError.message.includes('ENOENT') || 
-                    cmdError.message.includes('not found') ||
-                    cmdError.message.includes('not recognized')) {
+                const errMsg = cmdError.message || '';
+                
+                if (errMsg.includes('ENOENT') || 
+                    errMsg.includes('not found') ||
+                    errMsg.includes('not recognized') ||
+                    errMsg.includes('No such file')) {
                     console.log("[convertDocxToPdf] Path not found:", loPath);
                     continue;
                 }
-                console.log("[convertDocxToPdf] Command error:", cmdError.message.substring(0, 100));
+                
+                console.log("[convertDocxToPdf] Command error:", errMsg.substring(0, 150));
+                errors.push(`local-lo-${loPath}: ${errMsg.substring(0, 50)}`);
                 continue;
             }
         }
         
-        errors.push("local-libreoffice: Not found or failed");
-        console.log("[convertDocxToPdf] ❌ Local LibreOffice not available");
+        console.log("[convertDocxToPdf] ❌ Local LibreOffice: None of the paths worked");
+        errors.push("local-libreoffice: No working path found");
+        
     } catch (error) {
         console.error("[convertDocxToPdf] ❌ Local LibreOffice error:", error.message);
         errors.push(`local-libreoffice: ${error.message}`);
@@ -271,75 +321,128 @@ async function convertDocxToPdf(docxPath, onProgress) {
     console.log("[convertDocxToPdf] USE_REMOTE_CONVERTER:", useRemote);
 
     if (useRemote) {
-        const CONVERTER_BASE = "https://doc-converter-kypa.onrender.com";
+        const CONVERTER_BASE = process.env.CONVERTER_URL || "https://doc-converter-kypa.onrender.com";
         const CONVERTER_ENDPOINTS = ["/convert", "/api/convert/docx-to-pdf", "/api/convert", "/convert/docx-to-pdf"];
-        const timeoutMs = 120000;
+        const timeoutMs = parseInt(process.env.CONVERTER_TIMEOUT_MS || "180000", 10);
+        
+        console.log("[convertDocxToPdf] Converter base:", CONVERTER_BASE);
+        console.log("[convertDocxToPdf] Timeout:", timeoutMs, "ms");
         
         for (const endpoint of CONVERTER_ENDPOINTS) {
             const url = `${CONVERTER_BASE}${endpoint}`;
-            console.log(`[convertDocxToPdf] Trying endpoint: ${url}`);
+            console.log(`\n[convertDocxToPdf] 📡 Trying endpoint: ${url}`);
             
             try {
-                const FormData = require('form-data');
+                progress(30, `Trying remote: ${endpoint}...`);
+                
                 const formData = new FormData();
                 formData.append("file", fsSync.createReadStream(docxPath), path.basename(docxPath));
 
                 const requestStart = Date.now();
                 
                 const response = await axios.post(url, formData, {
-                    headers: { ...formData.getHeaders(), Accept: "application/pdf" },
+                    headers: { 
+                        ...formData.getHeaders(), 
+                        Accept: "application/pdf" 
+                    },
                     responseType: "stream",
                     timeout: timeoutMs,
+                    maxContentLength: 100 * 1024 * 1024,
+                    maxBodyLength: 100 * 1024 * 1024,
                 });
 
-                console.log(`[convertDocxToPdf] Response in ${Date.now() - requestStart}ms`);
+                const requestDuration = Date.now() - requestStart;
+                console.log(`[convertDocxToPdf] Response received in ${requestDuration}ms`);
                 console.log(`[convertDocxToPdf] Status: ${response.status}`);
                 console.log(`[convertDocxToPdf] Content-Type: ${response.headers['content-type']}`);
 
                 const contentType = (response.headers?.["content-type"] || "").toLowerCase();
                 if (!contentType.includes("application/pdf")) {
-                    throw new Error(`Expected application/pdf but got ${contentType}`);
+                    console.log("[convertDocxToPdf] ❌ Response is not PDF:", contentType);
+                    errors.push(`remote:${endpoint}: Got ${contentType}`);
+                    continue;
                 }
 
+                progress(60, "Downloading PDF...");
+                
                 const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+                let downloadedBytes = 0;
                 
                 await new Promise((resolve, reject) => {
                     const writeStream = fsSync.createWriteStream(pdfPath);
-                    response.data.on("error", reject);
-                    writeStream.on("error", reject);
-                    writeStream.on("finish", resolve);
+                    
+                    response.data.on("data", (chunk) => {
+                        downloadedBytes += chunk.length;
+                    });
+                    
+                    response.data.on("error", (err) => {
+                        console.error("[convertDocxToPdf] Stream error:", err.message);
+                        reject(err);
+                    });
+                    
+                    writeStream.on("error", (err) => {
+                        console.error("[convertDocxToPdf] Write error:", err.message);
+                        reject(err);
+                    });
+                    
+                    writeStream.on("finish", () => {
+                        console.log("[convertDocxToPdf] Downloaded:", downloadedBytes, "bytes");
+                        resolve();
+                    });
+                    
                     response.data.pipe(writeStream);
                 });
 
                 if (isValidPdf(pdfPath)) {
-                    console.log("[convertDocxToPdf] ✅ REMOTE CONVERSION SUCCESSFUL");
+                    const pdfStats = fsSync.statSync(pdfPath);
+                    console.log("[convertDocxToPdf] ✅ PDF is valid!");
+                    console.log("[convertDocxToPdf] PDF size:", (pdfStats.size / 1024).toFixed(2), "KB");
+                    console.log("[convertDocxToPdf] 🎉🎉🎉 REMOTE CONVERSION SUCCESSFUL! 🎉🎉🎉");
+                    progress(100, "Conversion complete");
                     return pdfPath;
+                } else {
+                    console.log("[convertDocxToPdf] ❌ Downloaded PDF is invalid");
+                    errors.push(`remote:${endpoint}: Invalid PDF`);
                 }
                 
             } catch (error) {
+                const status = error.response?.status;
                 console.error(`[convertDocxToPdf] ❌ Endpoint ${url} failed:`, error.message);
-                errors.push(`remote:${endpoint}:${error.message}`);
+                console.error(`[convertDocxToPdf] Status: ${status}, Code: ${error.code}`);
+                
+                if (status === 404 || status === 405) {
+                    console.log("[convertDocxToPdf] Endpoint not found, trying next...");
+                }
+                
+                errors.push(`remote:${endpoint}:${error.message.substring(0, 50)}`);
                 continue;
             }
         }
         
-        console.log("[convertDocxToPdf] All remote endpoints failed");
+        console.log("[convertDocxToPdf] ❌ All remote endpoints failed");
+    } else {
+        console.log("[convertDocxToPdf] Remote converter disabled");
+        errors.push("remote: disabled");
     }
 
     // =====================================================
     // 🥉 METHOD 3: Puppeteer/Mammoth (LAST RESORT)
     // =====================================================
     console.log("\n[convertDocxToPdf] ═══ METHOD 3: PUPPETEER/MAMMOTH ═══");
-    console.log("[convertDocxToPdf] ⚠️ WARNING: Images and tables may be MISSING!");
+    console.log("[convertDocxToPdf] ⚠️⚠️⚠️ WARNING: Images and tables may be MISSING! ⚠️⚠️⚠️");
+    progress(80, "Using fallback converter...");
     
     try {
-        const pdfPath = await convertDocxToPdfNode(docxPath, null, progress);
+        const pdfPath = await convertDocxToPdfNode(docxPath, null, (p, s) => {
+            progress(80 + (p * 0.2), s);
+        });
         
         if (!isValidPdf(pdfPath)) {
             throw new Error("Puppeteer returned invalid PDF");
         }
         
-        console.log("[convertDocxToPdf] ✅ PUPPETEER CONVERSION SUCCESSFUL");
+        console.log("[convertDocxToPdf] ⚠️ PUPPETEER CONVERSION DONE (may have missing content)");
+        progress(100, "Conversion complete (fallback)");
         return pdfPath;
         
     } catch (error) {
@@ -347,7 +450,12 @@ async function convertDocxToPdf(docxPath, onProgress) {
         errors.push(`puppeteer:${error.message}`);
     }
 
-    console.error("[convertDocxToPdf] ❌ ALL CONVERSION METHODS FAILED");
+    // All methods failed
+    console.error("\n[convertDocxToPdf] ════════════════════════════════════════════");
+    console.error("[convertDocxToPdf] ❌❌❌ ALL CONVERSION METHODS FAILED! ❌❌❌");
+    console.error("[convertDocxToPdf] Errors:", errors);
+    console.error("[convertDocxToPdf] ════════════════════════════════════════════\n");
+    
     throw new Error(`DOCX to PDF conversion failed: ${errors.join(" | ")}`);
 }
 // Helper function to extract abstract from text
