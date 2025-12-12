@@ -235,7 +235,141 @@ app.get('/api/health', (req, res) => {
     uptime: Math.round(process.uptime())
   });
 });
-
+// Add this route to test ACTUAL docx conversion
+app.get('/test-docx-convert', async (req, res) => {
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const https = require('https');
+    
+    const results = {
+        timestamp: new Date().toISOString(),
+        steps: []
+    };
+    
+    const testDir = path.join(os.tmpdir(), `docx-test-${Date.now()}`);
+    const profileDir = path.join(os.tmpdir(), `lo-profile-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    
+    try {
+        // Step 1: Create test directory
+        fs.mkdirSync(testDir, { recursive: true });
+        results.steps.push({ step: 1, action: 'Created test dir', path: testDir });
+        
+        // Step 2: Download a sample DOCX file
+        const docxUrl = 'https://calibre-ebook.com/downloads/demos/demo.docx';
+        const docxPath = path.join(testDir, 'test.docx');
+        
+        await new Promise((resolve, reject) => {
+            const file = fs.createWriteStream(docxPath);
+            https.get(docxUrl, (response) => {
+                response.pipe(file);
+                file.on('finish', () => {
+                    file.close();
+                    resolve();
+                });
+            }).on('error', reject);
+        });
+        
+        const docxSize = fs.statSync(docxPath).size;
+        results.steps.push({ step: 2, action: 'Downloaded DOCX', size: docxSize });
+        
+        // Step 3: Build the EXACT command from your code
+        const outputDir = testDir;
+        const loPath = '/usr/bin/libreoffice';
+        
+        const command = `${loPath} --headless --nofirststartwizard --norestore "-env:UserInstallation=file://${profileDir}" --convert-to pdf --outdir "${outputDir}" "${docxPath}"`;
+        
+        results.steps.push({ step: 3, action: 'Built command', command });
+        
+        // Step 4: Execute conversion
+        const startTime = Date.now();
+        
+        try {
+            const { stdout, stderr } = await execPromise(command, {
+                timeout: 120000,
+                maxBuffer: 10 * 1024 * 1024,
+                env: {
+                    ...process.env,
+                    HOME: process.env.HOME || '/tmp',
+                }
+            });
+            
+            const duration = Date.now() - startTime;
+            results.steps.push({ 
+                step: 4, 
+                action: 'Command executed',
+                duration: `${duration}ms`,
+                stdout: stdout.trim(),
+                stderr: stderr.trim()
+            });
+            
+        } catch (cmdErr) {
+            results.steps.push({ 
+                step: 4, 
+                action: 'Command FAILED',
+                error: cmdErr.message,
+                stdout: cmdErr.stdout,
+                stderr: cmdErr.stderr,
+                code: cmdErr.code
+            });
+            throw cmdErr;
+        }
+        
+        // Step 5: Check output
+        await new Promise(r => setTimeout(r, 500));
+        
+        const filesInDir = fs.readdirSync(testDir);
+        results.steps.push({ step: 5, action: 'Files in dir', files: filesInDir });
+        
+        const pdfPath = path.join(testDir, 'test.pdf');
+        
+        if (fs.existsSync(pdfPath)) {
+            const pdfSize = fs.statSync(pdfPath).size;
+            
+            // Check PDF header
+            const fd = fs.openSync(pdfPath, 'r');
+            const buffer = Buffer.alloc(10);
+            fs.readSync(fd, buffer, 0, 10, 0);
+            fs.closeSync(fd);
+            
+            results.steps.push({ 
+                step: 6, 
+                action: 'PDF CHECK',
+                exists: true,
+                size: pdfSize,
+                header: buffer.toString(),
+                isValidPdf: buffer.toString().startsWith('%PDF-')
+            });
+            
+            results.success = true;
+            results.message = '🎉 LibreOffice conversion WORKING!';
+        } else {
+            results.steps.push({ 
+                step: 6, 
+                action: 'PDF CHECK',
+                exists: false,
+                error: 'PDF file not created'
+            });
+            results.success = false;
+        }
+        
+    } catch (error) {
+        results.success = false;
+        results.error = error.message;
+        results.stack = error.stack;
+    } finally {
+        // Cleanup
+        try {
+            fs.rmSync(testDir, { recursive: true, force: true });
+            fs.rmSync(profileDir, { recursive: true, force: true });
+        } catch (e) {}
+    }
+    
+    res.json(results);
+});
 app.use("/api", require("./routes/manuscriptRoutes"));
 
 // Error Handling
