@@ -53,7 +53,8 @@ import WebSeriesCast from "./pages/WebSeriesCast";
 import ConferencePublication from "./pages/ConferencePublication";
 import CurrentIssue from "./pages/CurrentIssue";
 import ArticleDetail from "./pages/journal/jics/articles/ArticleDetail";
-
+import VerifyEmail from "./pages/VerifyEmail";
+import VerificationPending from "./pages/VerificationPending";
 
 // Create Authentication Context
 const AuthContext = createContext(null);
@@ -180,7 +181,8 @@ function AppContent() {
         <Route path="/books" element={<BookPublication />} />
         <Route path="/web-series-cast" element={<WebSeriesCast />} />
         <Route path="/conference-publication" element={<ConferencePublication />} />
-
+        <Route path="/verify-email/:token" element={<VerifyEmail />} />
+        <Route path="/verification-pending" element={<VerificationPending />} />
         {/* Journal Management Routes */}
         {/* <Route path={BASE_URL} element={<HomePage />} /> */}
         <Route path={`/publish`} element={<Publish />} />

@@ -24,6 +24,8 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState({ show: false, message: "" });
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
   const [editorPassKey, setEditorPassKey] = useState("");
   const [showEditorKeyInput, setShowEditorKeyInput] = useState(false);
 
@@ -161,10 +163,20 @@ function Login() {
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Login Failed";
 
-      setError(errorMessage);
-      if (errorMessage == "Editor key required") {
+      // ══════════════════════════════════════════════════════════════
+      // 🆕 NEW: Handle email verification required error
+      // ══════════════════════════════════════════════════════════════
+      if (error.response?.data?.needsVerification) {
+        setNeedsVerification(true);
+        setVerificationEmail(error.response?.data?.email || formData.email);
+        setError("Please verify your email before logging in.");
+      } else if (errorMessage === "Editor key required") {
         setShowEditorKeyInput(true);
+        setError(errorMessage);
+      } else {
+        setError(errorMessage);
       }
+      // ══════════════════════════════════════════════════════════════
     } finally {
       setIsLoading(false);
     }
@@ -182,6 +194,34 @@ function Login() {
     } catch (err) {
       console.error("ORCID redirect error:", err);
       alert("ORCID login failed. Please try again.");
+    }
+  };
+
+  // Add this new function
+  const handleResendVerification = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/resend-verification`,
+        { email: verificationEmail }
+      );
+
+      if (response.data.success) {
+        setSuccess({
+          show: true,
+          message: "Verification email sent! Please check your inbox.",
+        });
+        setNeedsVerification(false);
+      }
+    } catch (error) {
+      if (error.response?.data?.alreadyVerified) {
+        setError("Email is already verified. Please try logging in again.");
+        setNeedsVerification(false);
+      } else {
+        setError(error.response?.data?.message || "Failed to send verification email.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -415,6 +455,28 @@ function Login() {
                 rights reserved.
               </p>
             </div>
+            {/* {error && (
+              <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+                {error}
+              </div>
+            )} */}
+
+            {/* Add this NEW block right after the error block: */}
+            {needsVerification && (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-yellow-800 text-sm mb-3">
+                  Your email is not verified. Please check your inbox for the verification link.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={isLoading}
+                  className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  {isLoading ? "Sending..." : "Resend Verification Email"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

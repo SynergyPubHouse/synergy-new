@@ -19,7 +19,7 @@ const FormData = require("form-data");
 const { uploadToCloudinary } = require("../utils/cloudinary");
 const { uploadFileToDrive,deleteFileFromDrive, downloadDriveFileToTemp   } = require('../services/googleDriveOAuth');
 const sendEmail = require("../utils/sendEmail");
-const { console } = require("inspector");
+// const { console } = require("inspector");
 const { 
     createJob, 
     getJob, 
@@ -161,232 +161,195 @@ function isValidPdf(filePath) {
 	}
 }
 
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
+
 async function convertDocxToPdf(docxPath, onProgress) {
-	const errors = [];
-	const progress = (percent, step) => {
-		try {
-			if (typeof onProgress === "function") {
-				onProgress(
-					Math.max(0, Math.min(100, Math.round(percent))),
-					step || "Converting..."
-				);
-			}
-		} catch (_) {}
-	};
+    console.log("===========================================");
+    console.log("[convertDocxToPdf] FUNCTION STARTED");
+    console.log("[convertDocxToPdf] Input file:", docxPath);
+    console.log("===========================================");
+    
+    if (!fsSync.existsSync(docxPath)) {
+        console.error("[convertDocxToPdf] FILE DOES NOT EXIST:", docxPath);
+        throw new Error(`File not found: ${docxPath}`);
+    }
+    
+    const fileStats = fsSync.statSync(docxPath);
+    console.log("[convertDocxToPdf] File size:", (fileStats.size / 1024).toFixed(2), "KB");
+    
+    const errors = [];
+    const progress = (percent, step) => {
+        console.log(`[convertDocxToPdf] Progress: ${percent}% - ${step}`);
+        try {
+            if (typeof onProgress === "function") {
+                onProgress(Math.max(0, Math.min(100, Math.round(percent))), step || "Converting...");
+            }
+        } catch (_) {}
+    };
 
-	// Hard-coded external LibreOffice HTTP service base + endpoints (no env lookup)
-	const CONVERTER_BASE = "https://doc-converter-kypa.onrender.com";
-	const CONVERTER_ENDPOINTS = [
-		"/convert",
-		"/api/convert/docx-to-pdf",
-		"/api/convert",
-		"/convert/docx-to-pdf",
-	];
-	const useRemote = (process.env.USE_REMOTE_CONVERTER || "true").toLowerCase() !== "false";
+    // =====================================================
+    // 🥇 METHOD 1: LOCAL LibreOffice (BEST - Full support!)
+    // =====================================================
+    console.log("\n[convertDocxToPdf] ═══ METHOD 1: LOCAL LibreOffice ═══");
+    progress(10, "Trying LibreOffice conversion...");
+    
+    try {
+        const outputDir = path.dirname(docxPath);
+        const fileName = path.basename(docxPath, path.extname(docxPath));
+        const expectedPdfPath = path.join(outputDir, `${fileName}.pdf`);
+        
+        console.log("[convertDocxToPdf] Output dir:", outputDir);
+        console.log("[convertDocxToPdf] Expected PDF:", expectedPdfPath);
+        
+        // LibreOffice paths for Windows
+        const libreOfficePaths = [
+            'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+            'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+            'libreoffice',
+            'soffice',
+        ];
+        
+        for (const loPath of libreOfficePaths) {
+            let command;
+            if (loPath.includes(' ') || loPath.includes('\\')) {
+                command = `"${loPath}" --headless --convert-to pdf --outdir "${outputDir}" "${docxPath}"`;
+            } else {
+                command = `${loPath} --headless --convert-to pdf --outdir "${outputDir}" "${docxPath}"`;
+            }
+            
+            console.log("[convertDocxToPdf] Trying:", command.substring(0, 80) + "...");
+            
+            try {
+                const { stdout, stderr } = await execPromise(command, {
+                    timeout: 120000,
+                    windowsHide: true,
+                    maxBuffer: 10 * 1024 * 1024,
+                });
+                
+                if (stdout) console.log("[convertDocxToPdf] stdout:", stdout.trim().substring(0, 200));
+                if (stderr) console.log("[convertDocxToPdf] stderr:", stderr.trim().substring(0, 200));
+                
+                // Wait for file system
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                if (fsSync.existsSync(expectedPdfPath)) {
+                    const pdfStats = fsSync.statSync(expectedPdfPath);
+                    console.log("[convertDocxToPdf] ✅ LOCAL LibreOffice SUCCESS!");
+                    console.log("[convertDocxToPdf] PDF size:", (pdfStats.size / 1024).toFixed(2), "KB");
+                    
+                    if (isValidPdf(expectedPdfPath)) {
+                        progress(100, "Conversion complete");
+                        return expectedPdfPath;
+                    }
+                }
+            } catch (cmdError) {
+                if (cmdError.message.includes('ENOENT') || 
+                    cmdError.message.includes('not found') ||
+                    cmdError.message.includes('not recognized')) {
+                    console.log("[convertDocxToPdf] Path not found:", loPath);
+                    continue;
+                }
+                console.log("[convertDocxToPdf] Command error:", cmdError.message.substring(0, 100));
+                continue;
+            }
+        }
+        
+        errors.push("local-libreoffice: Not found or failed");
+        console.log("[convertDocxToPdf] ❌ Local LibreOffice not available");
+    } catch (error) {
+        console.error("[convertDocxToPdf] ❌ Local LibreOffice error:", error.message);
+        errors.push(`local-libreoffice: ${error.message}`);
+    }
 
-	if (useRemote) {
-		const timeoutMs = Math.max(
-			60000,
-			parseInt(
-				process.env.LIBREOFFICE_SERVICE_TIMEOUT_MS ||
-					process.env.CONVERTER_TIMEOUT_MS ||
-					"120000",
-				10
-			)
-		);
-		const maxContentLength = 100 * 1024 * 1024;
-		const maxBodyLength = 100 * 1024 * 1024;
+    // =====================================================
+    // 🥈 METHOD 2: REMOTE LibreOffice Service
+    // =====================================================
+    const useRemote = (process.env.USE_REMOTE_CONVERTER || "true").toLowerCase() !== "false";
+    console.log("\n[convertDocxToPdf] ═══ METHOD 2: REMOTE LibreOffice ═══");
+    console.log("[convertDocxToPdf] USE_REMOTE_CONVERTER:", useRemote);
 
-		let sizeBytes = null;
-		let sizeMB = null;
-		try {
-			const stat = fsSync.statSync(docxPath);
-			sizeBytes = stat.size;
-			sizeMB = Math.round((stat.size / (1024 * 1024)) * 100) / 100;
-		} catch (e) {}
+    if (useRemote) {
+        const CONVERTER_BASE = "https://doc-converter-kypa.onrender.com";
+        const CONVERTER_ENDPOINTS = ["/convert", "/api/convert/docx-to-pdf", "/api/convert", "/convert/docx-to-pdf"];
+        const timeoutMs = 120000;
+        
+        for (const endpoint of CONVERTER_ENDPOINTS) {
+            const url = `${CONVERTER_BASE}${endpoint}`;
+            console.log(`[convertDocxToPdf] Trying endpoint: ${url}`);
+            
+            try {
+                const FormData = require('form-data');
+                const formData = new FormData();
+                formData.append("file", fsSync.createReadStream(docxPath), path.basename(docxPath));
 
-		let meta = {
-			serviceUrl: `${CONVERTER_BASE}${CONVERTER_ENDPOINTS[0]}`,
-			timeoutMs,
-			maxContentLength,
-			maxBodyLength,
-			sizeBytes,
-			sizeMB,
-			fileName: path.basename(docxPath),
-		};
+                const requestStart = Date.now();
+                
+                const response = await axios.post(url, formData, {
+                    headers: { ...formData.getHeaders(), Accept: "application/pdf" },
+                    responseType: "stream",
+                    timeout: timeoutMs,
+                });
 
-		const fileName = meta.fileName;
-		const requestStartedAt = Date.now();
-		try {
-			let response;
-			const attempted = [];
-			for (const endpoint of CONVERTER_ENDPOINTS) {
-				const url = `${CONVERTER_BASE}${endpoint}`;
-				attempted.push(url);
-				meta.serviceUrl = url;
-				
-				const formData = new FormData();
-				formData.append("file", fsSync.createReadStream(docxPath), fileName);
+                console.log(`[convertDocxToPdf] Response in ${Date.now() - requestStart}ms`);
+                console.log(`[convertDocxToPdf] Status: ${response.status}`);
+                console.log(`[convertDocxToPdf] Content-Type: ${response.headers['content-type']}`);
 
-				const config = {
-					headers: {
-						...(typeof formData.getHeaders === "function"
-							? formData.getHeaders()
-							: {}),
-						Accept: "application/pdf",
-					},
-					responseType: "stream",
-					timeout: timeoutMs,
-					maxContentLength,
-					maxBodyLength,
-				};
+                const contentType = (response.headers?.["content-type"] || "").toLowerCase();
+                if (!contentType.includes("application/pdf")) {
+                    throw new Error(`Expected application/pdf but got ${contentType}`);
+                }
 
-				console.log("[convertDocxToPdf] Remote request config", {
-					method: "POST",
-					url,
-					timeoutMs: config.timeout,
-					maxContentLength,
-					maxBodyLength,
-				});
+                const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
+                
+                await new Promise((resolve, reject) => {
+                    const writeStream = fsSync.createWriteStream(pdfPath);
+                    response.data.on("error", reject);
+                    writeStream.on("error", reject);
+                    writeStream.on("finish", resolve);
+                    response.data.pipe(writeStream);
+                });
 
-				console.log('[LO-HTTP][manuscript] Calling converter at', url, 'for', docxPath);
-				try {
-					response = await axios.post(url, formData, config);
-					meta.serviceUrl = url;
-					// success
-					const requestDurationMs = Date.now() - requestStartedAt;
-					const contentType = (response.headers?.["content-type"] || "").toLowerCase();
-					const contentLengthHeader = response.headers?.["content-length"];
-					const contentLength = contentLengthHeader
-						? parseInt(contentLengthHeader, 10) || null
-						: null;
+                if (isValidPdf(pdfPath)) {
+                    console.log("[convertDocxToPdf] ✅ REMOTE CONVERSION SUCCESSFUL");
+                    return pdfPath;
+                }
+                
+            } catch (error) {
+                console.error(`[convertDocxToPdf] ❌ Endpoint ${url} failed:`, error.message);
+                errors.push(`remote:${endpoint}:${error.message}`);
+                continue;
+            }
+        }
+        
+        console.log("[convertDocxToPdf] All remote endpoints failed");
+    }
 
-					console.log("[convertDocxToPdf] Remote response received", {
-						status: response.status,
-						statusText: response.statusText,
-						requestDurationMs,
-						contentType,
-						contentLength,
-					});
+    // =====================================================
+    // 🥉 METHOD 3: Puppeteer/Mammoth (LAST RESORT)
+    // =====================================================
+    console.log("\n[convertDocxToPdf] ═══ METHOD 3: PUPPETEER/MAMMOTH ═══");
+    console.log("[convertDocxToPdf] ⚠️ WARNING: Images and tables may be MISSING!");
+    
+    try {
+        const pdfPath = await convertDocxToPdfNode(docxPath, null, progress);
+        
+        if (!isValidPdf(pdfPath)) {
+            throw new Error("Puppeteer returned invalid PDF");
+        }
+        
+        console.log("[convertDocxToPdf] ✅ PUPPETEER CONVERSION SUCCESSFUL");
+        return pdfPath;
+        
+    } catch (error) {
+        console.error("[convertDocxToPdf] ❌ Puppeteer fallback failed:", error.message);
+        errors.push(`puppeteer:${error.message}`);
+    }
 
-					if (!contentType.includes("application/pdf")) {
-						throw new Error(
-							`Expected application/pdf but got ${contentType || "unknown"}`
-						);
-					}
-
-					const pdfPath = docxPath.replace(/\.[^.]+$/, ".pdf");
-					const writeStartedAt = Date.now();
-					let downloadedBytes = 0;
-
-					await new Promise((resolve, reject) => {
-						const writeStream = fsSync.createWriteStream(pdfPath);
-						response.data.on("data", (chunk) => {
-							downloadedBytes += chunk.length;
-							if (downloadedBytes < 1024 * 1024) {
-								progress(10, "Downloading PDF from converter...");
-							} else if (downloadedBytes < 10 * 1024 * 1024) {
-								progress(40, "Downloading PDF from converter...");
-							} else {
-								progress(70, "Downloading PDF from converter...");
-							}
-						});
-						response.data.on("error", (err) => reject(err));
-						writeStream.on("error", (err) => reject(err));
-						writeStream.on("finish", () => resolve());
-						response.data.pipe(writeStream);
-					});
-
-					console.log("[convertDocxToPdf] PDF stream written", {
-						writeDurationMs: Date.now() - writeStartedAt,
-						bytes: downloadedBytes,
-					});
-
-					if (!isValidPdf(pdfPath)) {
-						throw new Error("Remote converter returned invalid PDF");
-					}
-
-					progress(100, "Conversion complete");
-					console.log("[convertDocxToPdf] Remote LibreOffice conversion successful", {
-						pdfPath,
-						requestDurationMs,
-					});
-					return pdfPath;
-				} catch (error) {
-					const status = error.response?.status;
-					if (status === 404 || status === 405) {
-						console.error('[convertDocxToPdf] Converter endpoint not found/allowed', { status, url });
-						continue; // try next endpoint
-					}
-					throw error;
-				}
-			}
-			throw new Error(`No converter endpoint available (tried: ${attempted.join(', ')})`);
-		} catch (error) {
-			const durationMs = Date.now() - requestStartedAt;
-			const isTimeout =
-				error.code === "ECONNABORTED" || /timeout/i.test(error.message || "");
-
-			let responseSnippet = null;
-			try {
-				if (error.response && error.response.data) {
-					if (Buffer.isBuffer(error.response.data)) {
-						responseSnippet = `Binary data length=${error.response.data.length}`;
-					} else if (typeof error.response.data === "string") {
-						responseSnippet = error.response.data.substring(0, 500);
-					} else {
-						responseSnippet = JSON.stringify(error.response.data).substring(
-							0,
-							500
-						);
-					}
-				}
-			} catch (_) {}
-
-			console.error("[convertDocxToPdf] Remote LibreOffice service call failed", {
-				...meta,
-				durationMs,
-				isTimeout,
-				message: error.message,
-				code: error.code,
-				status: error.response?.status,
-				statusText: error.response?.statusText,
-				responseHeaders: error.response?.headers,
-				responseSnippet,
-				stack: error.stack,
-			});
-			errors.push(`remote:${error.message}`);
-		}
-	} else {
-		console.log(
-			"[convertDocxToPdf] Remote converter disabled via USE_REMOTE_CONVERTER; skipping remote HTTP call"
-		);
-		errors.push("remote:disabled");
-	}
-
-	try {
-		console.log("[convertDocxToPdf] Falling back to internal Puppeteer/Mammoth converter");
-		const pdfPath = await convertDocxToPdfNode(
-			docxPath,
-			null,
-			(percent, step) => progress(percent, step)
-		);
-		if (!isValidPdf(pdfPath)) throw new Error("Puppeteer returned invalid PDF");
-		console.log("[convertDocxToPdf] Puppeteer conversion successful");
-		return pdfPath;
-	} catch (error) {
-		console.error("[convertDocxToPdf] Puppeteer fallback error", {
-			message: error.message,
-			stack: error.stack,
-		});
-		errors.push(`puppeteer:${error.message}`);
-	}
-
-	throw new Error(
-		`DOCX to PDF conversion failed. Attempts: ${errors.join(" | ")}`
-	);
+    console.error("[convertDocxToPdf] ❌ ALL CONVERSION METHODS FAILED");
+    throw new Error(`DOCX to PDF conversion failed: ${errors.join(" | ")}`);
 }
-
 // Helper function to extract abstract from text
 function extractAbstract(text) {
 	const lines = text.split('\n').filter(line => line.trim());
@@ -432,6 +395,7 @@ function extractKeywords(text) {
 
 // Helper: Extract text from DOCX using Python (original working version)
 async function extractTextFromDocx(docxPath) {
+    console.log("extractTextFromDocx");
 	const pythonPath = "python3"; // Use python3 for production compatibility
 	return new Promise((resolve, reject) => {
 		const scriptPath = path.join(__dirname, "../utils/textExtractor.py");
@@ -2519,6 +2483,19 @@ exports.uploadPublishedPdf = async (req, res) => {
     try {
         const { manuscriptId } = req.params;
 
+        // ═══════════════════════════════════════════════════════
+        // NEW: Extract Issue Info from request body
+        // ═══════════════════════════════════════════════════════
+        const {
+            issueVolume,
+            issueNumber,
+            issueYear,
+            issueTitle,
+            pageStart,
+            pageEnd,
+            section
+        } = req.body;
+
         if (!req.file) {
             return res.status(400).json({
                 success: false,
@@ -2553,30 +2530,45 @@ exports.uploadPublishedPdf = async (req, res) => {
         );
 
         const driveResult = await uploadFileToDrive(req.file.path, {
-    filename: fileName,
-    mimeType: 'application/pdf',
-    makePublic: true,
-});
+            filename: fileName,
+            mimeType: 'application/pdf',
+            makePublic: true,
+        });
 
-if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
-    throw new Error("Google Drive upload failed");
-}
+        if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
+            throw new Error("Google Drive upload failed");
+        }
 
-        // 🔥 Save published date in database
+        // 🔥 Save published date
         const publishedDate = new Date();
-        
+
+        // Update manuscript with PDF URLs
         manuscript.publishedFileUrl = uploadedPdf.secure_url;
+        manuscript.publishedDriveFileId = driveResult.driveFileId;
+        manuscript.publishedDriveViewUrl = driveResult.webViewLink || "";
         manuscript.status = "Published";
-        manuscript.publishedAt = publishedDate;  // ✅ Saved to database
+        manuscript.publishedAt = publishedDate;
+
+        // ═══════════════════════════════════════════════════════
+        // NEW: Save Issue Info to manuscript
+        // ═══════════════════════════════════════════════════════
+        if (issueVolume) manuscript.issueVolume = parseInt(issueVolume);
+        if (issueNumber) manuscript.issueNumber = parseInt(issueNumber);
+        if (issueYear) manuscript.issueYear = parseInt(issueYear);
+        if (issueTitle) manuscript.issueTitle = issueTitle;
+        if (pageStart) manuscript.pageStart = parseInt(pageStart);
+        if (pageEnd) manuscript.pageEnd = parseInt(pageEnd);
+        if (section) manuscript.section = section;
+
         await manuscript.save();
 
         // Cleanup temp file
         await cleanupFiles(tempFiles);
         tempFiles = [];
 
-        // ===================================
-        // EMAIL NOTIFICATION TO AUTHORS
-        // ===================================
+        // ═══════════════════════════════════════════════════════
+        // EMAIL NOTIFICATION TO AUTHORS (Updated with Issue Info)
+        // ═══════════════════════════════════════════════════════
         const authorEmails = new Set();
 
         if (manuscript.correspondingAuthor?.email) {
@@ -2593,7 +2585,7 @@ if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
 
         if (authorEmails.size > 0) {
             const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
-            
+
             // Format date for email display
             const formattedDate = publishedDate.toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -2601,58 +2593,94 @@ if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
                 day: 'numeric'
             });
 
-          const emailSubject = 'Congratulations! Your Manuscript Has Been Published - ' + customId;
+            // ═══════════════════════════════════════════════════════
+            // NEW: Issue info for email
+            // ═══════════════════════════════════════════════════════
+            const hasIssueInfo = manuscript.issueVolume && manuscript.issueNumber && manuscript.issueYear;
+            
+            const issueInfoText = hasIssueInfo
+                ? 'Vol ' + manuscript.issueVolume + ', No ' + manuscript.issueNumber + ', ' + manuscript.issueYear + (manuscript.issueTitle ? ' - ' + manuscript.issueTitle : '')
+                : '';
 
-const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">' +
-    
-    // Header
-    '<div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 30px; text-align: center;">' +
-    '<h1 style="margin: 0; font-size: 24px; color: #1c1c1cff;">Congratulations!</h1>' +
-    '<p style="margin: 10px 0 0 0; font-size: 16px; color: #1c1c1cff;">Your Manuscript Has Been Published</p>' +
-    '</div>' +
+            const pageInfoText = (manuscript.pageStart && manuscript.pageEnd)
+                ? 'Pages ' + manuscript.pageStart + '-' + manuscript.pageEnd
+                : '';
 
-    // Content
-    '<div style="padding: 30px;">' +
-    
-    '<p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Dear Author,</p>' +
-    
-    '<p style="color: #374151; font-size: 16px; margin-bottom: 20px; line-height: 1.6;">' +
-    'We are pleased to inform you that your manuscript has been <strong>successfully published</strong> in the Journal of Innovative Computer Science (JICS).' +
-    '</p>' +
+            const sectionText = manuscript.section || 'Research Article';
 
-    // Manuscript Details
-    '<div style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 25px;">' +
-    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Manuscript ID:</strong></p>' +
-    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + customId + '</p>' +
-    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Title:</strong></p>' +
-    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + (manuscript.title || 'Untitled') + '</p>' +
-    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published Date:</strong></p>' +
-    '<p style="margin: 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + formattedDate + '</p>' +
-    '</div>' +
+            const emailSubject = 'Congratulations! Your Manuscript Has Been Published - ' + customId;
 
-    // Download Button
-    '<div style="text-align: center; margin: 30px 0;">' +
-    '<a href="' + manuscript.publishedFileUrl + '" style="display: inline-block; background-color: #00796B; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Download Published PDF</a>' +
-    '</div>' +
+            const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">' +
 
-    '<p style="color: #374151; font-size: 15px; line-height: 1.6;">' +
-    'Thank you for choosing <strong>Synergy World Press</strong> for publishing your research.' +
-    '</p>' +
+                // Header
+                '<div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 30px; text-align: center;">' +
+                '<h1 style="margin: 0; font-size: 24px; color: #1c1c1cff;">Congratulations!</h1>' +
+                '<p style="margin: 10px 0 0 0; font-size: 16px; color: #1c1c1cff;">Your Manuscript Has Been Published</p>' +
+                '</div>' +
 
-    '<p style="color: #374151; font-size: 15px; margin-top: 25px;">Best regards,<br><strong>Synergy World Press Editorial Team</strong></p>' +
+                // Content
+                '<div style="padding: 30px;">' +
 
-    '</div>' +
+                '<p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Dear Author,</p>' +
 
-    // Footer
-    '<div style="background-color: #F3F4F6; padding: 20px; text-align: center; border-top: 1px solid #E5E7EB;">' +
-    '<p style="color: #6B7280; font-size: 12px; margin: 0 0 5px 0;">Journal of Innovative Computer Science (JICS)</p>' +
-    '<p style="color: #6B7280; font-size: 12px; margin: 0;">' +
-    '<a href="' + frontendUrl + '" style="color: #00796B; text-decoration: none;">synergyworldpress.com</a> | ' +
-    '<a href="mailto:support@synergyworldpress.com" style="color: #00796B; text-decoration: none;">support@synergyworldpress.com</a>' +
-    '</p>' +
-    '</div>' +
+                '<p style="color: #374151; font-size: 16px; margin-bottom: 20px; line-height: 1.6;">' +
+                'We are pleased to inform you that your manuscript has been <strong>successfully published</strong> in the Journal of Innovative Computer Science (JICS).' +
+                '</p>' +
 
-    '</div>';
+                // Manuscript Details
+                '<div style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 25px;">' +
+                
+                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Manuscript ID:</strong></p>' +
+                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + customId + '</p>' +
+                
+                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Title:</strong></p>' +
+                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + (manuscript.title || 'Untitled') + '</p>' +
+                
+                // NEW: Issue Info in Email
+                (hasIssueInfo ? (
+                    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published In:</strong></p>' +
+                    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + issueInfoText + '</p>'
+                ) : '') +
+
+                // NEW: Section
+                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Section:</strong></p>' +
+                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + sectionText + '</p>' +
+
+                // NEW: Page Numbers
+                (pageInfoText ? (
+                    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Page Numbers:</strong></p>' +
+                    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + pageInfoText + '</p>'
+                ) : '') +
+                
+                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published Date:</strong></p>' +
+                '<p style="margin: 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + formattedDate + '</p>' +
+                
+                '</div>' +
+
+                // Download Button
+                '<div style="text-align: center; margin: 30px 0;">' +
+                '<a href="' + manuscript.publishedFileUrl + '" style="display: inline-block; background-color: #00796B; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Download Published PDF</a>' +
+                '</div>' +
+
+                '<p style="color: #374151; font-size: 15px; line-height: 1.6;">' +
+                'Thank you for choosing <strong>Synergy World Press</strong> for publishing your research.' +
+                '</p>' +
+
+                '<p style="color: #374151; font-size: 15px; margin-top: 25px;">Best regards,<br><strong>Synergy World Press Editorial Team</strong></p>' +
+
+                '</div>' +
+
+                // Footer
+                '<div style="background-color: #F3F4F6; padding: 20px; text-align: center; border-top: 1px solid #E5E7EB;">' +
+                '<p style="color: #6B7280; font-size: 12px; margin: 0 0 5px 0;">Journal of Innovative Computer Science (JICS)</p>' +
+                '<p style="color: #6B7280; font-size: 12px; margin: 0;">' +
+                '<a href="' + frontendUrl + '" style="color: #00796B; text-decoration: none;">synergyworldpress.com</a> | ' +
+                '<a href="mailto:support@synergyworldpress.com" style="color: #00796B; text-decoration: none;">support@synergyworldpress.com</a>' +
+                '</p>' +
+                '</div>' +
+
+                '</div>';
+
             // Send email to all authors
             const emailPromises = Array.from(authorEmails).map(email => {
                 return sendEmail({
@@ -2666,7 +2694,9 @@ const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px;
             console.log('[uploadPublishedPdf] Emails sent to ' + authorEmails.size + ' author(s)');
         }
 
-        // 🔥 Return published date in response
+        // ═══════════════════════════════════════════════════════
+        // NEW: Return issue info in response
+        // ═══════════════════════════════════════════════════════
         return res.json({
             success: true,
             message: "Published PDF uploaded and emails sent successfully",
@@ -2674,8 +2704,16 @@ const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px;
                 manuscriptId: manuscript._id,
                 customId: customId,
                 publishedFileUrl: manuscript.publishedFileUrl,
-                publishedAt: manuscript.publishedAt,  // ✅ Return in response
-                status: manuscript.status
+                publishedAt: manuscript.publishedAt,
+                status: manuscript.status,
+                // Issue Info
+                issueVolume: manuscript.issueVolume,
+                issueNumber: manuscript.issueNumber,
+                issueYear: manuscript.issueYear,
+                issueTitle: manuscript.issueTitle,
+                section: manuscript.section,
+                pageStart: manuscript.pageStart,
+                pageEnd: manuscript.pageEnd,
             }
         });
 
@@ -2695,7 +2733,6 @@ const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px;
         });
     }
 };
-
 
 // Controller
 exports.getPublishedManuscripts = async (req, res) => {
@@ -2737,6 +2774,8 @@ exports.getPublishedManuscripts = async (req, res) => {
  * Returns immediately with jobId, processes in background
  */
 exports.createManuscriptAsync = async (req, res) => {
+
+    console.log("createManuscriptAsync");
     let tempFiles = [];
 
     try {
@@ -2808,6 +2847,7 @@ exports.createManuscriptAsync = async (req, res) => {
  * 🔥 Process manuscript in background
  */
 async function processManuscriptJob(jobId, tempFiles) {
+    console.log("processManuscriptJob");
     const job = getJob(jobId);
     if (!job) return;
 

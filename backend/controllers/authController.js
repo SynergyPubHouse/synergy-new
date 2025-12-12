@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const axios = require("axios");
 const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
@@ -9,9 +10,73 @@ const Reviewer = require("../models/Reviewer");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT
+// Find this function:
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "30d",
+  });
+};
+
+// Add these 2 functions after it:
+
+// Generate Email Verification Token
+const generateVerificationToken = () => {
+  return crypto.randomBytes(32).toString("hex");
+};
+
+// Send Verification Email Helper Function
+const sendVerificationEmail = async (user, token) => {
+  const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
+  const verificationLink = `${frontendUrl}/verify-email/${token}`;
+  
+  const fullName = [user.title, user.firstName, user.middleName, user.lastName]
+    .filter(Boolean)
+    .join(" ");
+
+  const emailHtml = `
+    <div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #111; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #4F46E5; padding: 20px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0;">Synergy World Press</h1>
+      </div>
+      
+      <div style="padding: 30px; background-color: #f9f9f9;">
+        <p>Dear ${fullName},</p>
+        
+        <p>Thank you for registering at Synergy World Press. To complete your registration and activate your account, please verify your email address.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${verificationLink}" 
+             style="background-color: #4F46E5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            Verify Email Address
+          </a>
+        </div>
+        
+        <p>Or copy and paste this link in your browser:</p>
+        <p style="background-color: #e9e9e9; padding: 10px; border-radius: 4px; word-break: break-all;">
+          <a href="${verificationLink}">${verificationLink}</a>
+        </p>
+        
+        <p><strong>This link will expire in 10 minutes.</strong></p>
+        
+        <p>If you did not create an account, please ignore this email.</p>
+        
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+        
+        <p>With best regards,<br/>
+        <strong>Synergy World Press</strong><br/>
+        Editorial Office</p>
+      </div>
+      
+      <div style="background-color: #333; color: #fff; padding: 15px; text-align: center; font-size: 12px;">
+        <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+      </div>
+    </div>
+  `;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Verify Your Email - Synergy World Press",
+    text: emailHtml,
   });
 };
 
@@ -118,6 +183,9 @@ exports.sendLoginDetails = async (req, res) => {
 // @desc    Register new user
 // @route   POST /api/auth/register
 // @access  Public
+// @desc    Register new user
+// @route   POST /api/auth/register
+// @access  Public
 exports.registerUser = async (req, res) => {
   const {
     title,
@@ -146,6 +214,22 @@ exports.registerUser = async (req, res) => {
       ? role.toLowerCase().replace(" ", "_")
       : "author";
 
+    // Determine roles based on selection
+    let assignedRoles;
+    let isEditor = false;
+
+    if (normalizedRole === "editor") {
+      assignedRoles = ["editor"];
+      isEditor = true;
+    } else {
+      assignedRoles = ["author", "reviewer"];
+      isEditor = false;
+    }
+
+    // Generate verification token
+    const verificationToken = generateVerificationToken();
+    const verificationExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
     // Create User entry
     const userData = {
       title,
@@ -155,10 +239,17 @@ exports.registerUser = async (req, res) => {
       email,
       username,
       password: hashedPassword,
-      roles: [normalizedRole],
+      roles: assignedRoles,
+      isEditor: isEditor,
+      isVerified: false,
+      emailVerified: false,
+      emailVerificationToken: verificationToken,
+      emailVerificationExpiry: verificationExpiry,
     };
 
-    // Extra fields for Editor/Reviewer
+    // ═══════════════════════════════════════════════════════════════
+    // EDITOR: Special key + Specialization + Experience required
+    // ═══════════════════════════════════════════════════════════════
     if (normalizedRole === "editor") {
       const HARDCODED_EDITOR_KEY = "myTestEditorKey123";
       if (!specialKey)
@@ -174,10 +265,12 @@ exports.registerUser = async (req, res) => {
       userData.experience = experience;
       userData.specialKey = specialKey;
 
-      // Optional: save extra info in Editor collection
       await Editor.create({ ...userData });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // REVIEWER: Specialization + Experience required
+    // ═══════════════════════════════════════════════════════════════
     if (normalizedRole === "reviewer") {
       if (!specialization || !experience)
         return res
@@ -187,28 +280,143 @@ exports.registerUser = async (req, res) => {
       userData.specialization = specialization;
       userData.experience = experience;
 
-      // Optional: save extra info in Reviewer collection
+      await Reviewer.create({ ...userData });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // AUTHOR: No specialization/experience required
+    // But still save to Reviewer collection (without specialization)
+    // ═══════════════════════════════════════════════════════════════
+    if (normalizedRole === "author") {
       await Reviewer.create({ ...userData });
     }
 
     const newUser = await User.create(userData);
 
+    // Send verification email
+    try {
+      await sendVerificationEmail(newUser, verificationToken);
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+    }
+
     res.status(201).json({
-      _id: newUser._id,
-      title: newUser.title,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      email: newUser.email,
-      username: newUser.username,
-      roles: newUser.roles,
-      token: generateToken(newUser._id),
+      success: true,
+      message: "Registration successful! Please check your email to verify your account.",
+      user: {
+        _id: newUser._id,
+        title: newUser.title,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        username: newUser.username,
+        roles: newUser.roles,
+        isEditor: newUser.isEditor,
+        isVerified: newUser.isVerified,
+      },
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server Error", error });
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+// @desc    Verify email with token
+// @route   POST /api/auth/verify-email-token
+// @access  Public
+exports.verifyEmailToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Verification token is required" });
+    }
+
+    // Find user with this token
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpiry: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Invalid or expired verification link. Please request a new one.",
+        expired: true,
+      });
+    }
+
+    // Update user verification status
+    user.isVerified = true;
+    user.emailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpiry = null;
+    await user.save();
+
+    // Generate login token after verification
+    const authToken = generateToken(user._id);
+
+    res.json({
+      success: true,
+      message: "Email verified successfully! You can now login.",
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        username: user.username,
+        roles: user.roles,
+        isVerified: user.isVerified,
+      },
+      token: authToken,
+    });
+  } catch (error) {
+    console.error("Email verification error:", error);
+    res.status(500).json({ message: "Failed to verify email", error: error.message });
   }
 };
 
+// @desc    Resend verification email
+// @route   POST /api/auth/resend-verification
+// @access  Public
+exports.resendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        message: "This email is already verified. You can login directly.",
+        alreadyVerified: true,
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = generateVerificationToken();
+    const verificationExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpiry = verificationExpiry;
+    await user.save();
+
+    await sendVerificationEmail(user, verificationToken);
+
+    res.json({
+      success: true,
+      message: "Verification email sent! Please check your inbox.",
+    });
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({ message: "Failed to send verification email", error: error.message });
+  }
+};
 // @desc    Authenticate user & get token (unified login for all roles)
 // @route   POST /api/auth/login
 // @access  Public
@@ -229,11 +437,19 @@ exports.loginUser = async (req, res) => {
     }
 
     // Compare password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
+   const isPasswordValid = await bcrypt.compare(password, user.password);
+if (!isPasswordValid) {
+  return res.status(401).json({ message: "Invalid email or password" });
+}
 
+
+if (!user.isVerified) {
+  return res.status(403).json({
+    message: "Please verify your email before logging in.",
+    needsVerification: true,
+    email: user.email,
+  });
+}
     // Determine current role
     let currentRole = null;
 
@@ -459,9 +675,7 @@ exports.googleAuth = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    const { sub: googleId, email, given_name, family_name, picture } = payload; // Use given_name and family_name
-
-    // const { sub: googleId, email, name, picture } = payload;
+    const { sub: googleId, email, given_name, family_name, picture } = payload;
 
     // Check if user exists
     let user = await User.findOne({
@@ -472,24 +686,48 @@ exports.googleAuth = async (req, res) => {
       // Create new user with Google info
       user = await User.create({
         firstName: given_name,
-        // Use family_name, but if it's missing, use a placeholder (like a period)
-        // to satisfy the 'required' rule.
         lastName: family_name || ".",
         email,
         googleId,
         username: email.split("@")[0] + "_" + googleId.slice(0, 4),
         password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10),
+        // ═══════════════════════════════════════════════════════════
+        // 🆕 NEW: Add these fields
+        // ═══════════════════════════════════════════════════════════
+        roles: ["author", "reviewer"],
+        isEditor: false,
         isVerified: true,
+        emailVerified: true,
       });
+
+      // 🆕 NEW: Save to Reviewer collection also
+      await Reviewer.create({
+        firstName: given_name,
+        lastName: family_name || ".",
+        email,
+        username: email.split("@")[0] + "_" + googleId.slice(0, 4),
+        password: await bcrypt.hash(googleId + process.env.JWT_SECRET, 10),
+        roles: ["author", "reviewer"],
+      });
+
     } else if (!user.googleId) {
       // Update existing user with Google ID
       user.googleId = googleId;
+      user.isVerified = true;
+      user.emailVerified = true;
+      
+      // 🆕 NEW: Add reviewer role if not present
+      if (!user.roles.includes("reviewer")) {
+        user.roles.push("reviewer");
+      }
+      
       await user.save();
     }
 
     // Generate JWT
     const authToken = generateToken(user._id);
 
+    // 🔄 CHANGED: Updated response with roles
     res.json({
       _id: user._id,
       firstName: user.firstName,
@@ -497,6 +735,13 @@ exports.googleAuth = async (req, res) => {
       email: user.email,
       username: user.username,
       token: authToken,
+      // ═══════════════════════════════════════════════════════════
+      // 🆕 NEW: Add these to response
+      // ═══════════════════════════════════════════════════════════
+      roles: user.roles,
+      availableRoles: user.roles,
+      isEditor: user.isEditor || false,
+      isVerified: user.isVerified,
     });
   } catch (error) {
     console.error("Google auth error:", error);
@@ -542,10 +787,9 @@ exports.getOrcidLoginUrl = async (req, res) => {
 // @access  Public
 exports.orcidCallback = async (req, res) => {
   try {
-    const code = req.query.code; // GET request parameter
+    const code = req.query.code;
     if (!code) return res.status(400).json({ message: "No code provided" });
     
-    // prefer env, fallback to your deployed render url if needed
     const ORCID_REDIRECT_URI = process.env.ORCID_REDIRECT_URI ||
       "https://synergy-world-press-pq5k.onrender.com/api/auth/orcid/callback";
     
@@ -573,12 +817,12 @@ exports.orcidCallback = async (req, res) => {
     }
     const orcid = orcidFromToken;
 
-    // Validate ORCID format (basic validation)
+    // Validate ORCID format
     if (!orcid.match(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/)) {
       return res.status(400).json({ message: "Invalid ORCID format" });
     }
 
-    // Get user info from ORCID (public API v3)
+    // Get user info from ORCID
     const userResponse = await axios.get(
       `https://pub.orcid.org/v3.0/${encodeURIComponent(orcid)}/person`,
       {
@@ -591,7 +835,7 @@ exports.orcidCallback = async (req, res) => {
 
     const orcidData = userResponse.data;
 
-    // Extract available names with fallbacks
+    // Extract names with fallbacks
     const givenName = orcidData.name?.["given-names"]?.value?.trim() || 
                      orcidData.name?.givenNames?.value?.trim() || 
                      orcidData.name?.["given-names"]?.trim() || 
@@ -602,9 +846,9 @@ exports.orcidCallback = async (req, res) => {
                       orcidData.name?.familyName?.value?.trim() || 
                       orcidData.name?.["family-name"]?.trim() || 
                       orcidData.name?.familyName?.trim() || 
-                      orcid.slice(-4); // Use last 4 digits of ORCID as fallback
+                      orcid.slice(-4);
 
-    // Generate username from available names (clean and unique)
+    // Generate username
     let username;
     try {
       const cleanGivenName = givenName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -616,7 +860,6 @@ exports.orcidCallback = async (req, res) => {
         username = `orcid_${orcid.slice(-6)}`;
       }
       
-      // Ensure username uniqueness
       const existingUsername = await User.findOne({ username });
       if (existingUsername) {
         username = `${username}_${orcid.slice(-4)}`;
@@ -625,7 +868,7 @@ exports.orcidCallback = async (req, res) => {
       username = `orcid_${orcid.slice(-6)}`;
     }
 
-    // Try to get real email from ORCID (optional)
+    // Try to get email from ORCID
     let primaryEmail = null;
     let emailVerified = false;
     
@@ -652,7 +895,6 @@ exports.orcidCallback = async (req, res) => {
       console.log("ORCID email not available:", emailErr.message);
     }
 
-    // Use fallback email if no verified email (required by schema)
     if (!primaryEmail || !emailVerified) {
       primaryEmail = `orcid_${orcid.slice(-6)}@example.com`;
       emailVerified = false;
@@ -660,42 +902,70 @@ exports.orcidCallback = async (req, res) => {
 
     console.log(`ORCID Login: ${orcid} -> ${username} (${givenName} ${familyName})`);
 
-    // Check if user exists by ORCID iD (primary identifier)
+    // Check if user exists by ORCID iD
     let user = await User.findOne({ orcidId: orcid });
 
     if (!user) {
-      // Check if user exists with same email (merge accounts)
+      // Check if user exists with same email
       if (primaryEmail && !primaryEmail.includes('@example.com')) {
         const existingEmailUser = await User.findOne({ email: primaryEmail });
         if (existingEmailUser && !existingEmailUser.orcidId) {
           // Link ORCID to existing account
           existingEmailUser.orcidId = orcid;
           existingEmailUser.orcidVerified = true;
+          existingEmailUser.isVerified = true;
+          
+          // 🆕 Add reviewer role if not present
+          if (!existingEmailUser.roles.includes("reviewer")) {
+            existingEmailUser.roles.push("reviewer");
+          }
+          
           user = await existingEmailUser.save();
         }
       }
       
       if (!user) {
-        // Create new user with ORCID as primary identifier
+        // Create new user with ORCID
         const userData = {
           firstName: givenName,
           lastName: familyName,
           email: primaryEmail,
           username: username,
           password: await bcrypt.hash(orcid + (process.env.JWT_SECRET || "secret"), 10),
-          roles: ["author"],
-          isVerified: emailVerified,
+          // 🆕 Both roles assigned
+          roles: ["author", "reviewer"],
+          isEditor: false,
+          isVerified: true,
+          emailVerified: emailVerified,
           orcidId: orcid,
           orcidVerified: true,
-          profileCompleted: emailVerified // Mark as complete only if email verified
+          profileCompleted: emailVerified
         };
 
         user = await User.create(userData);
+
+        // 🆕 Save to Reviewer collection also
+        await Reviewer.create({
+          firstName: givenName,
+          lastName: familyName,
+          email: primaryEmail,
+          username: username,
+          password: await bcrypt.hash(orcid + (process.env.JWT_SECRET || "secret"), 10),
+          roles: ["author", "reviewer"],
+          orcidId: orcid,
+        });
+
         console.log(`Created new user: ${username} with ORCID ${orcid}`);
       }
     } else {
       // Update last login
       user.lastLogin = new Date();
+      
+      // 🆕 Add reviewer role if not present
+      if (!user.roles.includes("reviewer")) {
+        user.roles.push("reviewer");
+      }
+      
       await user.save();
     }
 
@@ -714,6 +984,7 @@ exports.orcidCallback = async (req, res) => {
       accountType: "author",
       currentRole: "author",
       availableRoles: user.roles,
+      isEditor: user.isEditor || false,
       orcidId: user.orcidId,
       isVerified: user.isVerified,
       orcidVerified: user.orcidVerified,
@@ -721,13 +992,11 @@ exports.orcidCallback = async (req, res) => {
       needsProfileCompletion: !emailVerified
     };
 
-    // Check if request expects HTML (browser redirect) or JSON (API call)
+    // Check if request expects HTML or JSON
     if (req.headers.accept && req.headers.accept.includes('text/html')) {
-      // Redirect to frontend with user data
       const frontendUrl = process.env.FRONTEND_URL || 'https://synergyworldpress.com';
       const redirectUrl = `${frontendUrl}/orcid-callback?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
       
-      // Send HTML page that redirects
       res.send(`
         <!DOCTYPE html>
         <html>
@@ -746,7 +1015,6 @@ exports.orcidCallback = async (req, res) => {
         </html>
       `);
     } else {
-      // Return JSON for API calls
       res.json(userData);
     }
 

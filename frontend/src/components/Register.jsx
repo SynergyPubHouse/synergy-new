@@ -34,46 +34,53 @@ function Register() {
     setErrorMessage("");
   };
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsLoading(true);
-  setErrorMessage("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage("");
 
-  if (formData.password !== formData.confirmPassword) {
-    setErrorMessage("Passwords do not match!");
-    setIsLoading(false);
-    return;
-  }
-
-  if ((role === "Editor" || role === "Reviewer") && (!formData.specialization || !formData.experience)) {
-    setErrorMessage("Please provide specialization and experience for this role.");
-    setIsLoading(false);
-    return;
-  }
-
-  try {
-    const endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`;
-
-    const payload = { ...formData, role };
-    if (role === "Editor") payload.specialKey = formData.specialKey || "";
-
-    const response = await axios.post(endpoint, payload);
-
-    if (response.data.role === "Author") {
-      login(response.data);
-      localStorage.setItem("user", JSON.stringify(response.data));
-      navigate(from, { replace: true });
-    } else {
-      alert(`${response.data.role} registration successful. Please log in.`);
-      navigate("/login");
+    if (formData.password !== formData.confirmPassword) {
+      setErrorMessage("Passwords do not match!");
+      setIsLoading(false);
+      return;
     }
 
-  } catch (error) {
-    setErrorMessage(error.response?.data?.message || "Registration Failed. Please try again.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+    if ((role === "Editor" || role === "Reviewer") && (!formData.specialization || !formData.experience)) {
+      setErrorMessage("Please provide specialization and experience for this role.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const endpoint = `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`;
+
+      const payload = { ...formData, role };
+      if (role === "Editor") payload.specialKey = formData.specialKey || "";
+
+      const response = await axios.post(endpoint, payload);
+
+      // ══════════════════════════════════════════════════════════════
+      // 🔄 CHANGED: Handle email verification response
+      // ══════════════════════════════════════════════════════════════
+      if (response.data.success) {
+        // Registration successful - redirect to verification pending page
+        navigate("/verification-pending", {
+          state: {
+            email: formData.email,
+            message: response.data.message
+          }
+        });
+      } else {
+        setErrorMessage("Registration failed. Please try again.");
+      }
+      // ══════════════════════════════════════════════════════════════
+
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || "Registration Failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   return (
@@ -116,7 +123,7 @@ function Register() {
           {/* Form Panel */}
           <div className="md:w-3/5 p-6 md:p-8">
             <h2 className="text-xl font-bold text-gray-800 mb-6">Create your account</h2>
-            
+
             {errorMessage && (
               <div className="mb-4 p-2 bg-red-50 text-red-600 rounded text-xs">
                 {errorMessage}
@@ -157,7 +164,7 @@ function Register() {
                     <option value="Prof">Prof</option>
                   </select>
                 </div>
-                
+
                 <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">First Name</label>
@@ -271,21 +278,21 @@ function Register() {
                   />
                 </div>
               </div>
-{role === "Editor" && (
-  <div className="grid grid-cols-1 gap-3">
-    <label className="block text-xs font-medium text-gray-600 mb-1">
-      Editor Key
-    </label>
-    <input
-      type="password"
-      name="specialKey"
-      value={formData.specialKey}
-      onChange={handleChange}
-      required
-      className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
-    />
-  </div>
-)}
+              {role === "Editor" && (
+                <div className="grid grid-cols-1 gap-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Editor Key
+                  </label>
+                  <input
+                    type="password"
+                    name="specialKey"
+                    value={formData.specialKey}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 py-2 text-xs rounded border border-gray-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none"
+                  />
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -310,7 +317,7 @@ function Register() {
             </form>
 
             <div className="mt-6 text-center text-xs text-gray-500">
-              
+
             </div>
           </div>
         </div>

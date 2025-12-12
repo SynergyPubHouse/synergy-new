@@ -17,6 +17,8 @@ const {
   sendLoginDetails,
   resetPassword,
   switchRole,
+  verifyEmailToken,
+  resendVerificationEmail,
 } = require("../controllers/authController");
 
 // Public routes
@@ -36,7 +38,8 @@ router.get("/profile", auth, getUserProfile);
 router.put("/profile", auth, updateUserProfile);
 router.post("/verify-email", auth, verifyEmail);
 router.post("/switch-role", auth, switchRole);
-
+router.post("/verify-email-token", verifyEmailToken);
+router.post("/resend-verification", resendVerificationEmail);
 // Admin routes
 router.get("/users", auth, getAllUsers);
 router.delete("/users/:id", auth, deleteUser);

@@ -8,6 +8,7 @@ const BASE_URL = '';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  console.log("user", user)
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || user.email
     : "";
@@ -25,8 +26,8 @@ const Navbar = () => {
     user?.editor
       ? '/journal/jics/editor/dashboard'
       : user?.reviewer
-      ? '/journal/jics/reviewer/dashboard'
-      : '/';
+        ? '/journal/jics/reviewer/dashboard'
+        : '/';
 
   // Build available roles from backend-provided role strings
   const rawRoles = (user?.availableRoles || user?.roles || []).map((r) =>
@@ -34,19 +35,21 @@ const Navbar = () => {
   );
   const hasRole = (role) => rawRoles.includes(role);
   const availableRoles = [
-    { key: 'author', label: 'Author', path: '/' },
+    ...(hasRole('author')
+      ? [{ key: 'author', label: 'Author', path: '/journal/jics/about/overview' }]
+      : []),
     ...(hasRole('reviewer')
       ? [{ key: 'reviewer', label: 'Reviewer', path: '/journal/jics/reviewer/dashboard' }]
       : []),
     ...(hasRole('editor')
       ? [{ key: 'editor', label: 'Editor', path: '/journal/jics/editor/dashboard' }]
       : []),
-  ];
+  ]
   const currentRole = location.pathname.includes('/editor')
     ? 'editor'
     : location.pathname.includes('/reviewer')
-    ? 'reviewer'
-    : 'author';
+      ? 'reviewer'
+      : 'author';
 
   const handleLogoutConfirm = () => {
     logout();
@@ -80,11 +83,11 @@ const Navbar = () => {
     >
       <div className="container mx-auto flex justify-between items-center">
         <Link to={logoTarget} className="flex items-center hover:opacity-80 transition-opacity">
-          <img 
-            src="/images/SWP-bgremove.png" 
-            alt="Synergy World Press Logo" 
-            className="h-10 w-auto rounded-md" 
-          /> 
+          <img
+            src="/images/SWP-bgremove.png"
+            alt="Synergy World Press Logo"
+            className="h-10 w-auto rounded-md"
+          />
         </Link>
 
         <div className="hidden md:flex gap-8">
@@ -200,73 +203,73 @@ const Navbar = () => {
                 )}
               </AnimatePresence>
 
-		      {/* Icon options dropdown (My Account, etc.) */}
-		      <AnimatePresence>
-		        {userMenuOpen && (
-		          <motion.div
-		            initial={{ opacity: 0, y: -10 }}
-		            animate={{ opacity: 1, y: 0 }}
-		            exit={{ opacity: 0, y: -10 }}
-		            transition={{ duration: 0.2 }}
-		            className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl py-3 text-[#212121] border border-[#e0e0e0] ring-1 ring-black/5"
-		          >
-		            <div className="px-4 pb-3 text-sm">
-		              <p className="font-semibold truncate">{displayName}</p>
-		              <p className="opacity-70 text-xs truncate">{user.email}</p>
-		            </div>
-		            <hr className="border-[#e0e0e0] my-1" />
-		            <Link
-		              to={`${BASE_URL}/account`}
-		              className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
-		              onClick={() => setUserMenuOpen(false)}
-		            >
-		              My Account
-		            </Link>
-		            <Link
-		              to="/journal/jics/my-submissions"
-		              className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
-		              onClick={() => setUserMenuOpen(false)}
-		            >
-		              My Submissions
-		            </Link>
-		            <Link
-		              to={`${BASE_URL}/subscriptions`}
-		              className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
-		              onClick={() => setUserMenuOpen(false)}
-		            >
-		              My Subscriptions
-		            </Link>
-		            <button
-		              onClick={() => {
-		                setUserMenuOpen(false);
-		                setLogoutModalOpen(true);
-		              }}
-		              className="w-full text-left px-4 py-2 text-sm hover:bg-red-600/10 hover:text-red-700 transition-colors rounded-md mx-2"
-		            >
-		              Logout
-		            </button>
-		          </motion.div>
-		        )}
-		      </AnimatePresence>
+              {/* Icon options dropdown (My Account, etc.) */}
+              <AnimatePresence>
+                {userMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl py-3 text-[#212121] border border-[#e0e0e0] ring-1 ring-black/5"
+                  >
+                    <div className="px-4 pb-3 text-sm">
+                      <p className="font-semibold truncate">{displayName}</p>
+                      <p className="opacity-70 text-xs truncate">{user.email}</p>
+                    </div>
+                    <hr className="border-[#e0e0e0] my-1" />
+                    <Link
+                      to={`${BASE_URL}/account`}
+                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      My Account
+                    </Link>
+                    <Link
+                      to="/journal/jics/my-submissions"
+                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      My Submissions
+                    </Link>
+                    <Link
+                      to={`${BASE_URL}/subscriptions`}
+                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      My Subscriptions
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        setLogoutModalOpen(true);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-red-600/10 hover:text-red-700 transition-colors rounded-md mx-2"
+                    >
+                      Logout
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           ) : (
-      location.pathname !== '/' && (
-  <div className="hidden md:flex gap-4">
-    <Link
-      to="/login" 
-      state={{ from: location.pathname }} 
-      className="text-white font-semibold px-4 py-2 rounded-md border-2 border-[#00acc1] hover:bg-[#00acc1] hover:text-white transition-colors"
-    >
-      Login
-    </Link>
-    <Link
-      to="/register"
-      className="bg-[#00acc1] text-white font-semibold px-5 py-2 rounded-md shadow transition-colors hover:bg-[#0097a7]"
-    >
-      Register
-    </Link>
-  </div>
-)
+            location.pathname !== '/' && (
+              <div className="hidden md:flex gap-4">
+                <Link
+                  to="/login"
+                  state={{ from: location.pathname }}
+                  className="text-white font-semibold px-4 py-2 rounded-md border-2 border-[#00acc1] hover:bg-[#00acc1] hover:text-white transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="bg-[#00acc1] text-white font-semibold px-5 py-2 rounded-md shadow transition-colors hover:bg-[#0097a7]"
+                >
+                  Register
+                </Link>
+              </div>
+            )
           )}
 
           <button
