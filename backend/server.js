@@ -229,11 +229,37 @@ app.get('/debug-libreoffice', async (req, res) => {
     
     res.json(results);
 });
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: Math.round(process.uptime())
-  });
+app.get('/health', async (req, res) => {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execPromise = promisify(exec);
+    
+    const health = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        container: 'Docker',
+        memory: {
+            used: `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`,
+            total: `${(process.memoryUsage().heapTotal / 1024 / 1024).toFixed(2)} MB`
+        }
+    };
+    
+    try {
+        // Check LibreOffice
+        const { stdout } = await execPromise('libreoffice --version', { timeout: 5000 });
+        health.libreoffice = stdout.trim();
+        
+        // Check fonts
+        const { stdout: fontCount } = await execPromise('fc-list | wc -l', { timeout: 5000 });
+        health.fonts = parseInt(fontCount.trim()) + ' fonts installed';
+        
+    } catch (error) {
+        health.status = 'degraded';
+        health.error = error.message;
+    }
+    
+    res.status(health.status === 'healthy' ? 200 : 503).json(health);
 });
 // Add this route to test ACTUAL docx conversion
 app.get('/test-docx-convert', async (req, res) => {
