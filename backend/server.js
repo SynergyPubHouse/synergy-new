@@ -246,11 +246,9 @@ app.get('/health', async (req, res) => {
     };
     
     try {
-        // Check LibreOffice
         const { stdout } = await execPromise('libreoffice --version', { timeout: 5000 });
         health.libreoffice = stdout.trim();
         
-        // Check fonts
         const { stdout: fontCount } = await execPromise('fc-list | wc -l', { timeout: 5000 });
         health.fonts = parseInt(fontCount.trim()) + ' fonts installed';
         
