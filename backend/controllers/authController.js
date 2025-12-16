@@ -26,9 +26,22 @@ const generateVerificationToken = () => {
 
 // Send Verification Email Helper Function
 const sendVerificationEmail = async (user, token) => {
-  const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
-  const verificationLink = `${frontendUrl}/verify-email/${token}`;
+  const frontendUrl =  "https://synergyworldpress.com";
   
+  let verificationLink;
+  let buttonText = "Verify Email Address";
+  let buttonColor = "#4F46E5";
+  let subjectLine = "Verify Your Email - Synergy World Press";
+
+  if (user.roles && user.roles.includes("editor")) {
+    verificationLink = `${frontendUrl}/journal/jics/editor/dashboard?verify=${token}`;
+    buttonText = "Access Editor Dashboard →";
+    buttonColor = "#dc2626"; // red for editor
+    subjectLine = "Welcome Editor! Verify Your Email - Synergy World Press";
+  } else {
+    verificationLink = `${frontendUrl}/verify-email/${token}`;
+  }
+
   const fullName = [user.title, user.firstName, user.middleName, user.lastName]
     .filter(Boolean)
     .join(" ");
@@ -44,23 +57,29 @@ const sendVerificationEmail = async (user, token) => {
         
         <p>Thank you for registering at Synergy World Press. To complete your registration and activate your account, please verify your email address.</p>
         
-        <div style="text-align: center; margin: 30px 0;">
+        ${user.roles?.includes("editor") 
+          ? `<p style="font-weight: bold; color: #dc2626;">🎉 Congratulations! You have been registered as an <strong>Editor</strong>.</p>
+             <p>Click the button below to verify your email and access your Editor Dashboard immediately.</p>`
+          : `<p>After verification, you will be able to log in and submit manuscripts or review papers.</p>`
+        }
+
+        <div style="text-align: center; margin: 35px 0;">
           <a href="${verificationLink}" 
-             style="background-color: #4F46E5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-            Verify Email Address
+             style="background-color: ${buttonColor}; color: #ffffff; padding: 16px 36px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            ${buttonText}
           </a>
         </div>
         
         <p>Or copy and paste this link in your browser:</p>
-        <p style="background-color: #e9e9e9; padding: 10px; border-radius: 4px; word-break: break-all;">
-          <a href="${verificationLink}">${verificationLink}</a>
+        <p style="background-color: #e9e9e9; padding: 12px; border-radius: 6px; word-break: break-all; font-size: 13px; font-family: monospace;">
+          ${verificationLink}
         </p>
         
-        <p><strong>This link will expire in 10 minutes.</strong></p>
+        <p><strong>This link will expire in 10 minutes for security.</strong></p>
         
-        <p>If you did not create an account, please ignore this email.</p>
+        <p>If you did not register, please ignore this email.</p>
         
-        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;" />
         
         <p>With best regards,<br/>
         <strong>Synergy World Press</strong><br/>
@@ -75,8 +94,8 @@ const sendVerificationEmail = async (user, token) => {
 
   await sendEmail({
     to: user.email,
-    subject: "Verify Your Email - Synergy World Press",
-    text: emailHtml,
+    subject: subjectLine,
+    html: emailHtml,  // ← html: use kar (text: nahi)
   });
 };
 
@@ -133,7 +152,7 @@ exports.sendLoginDetails = async (req, res) => {
     }
 
     const frontendUrl =
-      process.env.FRONTEND_URL || "https://synergyworldpress.com";
+       "https://synergyworldpress.com";
     const fullName = [
       user.title,
       user.firstName,
@@ -994,7 +1013,7 @@ exports.orcidCallback = async (req, res) => {
 
     // Check if request expects HTML or JSON
     if (req.headers.accept && req.headers.accept.includes('text/html')) {
-      const frontendUrl = process.env.FRONTEND_URL || 'https://synergyworldpress.com';
+      const frontendUrl =  'https://synergyworldpress.com';
       const redirectUrl = `${frontendUrl}/orcid-callback?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
       
       res.send(`

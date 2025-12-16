@@ -217,11 +217,10 @@ function AppContent() {
         <Route
           path={`${JICS_URL}/editor/dashboard`}
           element={
-            user?.accountType === "editor" ||
-              user?.availableRoles?.includes("editor") ? (
+            user?.accountType === "editor" || user?.availableRoles?.includes("editor") ? (
               <EditorDashboard />
             ) : (
-              <Navigate to="/login" replace />
+              <VerifyEmail />
             )
           }
         />
