@@ -13,32 +13,54 @@ function VerifyEmail() {
     const [email, setEmail] = useState("");
 
     useEffect(() => {
-        if (token) {
-            verifyEmail();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryToken = urlParams.get("verify");
+
+        if (queryToken) {
+            verifyEmail(queryToken);
+        } else if (token) {
+            verifyEmail(token);
         }
     }, [token]);
 
-    const verifyEmail = async () => {
+    const verifyEmail = async (verificationToken) => {
         try {
             const response = await axios.post(
                 `${import.meta.env.VITE_BACKEND_URL}/api/auth/verify-email-token`,
-                { token }
+                { token: verificationToken }
             );
 
             if (response.data.success) {
                 setStatus("success");
                 setMessage(response.data.message);
 
-                // Auto login after verification
+
                 if (response.data.token && response.data.user) {
-                    const userData = { ...response.data.user, token: response.data.token };
+                    const userData = {
+                        ...response.data.user,
+                        token: response.data.token,
+                        accountType: response.data.user.roles.includes("editor")
+                            ? "editor"
+                            : response.data.user.roles.includes("reviewer")
+                                ? "reviewer"
+                                : "author",
+                        availableRoles: response.data.user.roles || [],
+                    };
+
                     localStorage.setItem("user", JSON.stringify(userData));
                     login(userData);
 
-                    // Redirect after 3 seconds
+
+                    const redirectPath = userData.accountType === "editor"
+                        ? "/journal/jics/editor/dashboard"
+                        : userData.accountType === "reviewer"
+                            ? "/journal/jics/reviewer/dashboard"
+                            : "/";
+
                     setTimeout(() => {
-                        navigate("/", { replace: true });
-                    }, 3000);
+                        navigate(redirectPath, { replace: true });
+                    }, 2500);
                 }
             }
         } catch (error) {
@@ -47,7 +69,7 @@ function VerifyEmail() {
                 setMessage("Verification link has expired. Please request a new one.");
             } else {
                 setStatus("error");
-                setMessage(error.response?.data?.message || "Verification failed. Please try again.");
+                setMessage(error.response?.data?.message || "Verification failed.");
             }
         }
     };
