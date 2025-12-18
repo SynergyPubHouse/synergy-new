@@ -1,7 +1,4 @@
-const sgMail = require("@sendgrid/mail");
-
-// Set the API key
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const nodemailer = require("nodemailer");
 
 // Very simple HTML to text fallback
 function htmlToText(html = "") {
@@ -20,40 +17,70 @@ function htmlToText(html = "") {
     }
 }
 
+// Create reusable transporter
+const createTransporter = () => {
+    return nodemailer.createTransport({
+        host: process.env.EMAIL_HOST || "smtp.hostinger.com",
+        port: parseInt(process.env.EMAIL_PORT) || 465,
+        secure: true, // true for port 465
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+        },
+        // Extra settings for better deliverability
+        tls: {
+            rejectUnauthorized: false,
+        },
+    });
+};
+
 const sendEmail = async (options) => {
     try {
-        const fromEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@synergy.com";
-        const fromName = process.env.SENDGRID_FROM_NAME || "Synergy World Press";
-        const replyTo = process.env.SENDGRID_REPLY_TO || undefined;
+        const fromEmail = process.env.EMAIL_USER || process.env.EMAIL_FROM || "noreply@synergyworldpress.com";
+        const fromName = process.env.EMAIL_FROM_NAME || "Synergy World Press";
+        const replyTo = process.env.EMAIL_REPLY_TO || undefined;
 
         // Backward compatibility: if caller supplied `text` as HTML, treat it as html
         const html = options.html || options.text || "";
         const text = options.plainText || htmlToText(html);
 
-        const msg = {
+        const transporter = createTransporter();
+
+        const mailOptions = {
+            from: `"${fromName}" <${fromEmail}>`,
             to: options.to,
-            from: { email: fromEmail, name: fromName },
             subject: options.subject,
-            html,
-            text,
-            replyTo,
-            // Reduce spam signals for transactional mail
-            trackingSettings: {
-                clickTracking: { enable: false, enableText: false },
-                openTracking: { enable: false },
-            },
+            html: html,
+            text: text,
         };
 
-        // Optional categories for better deliverability analytics
-        if (options.categories) msg.categories = options.categories;
-
-        await sgMail.send(msg);
-        console.log("Email sent successfully via SendGrid");
-    } catch (error) {
-        console.error("SendGrid email error:", error);
-        if (error.response) {
-            console.error("SendGrid error details:", error.response.body);
+        // Add replyTo if exists
+        if (replyTo) {
+            mailOptions.replyTo = replyTo;
         }
+
+        // Add CC if exists
+        if (options.cc) {
+            mailOptions.cc = options.cc;
+        }
+
+        // Add BCC if exists
+        if (options.bcc) {
+            mailOptions.bcc = options.bcc;
+        }
+
+        // Add attachments if exists
+        if (options.attachments) {
+            mailOptions.attachments = options.attachments;
+        }
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log("Email sent successfully via Hostinger SMTP");
+        console.log("Message ID:", info.messageId);
+        
+        return info;
+    } catch (error) {
+        console.error("Email sending error:", error);
         throw error;
     }
 };
