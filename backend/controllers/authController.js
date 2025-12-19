@@ -448,27 +448,34 @@ exports.loginUser = async (req, res) => {
     // Import optional models
     const Reviewer = require("../models/Reviewer");
 
-    // Find the user by email in User collection
-    const user = await User.findOne({ email });
+    // ══════════════════════════════════════════════════════════
+    // 🆕 UPDATED: Find user by Email OR Username
+    // ══════════════════════════════════════════════════════════
+    const user = await User.findOne({
+      $or: [
+        { email: email },
+        { username: email }  // email field mein username bhi aa sakta hai
+      ]
+    });
 
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid email/username or password" });
     }
 
     // Compare password
-   const isPasswordValid = await bcrypt.compare(password, user.password);
-if (!isPasswordValid) {
-  return res.status(401).json({ message: "Invalid email or password" });
-}
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid email/username or password" });
+    }
 
+    if (!user.isVerified) {
+      return res.status(403).json({
+        message: "Please verify your email before logging in.",
+        needsVerification: true,
+        email: user.email,
+      });
+    }
 
-if (!user.isVerified) {
-  return res.status(403).json({
-    message: "Please verify your email before logging in.",
-    needsVerification: true,
-    email: user.email,
-  });
-}
     // Determine current role
     let currentRole = null;
 
@@ -486,6 +493,12 @@ if (!user.isVerified) {
 
     // Collect all roles from user.roles
     const availableRoles = [...user.roles];
+
+    // ══════════════════════════════════════════════════════════
+    // 🆕 OPTIONAL: Update last login time
+    // ══════════════════════════════════════════════════════════
+    user.lastLogin = new Date();
+    await user.save();
 
     // Respond with user info
     return res.json({
