@@ -285,7 +285,7 @@ function Login() {
                   htmlFor="email"
                   className="text-sm font-medium text-gray-700"
                 >
-                  Username:
+                  Username / Email:
                 </label>
                 <input
                   id="email"
