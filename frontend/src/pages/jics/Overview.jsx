@@ -17,12 +17,12 @@ const Overview = () => (
         There are no publication or article processing charges (APCs). We are committed to supporting open-access publishing while ensuring that authors face no financial barriers in disseminating their work.
       </p>
 
-      {/* Editor-in-Chief - Fixed Design */}
+      {/* Editorial Leadership - Single Card */}
       <div className="mt-10 border-l-4 border-[#00796b] bg-gradient-to-r from-gray-50 to-white p-6 rounded-r-xl shadow-sm hover:shadow-md transition-all duration-300">
-        {/* Top Row - Title & Link */}
-        <div className="flex items-center justify-between mb-4">
+        {/* Header with Title & Link */}
+        <div className="flex items-center justify-between mb-6">
           <p className="text-xs text-[#00796b] font-bold uppercase tracking-widest">
-            ✦ Editor-in-Chief
+            ✦ Editorial Leadership
           </p>
           <Link
             to="/journal/jics/about/editorial-board"
@@ -40,27 +40,54 @@ const Overview = () => (
           </Link>
         </div>
 
-        {/* Bottom Row - Image & Info */}
-        <div className="flex items-center gap-5">
-          {/* Profile Image */}
-          <img
-            src="/images/b12a986f-b157-4137-93fa-c6d5af52a98a.jfif"
-            alt="Dr. Meenu Gupta"
-            className="w-20 h-20 rounded-full object-cover border-3 border-[#00796b] shadow-md hover:scale-105 transition-transform duration-300 flex-shrink-0"
-          />
+        {/* Both Editors in Grid */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Editor-in-Chief */}
+          <div className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-100 hover:border-[#00796b] hover:shadow-sm transition-all duration-300">
+            <img
+              src="/images/b12a986f-b157-4137-93fa-c6d5af52a98a.jfif"
+              alt="Dr. Meenu Gupta"
+              className="w-16 h-16 rounded-full object-cover border-2 border-[#00796b] shadow-md hover:scale-105 transition-transform duration-300 flex-shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] text-[#00796b] font-bold uppercase tracking-wider mb-1">
+                Editor-in-Chief
+              </p>
+              <h4 className="text-base font-bold text-[#212121] hover:text-[#00796b] transition-colors leading-tight">
+                Dr. Meenu Gupta
+              </h4>
+              <p className="text-gray-500 text-xs mt-1 flex items-start gap-1">
+                <svg className="w-3 h-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="line-clamp-2">Chandigarh University, Mohali, Punjab, India</span>
+              </p>
+            </div>
+          </div>
 
-          {/* Text Info */}
-          <div className="min-w-0">
-            <h4 className="text-xl font-bold text-[#212121] hover:text-[#00796b] transition-colors">
-              Dr. Meenu Gupta
-            </h4>
-            <p className="text-gray-500 text-sm mt-1 flex items-start gap-1">
-              <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>Chandigarh University, Mohali, Punjab, 140413, India</span>
-            </p>
+          {/* Co-Editor-in-Chief */}
+          <div className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-100 hover:border-[#26a69a] hover:shadow-sm transition-all duration-300">
+            <img
+              src="/images/coEditorInChief.jfif"
+              alt="Dr. Rakesh Kumar"
+              className="w-16 h-16 rounded-full object-cover border-2 border-[#26a69a] shadow-md hover:scale-105 transition-transform duration-300 flex-shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] text-[#26a69a] font-bold uppercase tracking-wider mb-1">
+                Co-Editor-in-Chief
+              </p>
+              <h4 className="text-base font-bold text-[#212121] hover:text-[#26a69a] transition-colors leading-tight">
+                Dr. Rakesh Kumar
+              </h4>
+              <p className="text-gray-500 text-xs mt-1 flex items-start gap-1">
+                <svg className="w-3 h-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="line-clamp-2">Chandigarh University, Mohali, Punjab, India</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>

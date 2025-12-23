@@ -25,7 +25,7 @@ const JICSJournal = () => (
       <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-10 pb-8 md:pb-12 relative">
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
           {/* Logo */}
-          <Link to="/" className="flex-shrink-0 relative group">
+          <Link to="/journal/jics/about/overview" className="flex-shrink-0 relative group">
             <img
               src="/images/JICSLogo.png"
               alt="JICS Logo"
@@ -112,8 +112,8 @@ const JICSJournal = () => (
             path="/review/transparency"
             element={<TransparencyMeasures />}
           />
-		  {/* Catch-All Route for invalid /journal/jics/* paths */}
-      	  <Route path="*" element={<Navigate to="/journal/jics" replace />} />
+          {/* Catch-All Route for invalid /journal/jics/* paths */}
+          <Route path="*" element={<Navigate to="/journal/jics" replace />} />
         </Routes>
       </div>
     </main>
