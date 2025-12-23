@@ -64,7 +64,7 @@ With a strong commitment to academic excellence, mentorship, innovation, and int
     name: 'Dr. Rakesh Kumar',
     affiliation: 'Chandigarh University, Mohali, Punjab, 140413, India',
     designation: 'Associate Director, Department of CSE',
-    image: '/images/rakesh-kumar.jpg',
+    image: '/images/coEditorInChief.jfif',
     role: 'Co-Editor-in-Chief',
     biography: `Dr. Rakesh Kumar is a highly accomplished academician, researcher, and academic administrator with over 24 years of rich experience in teaching, research, academic leadership, and institutional development in the field of Computer Science and Engineering. He currently serves as Associate Director in the Department of Computer Science and Engineering at Chandigarh University, Punjab, India, where he plays a key role in strategic planning, research promotion, faculty development, and global academic outreach.
 
