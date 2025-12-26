@@ -48,23 +48,25 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit ← Fixed comment
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /docx/;
+        // 🔥 Allow both PDF and DOCX
+        const allowedTypes = /docx|pdf/;
         const extname = allowedTypes.test(
             path.extname(file.originalname).toLowerCase()
         );
+        
         if (extname) {
             return cb(null, true);
         }
-        cb(new Error("Only Word documents (.docx) are allowed!"));
+        
+        cb(new Error("Only Word documents (.docx) or PDF files (.pdf) are allowed!"));
     },
 }).fields([
     { name: "manuscript", maxCount: 1 },
     { name: "coverLetter", maxCount: 1 },
     { name: "declaration", maxCount: 1 },
 ]);
-
 const responseUpload = multer({
 	storage: storage,
 	limits: { fileSize: 50 * 1024 * 1024 },

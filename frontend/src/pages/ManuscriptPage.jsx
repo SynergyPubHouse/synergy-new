@@ -3675,13 +3675,9 @@ const ManuscriptPage = () => {
 								</div>
 								<div className="w-1/2">
 									<h3 className="text-lg font-semibold mb-4 text-[#00796b]">
-										Upload Files (DOCX only)
+										Upload Files (PDF only)
 									</h3>
-									{[
-										"manuscript",
-										"coverLetter",
-										"declaration",
-									].map((doc) => (
+									{["manuscript", "coverLetter", "declaration"].map((doc) => (
 										<div key={doc} className="mb-4">
 											<div className="flex items-center">
 												<input
@@ -3716,91 +3712,48 @@ const ManuscriptPage = () => {
 														e.stopPropagation();
 														setDragOver(false);
 
-														// Check if files were dropped
-														if (
-															e.dataTransfer
-																.files &&
-															e.dataTransfer.files
-																.length > 0
-														) {
-															const file =
-																e.dataTransfer
-																	.files[0];
+														if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+															const file = e.dataTransfer.files[0];
 
-															// Check file type
-															const validTypes = [
-																".docx",
-																".pdf",
-															];
-															const fileExtension =
-																file.name
-																	.split(".")
-																	.pop()
-																	.toLowerCase();
-
-															if (
-																validTypes.includes(
-																	`.${fileExtension}`
-																)
-															) {
-																// Create a synthetic event to reuse your existing handler
-																const syntheticEvent =
-																{
+															// Only PDF allowed
+															if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+																const syntheticEvent = {
 																	target: {
-																		files: e
-																			.dataTransfer
-																			.files,
+																		files: e.dataTransfer.files,
 																		name: doc,
 																	},
 																};
-																handleFileChange(
-																	syntheticEvent,
-																	doc
-																);
+																handleFileChange(syntheticEvent, doc);
 															} else {
-																toast.error(
-																	"Please upload only DOCX or PDF files",
-																	{
-																		position: "top-center",
-																		autoClose: 3000,
-																	}
-																);
+																toast.error("Please upload only PDF files", {
+																	position: "top-center",
+																	autoClose: 3000,
+																});
 															}
 														}
 													}}
 												>
 													<div className="flex flex-col items-center justify-center pt-5 pb-6">
 														<p className="mb-2 text-sm text-[#00796b]">
-															<span className="font-semibold">
-																Click to upload
-															</span>{" "}
-															or drag and drop
+															<span className="font-semibold">Click to upload</span> or drag and drop
 														</p>
 														<p className="text-xs text-[#00796b]">
-															Upload {doc} (DOCX
-															or PDF)
-															<span className="text-red-500 ml-1">
-																*
-															</span>
+															Upload {doc.replace(/([A-Z])/g, " $1").toLowerCase()} (PDF only)
+															<span className="text-red-500 ml-1">*</span>
 														</p>
 													</div>
 													<input
 														type="file"
 														name={doc}
-														accept=".docx,.pdf"
-														onChange={(e) =>
-															handleFileChange(
-																e,
-																doc
-															)
-														}
+														accept=".pdf"
+														onChange={(e) => handleFileChange(e, doc)}
 														className="hidden"
 													/>
 												</label>
 											</div>
-											{/* File Display - New File or Existing File */}
+
+											{/* File Display */}
 											{files[doc] ? (
-												// 🔥 New file uploaded (both create & edit mode)
 												<div className="mt-2 flex items-center justify-between bg-green-50 p-2 rounded border border-green-200">
 													<p className="text-sm text-green-700 truncate flex-1">
 														📄 {files[doc].name}
@@ -3810,7 +3763,6 @@ const ManuscriptPage = () => {
 														type="button"
 														onClick={() => {
 															setFiles((prev) => ({ ...prev, [doc]: null }));
-															// In edit mode, keep checkbox checked if existing file exists
 															if (!existingFileUrls[`${doc}File`]) {
 																setUploadedFiles((prev) => ({ ...prev, [doc]: false }));
 															}
@@ -3822,7 +3774,6 @@ const ManuscriptPage = () => {
 													</button>
 												</div>
 											) : existingFileUrls[`${doc}File`] ? (
-												// 🔥 Existing file from database (edit mode only)
 												<div className="mt-2 flex items-center justify-between bg-blue-50 p-2 rounded border border-blue-200">
 													<p className="text-sm text-blue-700 truncate flex-1">
 														📎 {getFileNameFromUrl(existingFileUrls[`${doc}File`])}
