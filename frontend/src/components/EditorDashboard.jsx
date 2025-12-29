@@ -1801,40 +1801,34 @@ function EditorDashboard() {
 												</button>
 											)}
 
-											{manuscript.manuscriptFile && (
+											{/* Clean Final Manuscript Download - Yeh sabse upar rakhna, priority highest */}
+											{manuscript.authorResponse?.withoutHighlightedFileUrl && (
 												<button
 													onClick={() => {
-														let fileUrl = manuscript.manuscriptFile;
+														let url = manuscript.authorResponse.withoutHighlightedFileUrl;
 
-														// Google Drive view → direct download
-														if (fileUrl.includes("drive.google.com/file/d/")) {
-															const fileId = fileUrl.split("/d/")[1].split("/")[0];
-															fileUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+														// Google Drive file link handle
+														if (url.includes("drive.google.com/file/d/")) {
+															const fileId = url.split("/d/")[1].split("/")[0];
+															const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+															window.open(downloadUrl, "_blank");
 														}
-
-														// Google Docs → export as DOCX
-														if (fileUrl.includes("docs.google.com/document/d/")) {
-															const fileId = fileUrl.split("/d/")[1].split("/")[0];
-															fileUrl = `https://docs.google.com/document/d/${fileId}/export?format=docx`;
+														// Direct link ya S3/etc
+														else {
+															const link = document.createElement("a");
+															link.href = url;
+															link.download = `${manuscript.customId || manuscript._id}-FINAL-CLEAN.docx`;
+															link.target = "_blank";
+															document.body.appendChild(link);
+															link.click();
+															document.body.removeChild(link);
 														}
-
-														const link = document.createElement("a");
-														link.href = fileUrl;
-
-														// Get extension (fallback DOCX)
-														const extension = 'docx';
-														link.download = `${manuscript.customId || manuscript._id}-manuscript.${extension}`;
-														link.target = "_blank";
-
-														document.body.appendChild(link);
-														link.click();
-														document.body.removeChild(link);
 													}}
-													className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2"
-													title="Download Manuscript File"
+													className="w-full px-3 py-2 text-sm bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded hover:from-green-600 hover:to-emerald-700 transition-all font-medium flex items-center justify-center space-x-2 shadow-md"
 												>
-													<span>⬇️</span>
-													<span>Download Manuscript</span>
+													<span>⭐</span>
+													<span>Download Final Clean Manuscript</span>
+
 												</button>
 											)}
 
