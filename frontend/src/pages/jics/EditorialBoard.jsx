@@ -144,6 +144,8 @@ const editorialMembers = [
   { name: 'Dr. Debabrata Bej', affiliation: 'Indian Institute of Technology Kharagpur, India', specialization: 'Sensor, Embedded system and IoT', role: 'Area Editors' },
   { name: 'Mohan Krishna Mannava', affiliation: 'University of Connecticut, USA', specialization: 'Big Data Analytics & Machine Learning', role: 'Associate Editors' },
   { name: 'Milankumar Rana', affiliation: 'University of the Cumberlands, USA', specialization: 'Cloud Computing, Quantum Computing, AIOps, MLOps', role: 'Area Editors' },
+  { name: 'Monu Sharma', affiliation: 'Valley Health System, Winchester Virginia, USA', role: 'Editorial Team Member' },
+  { name: 'Dr. Ahmed Hussein Ali', affiliation: 'Al-Iraqia University, Baghdad, Iraq', role: 'Editorial Team Member' },
 ];
 
 // Gender diversity data
@@ -159,6 +161,7 @@ const roleOrder = [
   'Managing Editor',
   'Area Editors',
   'Associate Editors',
+  'Editorial Team Member',
   'Honorary Editor',
   'Editorial Board',
   'Former Associate Editors',
