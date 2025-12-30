@@ -1396,7 +1396,7 @@ console.log("Author Response Files Available:", hasAuthorResponseFiles);
 
         for (const email of emails) {
             try {
-                const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+                const baseUrl = "https://synergyworldpress.com";
                 const registrationUrl = `${baseUrl}/register`;
 
                 // Build editor note section
