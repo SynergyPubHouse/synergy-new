@@ -1344,23 +1344,24 @@ exports.sendInvitation = async (req, res) => {
         // ═══════════════════════════════════════════════════════════════════════
         // 👇 CREATE INVITATIONS WITH REVISION TRACKING
         // ═══════════════════════════════════════════════════════════════════════
-        const newInvitations = emails.map((email) => {
-            const normalizedEmail = email.toLowerCase().trim();
-            const previousInvitations = existingInvitationsForEmail(normalizedEmail);
-            
-            return {
-                email: normalizedEmail,
-                invitedAt: new Date(),
-                status: "pending",
-                reviewRound: previousInvitations + 1,
-                
-                // 👇 SET REVISION ROUND TO CURRENT MANUSCRIPT REVISION
-                revisionRound: currentRevisionRound,
-                
-                // 👇 Mark as revision review if currentRevisionRound > 0
-                isRevisionReview: isRevisionReview || currentRevisionRound > 0 || previousInvitations > 0,
-            };
-        });
+     const newInvitations = emails.map((email) => {
+    const normalizedEmail = email.toLowerCase().trim();
+    const previousInvitations = existingInvitationsForEmail(normalizedEmail);
+    
+    return {
+        email: normalizedEmail,
+        invitedAt: new Date(),
+        status: "pending",
+        
+        expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 
+        remindedAt: null,
+        expiredAt: null,
+
+        reviewRound: previousInvitations + 1,
+        revisionRound: currentRevisionRound,
+        isRevisionReview: isRevisionReview || currentRevisionRound > 0 || previousInvitations > 0,
+    };
+})
 
         console.log("New invitations:", JSON.stringify(newInvitations, null, 2));
 
