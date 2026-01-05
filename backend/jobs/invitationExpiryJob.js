@@ -25,16 +25,16 @@ const runInvitationExpiryJob = async () => {
               
                 const minutesSinceInvite = (now - new Date(inv.invitedAt)) / (1000 * 60);
 
-                // 1️⃣ 48 HOURS REMINDER (jab 47.5 se 50 hours ke beech mein ho)
-                if (minutesSinceInvite >= 2 && minutesSinceInvite < 5 && !inv.remindedAt) {
+                
+                if (minutesSinceInvite >= 2880 && minutesSinceInvite < 5 && !inv.remindedAt) {
                     await sendFinalReminder(manuscript, inv);
                     inv.remindedAt = now;
                     reminded++;
                     needSave = true;
                 }
 
-                // 2️⃣ AUTO EXPIRE AT 72 HOURS + EXPIRY EMAIL BHEJO
-                if (minutesSinceInvite >= 4 && !inv.expiredAt) {
+                
+                if (minutesSinceInvite >= 4320 && !inv.expiredAt) {
                     inv.status = "expired";
                     inv.expiredAt = now;
                     expired++;
