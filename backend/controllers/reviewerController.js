@@ -191,14 +191,14 @@ exports.getAssignedManuscripts = async (req, res) => {
         }
 
         const manuscripts = await Manuscript.find({
-            _id: { $in: assignedIds },
-            invitations: { 
-                $elemMatch: { 
-                    email: reviewerEmail, 
-                    status: "accepted" 
-                } 
-            },
-        })
+    _id: { $in: assignedIds },
+    invitations: { 
+        $elemMatch: { 
+            email: reviewerEmail,
+            status: { $in: ["accepted", "blocked"] }  
+        } 
+    }
+})
         .select(`
             customId 
             title 
@@ -361,113 +361,127 @@ if (manuscript.authorResponse) {
 
 // Submit a review for a manuscript
 exports.submitReview = async (req, res) => {
-	try {
-		const { manuscriptId } = req.params;
-		const { comments, recommendation } = req.body;
+  try {
+    const { manuscriptId } = req.params;
+    const { comments, recommendation } = req.body;
 
-		// Get the manuscript first to preserve required fields
-		const manuscript = await Manuscript.findById(manuscriptId)
-			.populate("correspondingAuthor")
-			.populate("authors")
-			.select("+declarationFile +manuscriptFile +coverLetterFile");
+    const manuscript = await Manuscript.findById(manuscriptId)
+      .populate("correspondingAuthor")
+      .populate("authors")
+      .select("+declarationFile +manuscriptFile +coverLetterFile");
 
-		if (!manuscript) {
-			return res.status(404).json({ message: "Manuscript not found" });
-		}
+    if (!manuscript) {
+      return res.status(404).json({ message: "Manuscript not found" });
+    }
 
-		// Get the reviewer's information
-		let reviewer = await Reviewer.findById(req.user._id);
-		if (!reviewer && req.user?.email) {
-			reviewer = await Reviewer.findOne({ email: req.user.email });
-		}
-		if (!reviewer) {
-			return res.status(404).json({ message: "Reviewer not found" });
-		}
+    let reviewer = await Reviewer.findById(req.user._id);
+    if (!reviewer && req.user?.email) {
+      reviewer = await Reviewer.findOne({ email: req.user.email });
+    }
+    if (!reviewer) {
+      return res.status(404).json({ message: "Reviewer not found" });
+    }
 
-		if (!manuscript.assignedReviewers.includes(reviewer._id)) {
-			return res
-				.status(403)
-				.json({ message: "Not authorized to review this manuscript" });
-		}
+    if (!manuscript.assignedReviewers.includes(reviewer._id)) {
+      return res.status(403).json({ message: "Not authorized to review this manuscript" });
+    }
 
-		// Map recommendation to valid enum action values from the schema
-		let action;
-		switch (recommendation) {
-			case "Accept":
-				action = "Accepted";
-				break;
-			case "Minor Revision":
-				action = "Revision Required";
-				break;
-			case "Major Revision":
-				action = "Revision Required";
-				break;
-			case "Reject":
-				action = "Rejected";
-				break;
-			default:
-				action = "Reviewed";
-		}
+    let action;
+    switch (recommendation) {
+      case "Accept":
+        action = "Accepted";
+        break;
+      case "Minor Revision":
+      case "Major Revision":
+        action = "Revision Required";
+        break;
+      case "Reject":
+        action = "Rejected";
+        break;
+      default:
+        action = "Reviewed";
+    }
 
-		// Create the reviewer note with all required fields
-		const reviewerNote = {
-			text: comments,
-			action: action,
-			visibility: ["editor", "reviewer"],
-			addedBy: {
-				_id: reviewer._id,
-				name: formatFullName(reviewer),
-				email: reviewer.email,
-				role: "reviewer",
-			},
-			addedAt: new Date(),
-		};
+    const reviewerNote = {
+      text: comments,
+      action: action,
+      visibility: ["editor", "reviewer"],
+      addedBy: {
+        _id: reviewer._id,
+        name: formatFullName(reviewer),
+        email: reviewer.email,
+        role: "reviewer",
+      },
+      addedAt: new Date(),
+    };
 
-		// Clean up any existing invalid action values before adding new one
-		const validActions = [
-			"Under Review",
-			"Reviewed",
-			"Accepted",
-			"Rejected",
-			"Revision Required",
-			"Revised",
-		];
-		if (manuscript.reviewerNotes && manuscript.reviewerNotes.length > 0) {
-			manuscript.reviewerNotes.forEach((note, index) => {
-				if (note.action && !validActions.includes(note.action)) {
-					console.log(
-						`Fixing invalid action at index ${index}: ${note.action} -> Reviewed`
-					);
-					manuscript.reviewerNotes[index].action = "Reviewed";
-				}
-			});
-		}
+    const validActions = ["Under Review", "Reviewed", "Accepted", "Rejected", "Revision Required", "Revised"];
+    if (manuscript.reviewerNotes?.length > 0) {
+      manuscript.reviewerNotes.forEach((note, index) => {
+        if (note.action && !validActions.includes(note.action)) {
+          manuscript.reviewerNotes[index].action = "Reviewed";
+        }
+      });
+    }
 
-		// Add the review to reviewerNotes array only
-		manuscript.reviewerNotes.push(reviewerNote);
+    manuscript.reviewerNotes.push(reviewerNote);
+    manuscript.markModified('reviewerNotes');
 
-		// Keep the manuscript status as "Under Review" - only editors can change the final status
-		// Do NOT automatically change status to "Reviewed"
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 1: Pehle manuscript save kar (reviewerNotes ke liye)
+    // ═══════════════════════════════════════════════════════════════
+    await manuscript.save();
+    console.log("Step 1: reviewerNotes saved");
 
-		// Save the changes
-		await manuscript.save();
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 2: Direct MongoDB update for reviewSubmittedAt (100% reliable)
+    // ═══════════════════════════════════════════════════════════════
+const updateResult = await Manuscript.updateOne(
+  { _id: manuscriptId },
+  {
+    $set: {
+      "invitations.$[elem].reviewSubmittedAt": new Date()
+    }
+  },
+  {
+    arrayFilters: [
+      {
+        "elem.email": reviewer.email.toLowerCase(),
+        "elem.status": "accepted",
+        "elem.reviewSubmittedAt": null,        
+        "elem.isReviewBlocked": { $ne: true }
+      }
+    ]
+  }
+);
 
-		// Return the updated manuscript data
-		res.json({
-			message: "Review submitted successfully",
-			manuscript: {
-				_id: manuscript._id,
-				status: manuscript.status,
-				reviewerNotes: manuscript.reviewerNotes,
-			},
-		});
-	} catch (error) {
-		console.error("Error submitting review:", error);
-		res.status(500).json({
-			message: "Error submitting review",
-			error: error.message,
-		});
-	}
+    console.log("Step 2: MongoDB Update Result:", {
+      matched: updateResult.matchedCount,
+      modified: updateResult.modifiedCount
+    });
+
+    if (updateResult.modifiedCount === 0) {
+      console.log("WARNING: reviewSubmittedAt not updated - Check invitation status");
+    } else {
+      console.log("SUCCESS: reviewSubmittedAt updated for:", reviewer.email);
+    }
+    // ═══════════════════════════════════════════════════════════════
+
+    res.json({
+      message: "Review submitted successfully",
+      manuscript: {
+        _id: manuscript._id,
+        status: manuscript.status,
+        reviewerNotes: manuscript.reviewerNotes,
+      },
+    });
+  } catch (error) {
+    console.error("Error submitting review:", error);
+    res.status(500).json({
+      message: "Error submitting review",
+      error: error.message,
+    });
+  }
 };
 
 // Forgot Password

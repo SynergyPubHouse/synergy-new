@@ -171,46 +171,55 @@ const manuscriptSchema = new mongoose.Schema(
 			{
 				type: mongoose.Schema.Types.ObjectId,
 				ref: "Reviewer",
-				required: false, // Reviewers assigned by editors
+				required: false, 
 			},
 		],
 		invitations: [
-			{
-				email: {
-					type: String,
-					required: true,
-				},
-				invitedAt: {
-					type: Date,
-					default: Date.now,
-				},
-				status: {
-					type: String,
-					enum: ["pending", "accepted", "rejected", ],
-					default: "pending",
-				},
-				acceptedAt: {
-					type: Date,
-				},
-				rejectedAt: {
-					type: Date,
-				},
-				rejectionReason: {
-					type: String,
-					default: "",
-				},
-				  // 👇 NEW: Track which round of review this is
-        reviewRound: {
-            type: Number,
-            default: 1,
-        },
-        // 👇 NEW: Track if this is a re-review after revision
-        isRevisionReview: {
-            type: Boolean,
-            default: false,
-        },
-			},
-		],
+  {
+    email: { type: String, required: true },
+    invitedAt: { type: Date, default: Date.now },
+    
+    status: {
+      type: String,
+      enum: ["pending", "accepted", "rejected", "expired","blocked"],  
+      default: "pending",
+    },
+
+    acceptedAt: { type: Date },
+    rejectedAt: { type: Date },
+    rejectionReason: { type: String, default: "" },
+
+   
+    expiresAt: {          
+      type: Date,
+      default: () => new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+    },
+    remindedAt: {         
+      type: Date,
+      default: null
+    },
+    expiredAt: {           
+      type: Date,
+      default: null
+    },
+
+	 reviewReminderSentAt: {     
+      type: Date,
+      default: null
+    },
+    reviewBlockedAt: {         
+      type: Date,
+      default: null
+    },
+    isReviewBlocked: {          
+      type: Boolean,
+      default: false
+    },
+reviewSubmittedAt: { type: Date, default: null },
+    reviewRound: { type: Number, default: 1 },
+    isRevisionReview: { type: Boolean, default: false },
+  },
+],
 		authorNotes: [noteSchema],
 		editorNotes: [noteSchema],
 		editorNotesForAuthor: [noteSchema],

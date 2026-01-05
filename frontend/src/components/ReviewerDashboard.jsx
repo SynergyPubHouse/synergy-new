@@ -453,255 +453,248 @@ function ReviewerDashboard() {
                 : "Select an Author"}
             </h2>
             <div className="space-y-4" key={`${selectedUser?._id || 'all'}-${forceRender}`}>
-              {manuscripts.map((manuscript) => (
-                <div
-                  key={`${manuscript._id}-${forceRender}`}
-                  className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0]"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-xl font-semibold text-[#1a365d] mb-2">
-                        {manuscript.title}
-                      </h3>
-                      <p className="text-[#64748b] text-sm">
-                        Status: {manuscript.status}
-                      </p>
-                      <p className="text-[#64748b] text-sm">
-                        Submitted:{" "}
-                        {new Date(
-                          manuscript.submissionDate
-                        ).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex flex-col space-y-2">
-                      {manuscript.mergedFileUrl && (
-                        <button
-                          onClick={() => handleViewPDF(manuscript.mergedFileUrl)}
-                          className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors mb-1 flex items-center justify-center space-x-2"
-                        >
-                          <span>📄</span>
-                          <span>Original PDF</span>
-                        </button>
-                      )}
+              {manuscripts.map((manuscript) => {
+                // Find current reviewer's invitation
+                const reviewerInvitation = manuscript.invitations?.find(
+                  (inv) => inv.email?.toLowerCase() === user?.email?.toLowerCase()
+                );
 
-                      {/* Response Sheet (PDF) */}
-                      {manuscript.authorResponse?.responseSheet.docxUrl && (
-                        <button
-                          onClick={() => window.open(manuscript.authorResponse.docxUrl, "_blank")}
-                          className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-1 flex items-center justify-center space-x-2"
-                        >
-                          <span>📝</span>
-                          <span>Response Sheet</span>
-                        </button>
-                      )}
+                const isBlocked =
+                  reviewerInvitation?.status === "blocked" ||
+                  reviewerInvitation?.isReviewBlocked === true;
 
-                      {/* Highlighted Document (PDF) */}
-                      {manuscript.authorResponse?.highlightedDocument && (
-                        <button
-                          onClick={() => window.open(manuscript.authorResponse.highlightedDocument.url, "_blank")}
-                          className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors mb-1 flex items-center justify-center space-x-2"
-                        >
-                          <span>✏️</span>
-                          <span>Highlighted Doc</span>
-                        </button>
-                      )}
+                const isAccepted = reviewerInvitation?.status === "accepted";
 
-                      {/* Without Highlighted Document (DOCX/LaTeX) */}
-                      {manuscript.authorResponse?.cleanDocument && (
-                        <button
-                          onClick={() => {
-                            const url = manuscript?.authorResponse?.cleanDocument?.url;
+                const canSubmitReview = isAccepted && !isBlocked;
 
-                            if (!url) {
-                              console.error("No URL found");
-                              return;
-                            }
+                return (
+                  <div
+                    key={`${manuscript._id}-${forceRender}`}
+                    className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0]"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-xl font-semibold text-[#1a365d] mb-2">
+                          {manuscript.title}
+                        </h3>
+                        <p className="text-[#64748b] text-sm">
+                          Status: {manuscript.status}
+                        </p>
+                        <p className="text-[#64748b] text-sm">
+                          Submitted:{" "}
+                          {new Date(manuscript.submissionDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex flex-col space-y-2">
+                        {manuscript.mergedFileUrl && (
+                          <button
+                            onClick={() => handleViewPDF(manuscript.mergedFileUrl)}
+                            className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors mb-1 flex items-center justify-center space-x-2"
+                          >
+                            Original PDF
+                          </button>
+                        )}
 
-                            // Check if Google Drive URL
-                            if (url.includes('drive.google.com')) {
-                              // Extract file ID
-                              const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-                              const fileId = match?.[1];
+                        {manuscript.authorResponse?.responseSheet?.docxUrl && (
+                          <button
+                            onClick={() => window.open(manuscript.authorResponse.responseSheet.docxUrl, "_blank")}
+                            className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-1 flex items-center justify-center space-x-2"
+                          >
+                            Response Sheet
+                          </button>
+                        )}
 
-                              if (fileId) {
-                                // Check if ZIP file
-                                const isZip = url.toLowerCase().includes('.zip');
+                        {manuscript.authorResponse?.highlightedDocument?.url && (
+                          <button
+                            onClick={() => window.open(manuscript.authorResponse.highlightedDocument.url, "_blank")}
+                            className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors mb-1 flex items-center justify-center space-x-2"
+                          >
+                            Highlighted Doc
+                          </button>
+                        )}
 
-                                if (isZip) {
-                                  // Download ZIP
-                                  const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                                  window.open(downloadUrl, '_blank');
-                                } else {
-                                  // View DOC/DOCX in Google Drive Preview
-                                  const previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
-                                  window.open(previewUrl, '_blank');
+                        {manuscript.authorResponse?.cleanDocument?.url && (
+                          <button
+                            onClick={() => {
+                              const url = manuscript.authorResponse.cleanDocument.url;
+                              if (!url) return;
+
+                              if (url.includes('drive.google.com')) {
+                                const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                                const fileId = match?.[1];
+                                if (fileId) {
+                                  const isZip = url.toLowerCase().includes('.zip');
+                                  if (isZip) {
+                                    window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+                                  } else {
+                                    window.open(`https://drive.google.com/file/d/${fileId}/preview`, '_blank');
+                                  }
                                 }
                               } else {
-                                window.open(url, '_blank');
+                                const isZip = url.toLowerCase().includes('.zip');
+                                const isPdf = url.toLowerCase().includes('.pdf');
+                                if (isZip) {
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = 'clean-document.zip';
+                                  link.target = '_blank';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                } else if (isPdf) {
+                                  window.open(url, "_blank");
+                                } else {
+                                  const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+                                  window.open(viewerUrl, "_blank");
+                                }
                               }
-                            } else {
-                              // Non-Google Drive URL (Original logic)
-                              const isZip = url.toLowerCase().includes('.zip');
-                              const isPdf = url.toLowerCase().includes('.pdf');
-
-                              if (isZip) {
-                                const link = document.createElement('a');
-                                link.href = url;
-                                link.download = 'clean-document.zip';
-                                link.target = '_blank';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                              } else if (isPdf) {
-                                window.open(url, "_blank");
-                              } else {
-                                const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-                                window.open(viewerUrl, "_blank");
-                              }
-                            }
-                          }}
-                          className="px-2 py-1 text-xs border border-green-600 text-green-600 rounded hover:bg-green-50 transition-colors"
-                        >
-                          without highlighted Doc
-                        </button>
-                      )}
+                            }}
+                            className="px-2 py-1 text-xs border border-green-600 text-green-600 rounded hover:bg-green-50 transition-colors"
+                          >
+                            without highlighted Doc
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Editor Notes Section */}
-                  {manuscript.editorNotes?.length > 0 && (
-                    <div className="mt-4 border-t border-[#e2e8f0] pt-4">
-                      <h4 className="text-[#496580] text-sm font-semibold mb-2">
-                        Editor Notes:
-                      </h4>
-                      <div className="space-y-2">
-                        {manuscript.editorNotes
-                          .filter((note) =>
-                            note.visibility.includes("reviewer")
-                          )
-                          .map((note, index) => (
-                            <div
-                              key={index}
-                              className="bg-white p-3 rounded border border-[#e2e8f0]"
-                            >
+                    {/* Editor Notes */}
+                    {manuscript.editorNotes?.length > 0 && (
+                      <div className="mt-4 border-t border-[#e2e8f0] pt-4">
+                        <h4 className="text-[#496580] text-sm font-semibold mb-2">
+                          Editor Notes:
+                        </h4>
+                        <div className="space-y-2">
+                          {manuscript.editorNotes
+                            .filter((note) => note.visibility?.includes("reviewer"))
+                            .map((note, index) => (
+                              <div key={index} className="bg-white p-3 rounded border border-[#e2e8f0]">
+                                <p className="text-[#1a365d]">{note.text}</p>
+                                {note.action && (
+                                  <span className={`inline-block mt-2 px-2 py-1 text-xs rounded ${note.action === "Under Review" ? "bg-[#f59e0b]" :
+                                    note.action === "Reviewed" ? "bg-[#3b82f6]" :
+                                      note.action === "Accepted" ? "bg-[#10b981]" : "bg-[#ef4444]"
+                                    } text-white`}>
+                                    {note.action}
+                                  </span>
+                                )}
+                                <p className="text-[#64748b] text-xs mt-2">
+                                  Added by: {note.addedBy?.name} on {new Date(note.addedAt).toLocaleString()}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Your Previous Reviews */}
+                    {manuscript.reviewerNotes?.length > 0 && (
+                      <div className="mt-4 border-t border-[#e2e8f0] pt-4">
+                        <h4 className="text-[#10b981] text-sm font-semibold mb-2">
+                          Your Previous Reviews:
+                        </h4>
+                        <div className="space-y-2">
+                          {manuscript.reviewerNotes.map((note, index) => (
+                            <div key={index} className="bg-white p-3 rounded border border-[#e2e8f0]">
                               <p className="text-[#1a365d]">{note.text}</p>
                               {note.action && (
-                                <span
-                                  className={`inline-block mt-2 px-2 py-1 text-xs rounded ${note.action === "Under Review"
-                                    ? "bg-[#f59e0b]"
-                                    : note.action === "Reviewed"
-                                      ? "bg-[#3b82f6]"
-                                      : note.action === "Accepted"
-                                        ? "bg-[#10b981]"
-                                        : "bg-[#ef4444]"
-                                    } text-white`}
-                                >
+                                <span className="inline-block mt-2 px-2 py-1 text-xs rounded bg-[#10b981] text-white">
                                   {note.action}
                                 </span>
                               )}
                               <p className="text-[#64748b] text-xs mt-2">
-                                Added by: {note.addedBy.name} on{" "}
-                                {new Date(note.addedAt).toLocaleString()}
+                                Added on: {new Date(note.addedAt).toLocaleString()}
                               </p>
                             </div>
                           ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Display Reviewer's Previous Notes */}
-                  {manuscript.reviewerNotes?.length > 0 && (
-                    <div className="mt-4 border-t border-[#e2e8f0] pt-4">
-                      <h4 className="text-[#10b981] text-sm font-semibold mb-2">
-                        Your Previous Reviews:
-                      </h4>
-                      <div className="space-y-2">
-                        {manuscript.reviewerNotes.map((note, index) => (
-                          <div
-                            key={index}
-                            className="bg-white p-3 rounded border border-[#e2e8f0]"
-                          >
-                            <p className="text-[#1a365d]">{note.text}</p>
-                            {note.action && (
-                              <span className="inline-block mt-2 px-2 py-1 text-xs rounded bg-[#10b981] text-white">
-                                {note.action}
-                              </span>
-                            )}
-                            <p className="text-[#64748b] text-xs mt-2">
-                              Added on:{" "}
-                              {new Date(note.addedAt).toLocaleString()}
+                    {/* Review Form Section */}
+                    {manuscript.status !== "Rejected" && (
+                      <div className="w-full border-t border-[#e2e8f0] pt-4 mt-4">
+                        {isBlocked ? (
+                          // BLOCKED MESSAGE
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                            <div className="text-red-800 text-lg font-semibold mb-2">
+                              Review Access Revoked
+                            </div>
+                            <p className="text-red-700">
+                              Your invitation to review this manuscript has been <strong>blocked</strong> by the editor.
                             </p>
+                            <p className="text-red-600 text-sm mt-2">
+                              You can no longer submit a review.
+                            </p>
+                            {reviewerInvitation?.reviewBlockedAt && (
+                              <p className="text-red-500 text-xs mt-3">
+                                Blocked on: {new Date(reviewerInvitation.reviewBlockedAt).toLocaleString()}
+                              </p>
+                            )}
                           </div>
-                        ))}
+                        ) : (
+                          // NORMAL REVIEW FORM - BILKUL PURANA WAHI
+                          <>
+                            <h4 className="text-[#10b981] text-lg font-semibold mb-4">
+                              Add Review
+                            </h4>
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-[#1a365d] mb-2">
+                                  Review Comments:
+                                </label>
+                                <textarea
+                                  value={reviewTexts[manuscript._id] || ""}
+                                  onChange={(e) =>
+                                    setReviewTexts((prev) => ({
+                                      ...prev,
+                                      [manuscript._id]: e.target.value,
+                                    }))
+                                  }
+                                  className="w-full h-32 bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
+                                  placeholder="Enter your review comments here..."
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[#1a365d] mb-2">
+                                  Recommendation:
+                                </label>
+                                <select
+                                  value={recommendations[manuscript._id] || ""}
+                                  onChange={(e) =>
+                                    setRecommendations((prev) => ({
+                                      ...prev,
+                                      [manuscript._id]: e.target.value,
+                                    }))
+                                  }
+                                  className="w-full bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
+                                >
+                                  <option value="">Select a recommendation</option>
+                                  <option value="Accept">Accept</option>
+                                  <option value="Minor Revision">Minor Revision</option>
+                                  <option value="Major Revision">Major Revision</option>
+                                  <option value="Reject">Reject</option>
+                                </select>
+                              </div>
+                              <div className="flex justify-end">
+                                <button
+                                  onClick={() => handleAddReview(manuscript._id)}
+                                  disabled={
+                                    !(reviewTexts[manuscript._id] || "").trim() ||
+                                    !(recommendations[manuscript._id] || "")
+                                  }
+                                  className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Add Review
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Add Review Form - Always Open */}
-                  {manuscript?.status != "Rejected" && (
-                    <div className="w-full border-t border-[#e2e8f0] pt-4 mt-4">
-                      <h4 className="text-[#10b981] text-lg font-semibold mb-4">
-                        Add Review
-                      </h4>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-[#1a365d] mb-2">
-                            Review Comments:
-                          </label>
-                          <textarea
-                            value={reviewTexts[manuscript._id] || ""}
-                            onChange={(e) =>
-                              setReviewTexts((prev) => ({
-                                ...prev,
-                                [manuscript._id]: e.target.value,
-                              }))
-                            }
-                            className="w-full h-32 bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
-                            placeholder="Enter your review comments here..."
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[#1a365d] mb-2">
-                            Recommendation:
-                          </label>
-                          <select
-                            value={recommendations[manuscript._id] || ""}
-                            onChange={(e) =>
-                              setRecommendations((prev) => ({
-                                ...prev,
-                                [manuscript._id]: e.target.value,
-                              }))
-                            }
-                            className="w-full bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
-                          >
-                            <option value="">Select a recommendation</option>
-                            <option value="Accept">Accept</option>
-                            <option value="Minor Revision">
-                              Minor Revision
-                            </option>
-                            <option value="Major Revision">
-                              Major Revision
-                            </option>
-                            <option value="Reject">Reject</option>
-                          </select>
-                        </div>
-                        <div className="flex justify-end">
-                          <button
-                            onClick={() => handleAddReview(manuscript._id)}
-                            disabled={
-                              !(reviewTexts[manuscript._id] || "").trim() ||
-                              !(recommendations[manuscript._id] || "")
-                            }
-                            className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Add Review
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
               {manuscripts.length === 0 && (
                 <div className="text-center text-[#64748b]">
                   No manuscripts under review from this author.

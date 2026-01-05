@@ -12,6 +12,9 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
 });
 const upload = multer({ storage });
+const runInvitationExpiryJob = require("./jobs/invitationExpiryJob");
+const runStrictReviewDeadline = require("./jobs/strictReviewDeadlineJob");
+const cron = require("node-cron");
  
 
 dotenv.config();
@@ -406,8 +409,27 @@ connectDB();
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
+
   
-  
+  cron.schedule("0 * * * *", async () => {
+    console.log(`[PRODUCTION] Cron jobs running - ${new Date().toLocaleString()}`);
+
+    try {
+      await runInvitationExpiryJob();
+      console.log("Invitation expiry job completed successfully");
+    } catch (error) {
+      console.error("Invitation expiry job failed:", error.message);
+    }
+
+    try {
+      await runStrictReviewDeadline();
+      console.log("Review deadline job completed successfully");
+    } catch (error) {
+      console.error("Review deadline job failed:", error.message);
+    }
+  });
+
+  console.log("Cron jobs scheduled: Every hour on the hour (PRODUCTION MODE)");
 });
 
 // Handle unhandled promise rejections

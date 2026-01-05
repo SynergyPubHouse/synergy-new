@@ -683,11 +683,11 @@ function EditorDashboard() {
 				.filter((email) => email.length > 0);
 
 			// Minimum 3, maximum 6 emails check
-			if (emailArray.length < 3 || emailArray.length > 6) {
-				addToast("Please enter between 3 and 6 email addresses", "error");
-				setIsSendingInvitations(false);
-				return;
-			}
+			// if (emailArray.length < 3 || emailArray.length > 6) {
+			// 	addToast("Please enter between 3 and 6 email addresses", "error");
+			// 	setIsSendingInvitations(false);
+			// 	return;
+			// }
 
 			// Validate email format
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
