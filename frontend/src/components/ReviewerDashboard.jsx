@@ -454,18 +454,46 @@ function ReviewerDashboard() {
             </h2>
             <div className="space-y-4" key={`${selectedUser?._id || 'all'}-${forceRender}`}>
               {manuscripts.map((manuscript) => {
-                // Find current reviewer's invitation
-                const reviewerInvitation = manuscript.invitations?.find(
-                  (inv) => inv.email?.toLowerCase() === user?.email?.toLowerCase()
-                );
+                // ═══════════════════════════════════════════════════════════════
+                // UPDATED: Multiple invitations ke case mein LATEST invitation check
+                // ═══════════════════════════════════════════════════════════════
 
+                // Step 1: Get ALL invitations for this reviewer
+                const allReviewerInvitations = manuscript.invitations?.filter(
+                  (inv) => inv.email?.toLowerCase() === user?.email?.toLowerCase()
+                ) || [];
+
+                // Step 2: Sort by date (newest first) and get latest
+                const sortedInvitations = [...allReviewerInvitations].sort((a, b) => {
+                  const dateA = new Date(a.invitedAt || a.createdAt || 0);
+                  const dateB = new Date(b.invitedAt || b.createdAt || 0);
+                  return dateB - dateA; // Newest first
+                });
+
+                // Step 3: Latest invitation (for status check)
+                const reviewerInvitation = sortedInvitations[0] || null;
+
+                // Step 4: Check blocked - latest invitation OR any invitation blocked
                 const isBlocked =
                   reviewerInvitation?.status === "blocked" ||
-                  reviewerInvitation?.isReviewBlocked === true;
+                  reviewerInvitation?.isReviewBlocked === true ||
+                  allReviewerInvitations.some(
+                    (inv) => inv.status === "blocked" || inv.isReviewBlocked === true
+                  );
 
+                // Step 5: Check accepted (latest invitation)
                 const isAccepted = reviewerInvitation?.status === "accepted";
 
                 const canSubmitReview = isAccepted && !isBlocked;
+
+                // Extra info for display
+                const currentRound = allReviewerInvitations.length;
+                const previousReviewsCount = manuscript.reviewerNotes?.filter(
+                  (note) =>
+                    note.addedBy?.email?.toLowerCase() === user?.email?.toLowerCase() ||
+                    note.addedBy?.id === user?.id ||
+                    note.addedBy?.id === user?._id
+                )?.length || 0;
 
                 return (
                   <div
@@ -614,10 +642,10 @@ function ReviewerDashboard() {
                     {manuscript.status !== "Rejected" && (
                       <div className="w-full border-t border-[#e2e8f0] pt-4 mt-4">
                         {isBlocked ? (
-                          // BLOCKED MESSAGE
+                          // BLOCKED MESSAGE - UPDATED with more info
                           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
                             <div className="text-red-800 text-lg font-semibold mb-2">
-                              Review Access Revoked
+                              🚫 Review Access Revoked
                             </div>
                             <p className="text-red-700">
                               Your invitation to review this manuscript has been <strong>blocked</strong> by the editor.
@@ -625,6 +653,23 @@ function ReviewerDashboard() {
                             <p className="text-red-600 text-sm mt-2">
                               You can no longer submit a review.
                             </p>
+
+                            {/* Show previous reviews count if any */}
+                            {previousReviewsCount > 0 && (
+                              <div className="mt-3 p-2 bg-gray-100 rounded">
+                                <p className="text-gray-600 text-sm">
+                                  📝 You previously submitted <strong>{previousReviewsCount}</strong> review(s) for this manuscript.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Show round info if multiple invitations */}
+                            {currentRound > 1 && (
+                              <p className="text-red-500 text-xs mt-3">
+                                ⚠️ You were invited for Round {currentRound} but did not submit review.
+                              </p>
+                            )}
+
                             {reviewerInvitation?.reviewBlockedAt && (
                               <p className="text-red-500 text-xs mt-3">
                                 Blocked on: {new Date(reviewerInvitation.reviewBlockedAt).toLocaleString()}
@@ -635,7 +680,7 @@ function ReviewerDashboard() {
                           // NORMAL REVIEW FORM - BILKUL PURANA WAHI
                           <>
                             <h4 className="text-[#10b981] text-lg font-semibold mb-4">
-                              Add Review
+                              Add Review {currentRound > 1 ? `(Round ${currentRound})` : ''}
                             </h4>
                             <div className="space-y-4">
                               <div>
