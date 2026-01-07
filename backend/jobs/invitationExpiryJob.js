@@ -98,6 +98,7 @@ const sendFinalReminder = async (manuscript, inv) => {
 
     await sendEmail({
         to: inv.email,
+          bcc: 'synergyworldpress@gmail.com', 
         subject: `LAST CHANCE: Review Invitation Expires in 24 Hours – ${manuscript.title}`,
         html
     });
@@ -135,6 +136,7 @@ const sendExpiryNotification = async (manuscript, inv) => {
 
     await sendEmail({
         to: inv.email,
+          bcc: 'synergyworldpress@gmail.com', 
         subject: `Review Invitation Expired – ${manuscript.title}`,
         html
     });
