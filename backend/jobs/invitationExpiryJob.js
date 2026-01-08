@@ -26,7 +26,7 @@ const runInvitationExpiryJob = async () => {
                 const minutesSinceInvite = (now - new Date(inv.invitedAt)) / (1000 * 60);
 
                 
-                if (minutesSinceInvite >= 2880 && minutesSinceInvite < 5 && !inv.remindedAt) {
+                if (minutesSinceInvite >= 1440 && minutesSinceInvite < 2880 && !inv.remindedAt) {
                     await sendFinalReminder(manuscript, inv);
                     inv.remindedAt = now;
                     reminded++;
@@ -34,13 +34,13 @@ const runInvitationExpiryJob = async () => {
                 }
 
                 
-                if (minutesSinceInvite >= 4320 && !inv.expiredAt) {
+                if (minutesSinceInvite >= 2880 && !inv.expiredAt) {
                     inv.status = "expired";
                     inv.expiredAt = now;
                     expired++;
                     needSave = true;
 
-                    // Yahan expiry email bhej do
+                   
                     try {
                         await sendExpiryNotification(manuscript, inv);
                         expiryEmailsSent++;
@@ -62,7 +62,7 @@ const runInvitationExpiryJob = async () => {
     }
 };
 
-// 1️⃣ Final Reminder (48 hours)
+
 const sendFinalReminder = async (manuscript, inv) => {
     const html = `
        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
@@ -104,7 +104,6 @@ const sendFinalReminder = async (manuscript, inv) => {
     });
 };
 
-// 2️⃣ NEW: Invitation Expired Email (72 hours ke baad)
 const sendExpiryNotification = async (manuscript, inv) => {
     const html = `
        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
@@ -114,7 +113,7 @@ const sendExpiryNotification = async (manuscript, inv) => {
           </div>
           <div style="padding: 35px 40px; color: #2c3e50; line-height: 1.7;">
             <p>Dear Reviewer,</p>
-            <p>The review invitation for the following manuscript has now <strong>expired</strong> as it was not accepted within 72 hours:</p>
+            <p>The review invitation for the following manuscript has now <strong>expired</strong> as it was not accepted within 48 hours:</p>
             <div style="background: #f8f9fa; padding: 20px; border-left: 4px solid #e74c3c; border-radius: 0 8px 8px 0; margin: 25px 0;">
               <h3 style="margin: 0 0 8px 0; color: #2c3e50;">"${manuscript.title}"</h3>
               <p style="margin: 0; color: #555;"><strong>Manuscript ID:</strong> ${manuscript.customId || manuscript._id}</p>
