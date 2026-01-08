@@ -553,9 +553,58 @@ const MySubmissions = () => {
                             <div className="flex flex-col space-y-1 min-w-[140px]">
                               {manuscript.reviewDocxUrl && (
                                 <button
-                                  onClick={() => handleDownloadReviewDocx(manuscript.reviewDocxUrl)}
-                                  className="px-2 py-1 text-xs border border-purple-600 text-purple-600 rounded hover:bg-purple-50 transition-colors"
+                                  onClick={() => {
+                                    try {
+                                      let fileId;
+                                      const fileUrl = manuscript.reviewDocxUrl;
+
+                                      // Extract file ID from Google Drive URL
+                                      if (fileUrl.includes('/file/d/')) {
+                                        fileId = fileUrl.split('/file/d/')[1].split('/')[0];
+                                      } else if (fileUrl.includes('id=')) {
+                                        fileId = fileUrl.split('id=')[1].split('&')[0];
+                                      } else if (fileUrl.includes('/uc?')) {
+                                        // Already in download format
+                                        window.open(fileUrl, '_blank');
+                                        return;
+                                      }
+
+                                      if (fileId) {
+                                        // Create direct download link for Google Drive
+                                        const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+                                        // Create anchor tag for download
+                                        const link = document.createElement('a');
+                                        link.href = downloadUrl;
+                                        link.download = `review_comments_${manuscript.manuscriptId || 'document'}.docx`;
+                                        link.target = '_blank';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      } else {
+                                        // Fallback: Open the file URL directly
+                                        window.open(fileUrl, '_blank');
+                                      }
+                                    } catch (error) {
+                                      console.error('Download error:', error);
+                                      window.open(manuscript.reviewDocxUrl, '_blank');
+                                    }
+                                  }}
+                                  className="px-2 py-1 text-xs border border-purple-600 text-purple-600 rounded hover:bg-purple-50 transition-colors inline-flex items-center gap-1"
                                 >
+                                  <svg
+                                    className="w-3 h-3"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                                    />
+                                  </svg>
                                   Review Comments
                                 </button>
                               )}
