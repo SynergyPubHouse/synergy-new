@@ -1941,8 +1941,7 @@ exports.uploadResponseDoc = async (req, res) => {
 exports.uploadNotesWord = async (req, res) => {
   const manuscriptId = req.params.manuscriptId;
 
-
-  console .log("Uploading review notes for manuscript ID:", manuscriptId);
+  console.log("Uploading review notes for manuscript ID:", manuscriptId);
   const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, os.tmpdir()),
     filename: (req, file, cb) =>
@@ -1961,43 +1960,47 @@ exports.uploadNotesWord = async (req, res) => {
         await fs.unlink(req.file.path);
         return res.status(404).json({ success: false, message: "Manuscript not found" });
       }
-      // Generate filename from manuscript customId (extract prefix before first hyphen)
-      // Format: customId is like "ART-25-001", we want "ART-review.docx"
+      
+      // 🔥 CHANGE 1: Generate UNIQUE filename with timestamp
+      const timestamp = Date.now();
       let fileName = "review.docx";
       if (manuscript.customId) {
         const prefix = manuscript.customId.split("-")[0];
-        fileName = `${prefix}-review.docx`;
+        fileName = `${prefix}-review-${timestamp}.docx`; // 🔥 Added timestamp
       } else {
         // Fallback: use first letters of title if no customId
         const titleWords = manuscript.title.split(" ").filter(w => w.length > 0);
         const prefix = titleWords.slice(0, 3).map(w => w.charAt(0).toUpperCase()).join("");
-        fileName = `${prefix || "REV"}-review.docx`;
+        fileName = `${prefix || "REV"}-review-${timestamp}.docx`; // 🔥 Added timestamp
       }
-      // Upload directly to Cloudinary (like PDF files)
-      const cloudinary = require('cloudinary').v2;
-      const uploadResult = await new Promise((resolve, reject) => {
-          cloudinary.uploader.upload(
-              req.file.path,
-              {
-                  resource_type: 'raw',
-                  public_id: `review-documents/${fileName}`,
-                  format: 'docx',
-                  access_mode: 'public'
-              },
-              (error, result) => {
-                  if (error) reject(error);
-                  else resolve(result);
-              }
-          );
+      
+      // 🔥 CHANGE 2: Upload to Google Drive instead of Cloudinary
+      console.log("[uploadNotesWord] Uploading to Google Drive:", fileName);
+      
+      const driveResult = await uploadFileToDrive(req.file.path, {
+        filename: fileName,
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        makePublic: true,
       });
-      const docxUrl = uploadResult.secure_url;
+
+      if (!driveResult || !driveResult.success) {
+        await fs.unlink(req.file.path);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Google Drive upload failed" 
+        });
+      }
+
+      const docxUrl = driveResult.driveViewUrl || driveResult.webViewLink;
 
       // Store the link in manuscript
       manuscript.reviewDocxUrl = docxUrl;
       await manuscript.save();
       console.log("Updated reviewDocxUrl:", manuscript.reviewDocxUrl);
+      
       // Cleanup temp file (async version)
       await fs.unlink(req.file.path);
+      
       // Collect all unique author emails
       const authorEmails = new Set();
       if (manuscript.authors && manuscript.authors.length > 0) {
@@ -2011,6 +2014,7 @@ exports.uploadNotesWord = async (req, res) => {
         authorEmails.add(manuscript.correspondingAuthor.email.toLowerCase());
       }
       const emailList = Array.from(authorEmails);
+      
       // Send email to all authors
       if (emailList.length > 0) {
         const emailSubject = `Review Comments Available - ${manuscript.title}`;
@@ -2075,6 +2079,7 @@ exports.uploadNotesWord = async (req, res) => {
           }
         }
       }
+      
       res.json({
         success: true,
         message: "Notes uploaded successfully and authors have been notified",
