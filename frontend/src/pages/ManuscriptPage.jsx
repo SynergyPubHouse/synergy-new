@@ -3583,7 +3583,7 @@ const ManuscriptPage = () => {
 									className="px-4 py-2 rounded-lg bg-white text-[#00796b] border border-[#e0e0e0] focus:outline-none focus:ring-2 focus:ring-[#00796b]"
 								>
 									<option value="">Select Type</option>
-									<option value="Manuscript">Manuscript</option>
+									{/* <option value="Manuscript">Manuscript</option> */}
 									<option value="Research Article">Research Article</option>
 									<option value="Review Article">Review Article</option>
 									<option value="SI: Data Driven Intelligent Computing and Applied AI Modeling for Smart Urban Systems">SI: Data Driven Intelligent Computing and Applied AI Modeling for Smart Urban Systems</option>
