@@ -45,7 +45,7 @@ const manuscriptSchema = new mongoose.Schema(
 		type: {
 			type: String,
 			required: true,
-			enum: ["Manuscript", "Research Article", "Review Article"],
+			enum: ["Manuscript", "Research Article", "Review Article","SI: Data Driven Intelligent Computing and Applied AI Modeling for Smart Urban Systems"],
 			default: "Manuscript",
 		},
 		classification: {

@@ -3586,6 +3586,7 @@ const ManuscriptPage = () => {
 									<option value="Manuscript">Manuscript</option>
 									<option value="Research Article">Research Article</option>
 									<option value="Review Article">Review Article</option>
+									<option value="SI: Data Driven Intelligent Computing and Applied AI Modeling for Smart Urban Systems">SI: Data Driven Intelligent Computing and Applied AI Modeling for Smart Urban Systems</option>
 								</select>
 							</div>
 							<div className="flex justify-between mt-6">
