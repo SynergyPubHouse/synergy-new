@@ -218,16 +218,16 @@ function ReviewerDashboard() {
         }
       );
 
-      const statusResponse = await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL
-        }/api/manuscripts/${manuscriptId}/status`,
-        { status: "Reviewed" },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
-      );
+      // const statusResponse = await axios.put(
+      //   `${import.meta.env.VITE_BACKEND_URL
+      //   }/api/manuscripts/${manuscriptId}/status`,
+      //   { status: "Reviewed" },
+      //   {
+      //     headers: {
+      //       Authorization: `Bearer ${user.token}`,
+      //     },
+      //   }
+      // );
 
       // Clear the form
       setReviewTexts((prev) => ({ ...prev, [manuscriptId]: "" }));
