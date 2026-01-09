@@ -425,17 +425,28 @@ exports.submitReview = async (req, res) => {
     }
 
     manuscript.reviewerNotes.push(reviewerNote);
-    manuscript.markModified('reviewerNotes');
+   if (manuscript.status !== "Revision Required") {
+  const decisionActions = ["Accepted", "Rejected", "Revision Required"];
+  
+  const reviewersWhoDecided = new Set(
+    manuscript.reviewerNotes
+      .filter(note => decisionActions.includes(note.action))
+      .map(note => note.addedBy._id.toString())
+  );
 
-    // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Pehle manuscript save kar (reviewerNotes ke liye)
-    // ═══════════════════════════════════════════════════════════════
+  const allReviewersDecided = manuscript.assignedReviewers.length > 0 &&
+    manuscript.assignedReviewers.every(id => 
+      reviewersWhoDecided.has(id.toString())
+    );
+
+  if (allReviewersDecided) {
+    manuscript.status = "Reviewed";
+  }
+}
+    manuscript.markModified('reviewerNotes');
+    
     await manuscript.save();
     console.log("Step 1: reviewerNotes saved");
-
-    // ═══════════════════════════════════════════════════════════════
-    // STEP 2: Direct MongoDB update for reviewSubmittedAt (100% reliable)
-    // ═══════════════════════════════════════════════════════════════
 const updateResult = await Manuscript.updateOne(
   { _id: manuscriptId },
   {
@@ -465,7 +476,6 @@ const updateResult = await Manuscript.updateOne(
     } else {
       console.log("SUCCESS: reviewSubmittedAt updated for:", reviewer.email);
     }
-    // ═══════════════════════════════════════════════════════════════
 
     res.json({
       message: "Review submitted successfully",
