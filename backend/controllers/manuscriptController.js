@@ -2053,7 +2053,7 @@ exports.uploadNotesWord = async (req, res) => {
                 This document contains all review comments and notes from editors and reviewers. Please review the feedback and take necessary actions.
               </p>
               <div style="text-align: center; margin-top: 30px;">
-                <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/journal/jics/my-submissions"
+                <a href="https://synergyworldpress.com/journal/jics/my-submissions"
                    style="display: inline-block; background-color: #F3F4F6; color: #00796B; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; border: 1px solid #00796B;">
                   View Your Submissions
                 </a>
@@ -2432,7 +2432,7 @@ exports.uploadRevisionFiles = async (req, res) => {
                         ? `${manuscript.correspondingAuthor.firstName || ''} ${manuscript.correspondingAuthor.lastName || ''}`.trim()
                         : 'Author';
 
-                    const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
+                    const frontendUrl = "https://synergyworldpress.com";
 
                     const emailSubject = `Revision Submitted - ${customId}`;
                     
