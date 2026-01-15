@@ -218,6 +218,8 @@ const manuscriptSchema = new mongoose.Schema(
 reviewSubmittedAt: { type: Date, default: null },
     reviewRound: { type: Number, default: 1 },
     isRevisionReview: { type: Boolean, default: false },
+	 revisionRound: { type: Number, default: 0 },
+	 
   },
 ],
 		authorNotes: [noteSchema],

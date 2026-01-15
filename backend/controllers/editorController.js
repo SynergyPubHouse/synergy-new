@@ -1285,6 +1285,10 @@ exports.getManuscriptNotes = async (req, res) => {
 };
 
 // Send invitation to reviewers
+// ═══════════════════════════════════════════════════════════════════════
+// FIX: sendInvitation controller mein revisionRound properly set karo
+// ═══════════════════════════════════════════════════════════════════════
+
 exports.sendInvitation = async (req, res) => {
     try {
         console.log("=== INVITATION REQUEST START ===");
@@ -1300,6 +1304,7 @@ exports.sendInvitation = async (req, res) => {
         }
 
         const manuscript = await Manuscript.findById(manuscriptId);
+		console.log("Manuscript:", manuscript);
         if (!manuscript) {
             return res.status(404).json({ message: "Manuscript not found" });
         }
@@ -1311,11 +1316,18 @@ exports.sendInvitation = async (req, res) => {
         // ═══════════════════════════════════════════════════════════════════════
         // 👇 GET CURRENT REVISION ROUND
         // ═══════════════════════════════════════════════════════════════════════
-        const currentRevisionRound = manuscript.currentRevisionRound || 0;
+        const currentRevisionRound = manuscript.revisionAttempts || 0;
+		console.log("Current revision round:", currentRevisionRound);
         
-        console.log(`Current revision round: ${currentRevisionRound}`);
+        console.log(`📊 Current revision round: ${currentRevisionRound}`);
+        console.log(`📄 Has author response files:`, {
+            pdfUrl: !!manuscript.authorResponse?.pdfUrl,
+            docxUrl: !!manuscript.authorResponse?.docxUrl,
+            highlightedFileUrl: !!manuscript.authorResponse?.highlightedFileUrl,
+            withoutHighlightedFileUrl: !!manuscript.authorResponse?.withoutHighlightedFileUrl
+        });
 
-        // Calculate review round
+        // Calculate review round for each email
         const existingInvitationsForEmail = (email) => {
             return manuscript.invitations.filter(
                 inv => inv.email.toLowerCase() === email.toLowerCase()
@@ -1342,28 +1354,41 @@ exports.sendInvitation = async (req, res) => {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // 👇 CREATE INVITATIONS WITH REVISION TRACKING
+        // 👇 CREATE INVITATIONS WITH REVISION TRACKING - PROPERLY SET revisionRound
         // ═══════════════════════════════════════════════════════════════════════
-     const newInvitations = emails.map((email) => {
-    const normalizedEmail = email.toLowerCase().trim();
-    const previousInvitations = existingInvitationsForEmail(normalizedEmail);
-    
-    return {
-        email: normalizedEmail,
-        invitedAt: new Date(),
-        status: "pending",
-        
-        expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 
-        remindedAt: null,
-        expiredAt: null,
+        const newInvitations = emails.map((email) => {
+            const normalizedEmail = email.toLowerCase().trim();
+            const previousInvitations = existingInvitationsForEmail(normalizedEmail);
+            
+            // 🔥 KEY FIX: Explicitly set revisionRound field
+            const invitation = {
+                email: normalizedEmail,
+                invitedAt: new Date(),
+                status: "pending",
+                
+                expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 
+                remindedAt: null,
+                expiredAt: null,
 
-        reviewRound: previousInvitations + 1,
-        revisionRound: currentRevisionRound,
-        isRevisionReview: isRevisionReview || currentRevisionRound > 0 || previousInvitations > 0,
-    };
-})
+                reviewRound: previousInvitations + 1,
+                
+                // 🔥 CRITICAL: Set revisionRound from manuscript's currentRevisionRound
+                revisionRound: currentRevisionRound,
+                
+                // Set isRevisionReview flag
+                isRevisionReview: currentRevisionRound > 0 || previousInvitations > 0,
+            };
 
-        console.log("New invitations:", JSON.stringify(newInvitations, null, 2));
+            console.log(`📧 Creating invitation for ${normalizedEmail}:`, {
+                reviewRound: invitation.reviewRound,
+                revisionRound: invitation.revisionRound,
+                isRevisionReview: invitation.isRevisionReview
+            });
+
+            return invitation;
+        });
+
+        console.log("✅ New invitations created:", newInvitations.length);
 
         manuscript.invitations.push(...newInvitations);
         
@@ -1376,17 +1401,14 @@ exports.sendInvitation = async (req, res) => {
         console.log("✅ Invitations saved to database successfully");
 
         // Check if author has submitted revision response
-      const hasAuthorResponseFiles = !!(
-    manuscript.authorResponse?.pdfUrl ||
-    manuscript.authorResponse?.docxUrl ||
-    manuscript.authorResponse?.highlightedFileUrl ||
-    manuscript.authorResponse?.withoutHighlightedFileUrl
-);
+        const hasAuthorResponseFiles = !!(
+            manuscript.authorResponse?.pdfUrl ||
+            manuscript.authorResponse?.docxUrl ||
+            manuscript.authorResponse?.highlightedFileUrl ||
+            manuscript.authorResponse?.withoutHighlightedFileUrl
+        );
 
-// Keep old variable for backward compatibility
-const hasRevisionResponse = hasAuthorResponseFiles;
-
-console.log("Author Response Files Available:", hasAuthorResponseFiles);
+        console.log("📄 Author Response Files Available:", hasAuthorResponseFiles);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 📧 SEND EMAILS - Non-blocking
@@ -1411,7 +1433,7 @@ console.log("Author Response Files Available:", hasAuthorResponseFiles);
                     : "";
 
                 // Build revision info section for email
-                const revisionInfoSection = hasRevisionResponse
+                const revisionInfoSection = hasAuthorResponseFiles
                     ? `
                     <div style="background-color: #fff3cd; padding: 15px; margin: 20px 0; border-left: 4px solid #ffc107;">
                         <h4 style="color: #856404; margin-top: 0;">📝 Revision ${currentRevisionRound} Submitted</h4>
@@ -1451,7 +1473,7 @@ console.log("Author Response Files Available:", hasAuthorResponseFiles);
 
                 await sendEmail({
                     to: email,
-                    subject: `${hasRevisionResponse ? '[Revision Review] ' : ''}Reviewer Invitation: ${manuscript.title}`,
+                    subject: `${hasAuthorResponseFiles ? '[Revision Review] ' : ''}Reviewer Invitation: ${manuscript.title}`,
                     html: emailContent,
                 });
 
@@ -1476,7 +1498,7 @@ console.log("Author Response Files Available:", hasAuthorResponseFiles);
                 : `Invitations created for ${emails.length} reviewers. ${emailsSent} emails sent, ${emailsFailed} failed.`,
             invitedEmails: emails,
             editorNoteAdded: editorNoteAdded,
-            isRevisionReview: hasRevisionResponse,
+            isRevisionReview: hasAuthorResponseFiles,
             currentRevisionRound: currentRevisionRound,
             emailStatus: {
                 total: emails.length,
