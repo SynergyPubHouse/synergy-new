@@ -453,27 +453,46 @@ function ReviewerDashboard() {
                 : "Select an Author"}
             </h2>
             <div className="space-y-4" key={`${selectedUser?._id || 'all'}-${forceRender}`}>
-              {manuscripts.map((manuscript) => {
-                // ═══════════════════════════════════════════════════════════════
-                // UPDATED: Multiple invitations ke case mein LATEST invitation check
-                // ═══════════════════════════════════════════════════════════════
 
-                // Step 1: Get ALL invitations for this reviewer
+
+
+
+              {manuscripts.map((manuscript) => {
+                // Get ALL invitations for this reviewer
                 const allReviewerInvitations = manuscript.invitations?.filter(
                   (inv) => inv.email?.toLowerCase() === user?.email?.toLowerCase()
                 ) || [];
 
-                // Step 2: Sort by date (newest first) and get latest
+                console.log(`📧 All invitations for ${user?.email} in manuscript ${manuscript._id}:`,
+                  allReviewerInvitations.map(inv => ({
+                    status: inv.status,
+                    revisionRound: inv.revisionRound,
+                    reviewRound: inv.reviewRound,
+                    invitedAt: inv.invitedAt,
+                    acceptedAt: inv.acceptedAt,
+                    isRevisionReview: inv.isRevisionReview
+                  }))
+                );
+
+                // Sort by invitedAt date (newest first) and get latest
                 const sortedInvitations = [...allReviewerInvitations].sort((a, b) => {
                   const dateA = new Date(a.invitedAt || a.createdAt || 0);
                   const dateB = new Date(b.invitedAt || b.createdAt || 0);
                   return dateB - dateA; // Newest first
                 });
 
-                // Step 3: Latest invitation (for status check)
+                // Latest invitation (most recent)
                 const reviewerInvitation = sortedInvitations[0] || null;
 
-                // Step 4: Check blocked - latest invitation OR any invitation blocked
+                console.log(`🎯 Latest invitation for ${user?.email}:`, {
+                  status: reviewerInvitation?.status,
+                  revisionRound: reviewerInvitation?.revisionRound,
+                  reviewRound: reviewerInvitation?.reviewRound,
+                  invitedAt: reviewerInvitation?.invitedAt,
+                  acceptedAt: reviewerInvitation?.acceptedAt
+                });
+
+                // Check blocked
                 const isBlocked =
                   reviewerInvitation?.status === "blocked" ||
                   reviewerInvitation?.isReviewBlocked === true ||
@@ -481,10 +500,33 @@ function ReviewerDashboard() {
                     (inv) => inv.status === "blocked" || inv.isReviewBlocked === true
                   );
 
-                // Step 5: Check accepted (latest invitation)
+                // Check accepted
                 const isAccepted = reviewerInvitation?.status === "accepted";
 
                 const canSubmitReview = isAccepted && !isBlocked;
+
+                // ═══════════════════════════════════════════════════════════════════
+                // 🔥 KEY FIX: Show author response files based on invitation revision round
+                // ═══════════════════════════════════════════════════════════════════
+                const currentInvitationRevisionRound = reviewerInvitation?.revisionRound || 0;
+
+                // Check if this invitation was sent during a revision round
+                // If revisionRound > 0, it means author has submitted revision
+                const isRevisionReview = currentInvitationRevisionRound > 0;
+
+                // Show author response files ONLY if:
+                // 1. Invitation was sent during revision round (revisionRound > 0)
+                // 2. Reviewer has accepted the invitation
+                const shouldShowAuthorResponseFiles = isRevisionReview && isAccepted;
+
+                console.log(`Manuscript ${manuscript._id}:`, {
+                  reviewerEmail: user?.email,
+                  isRevisionReview,
+                  isAccepted,
+                  shouldShowAuthorResponseFiles,
+                  revisionRound: currentInvitationRevisionRound,
+                  reviewRound: reviewerInvitation?.reviewRound
+                });
 
                 // Extra info for display
                 const currentRound = allReviewerInvitations.length;
@@ -512,36 +554,39 @@ function ReviewerDashboard() {
                           Submitted:{" "}
                           {new Date(manuscript.submissionDate).toLocaleDateString()}
                         </p>
+
                       </div>
                       <div className="flex flex-col space-y-2">
+                        {/* ALWAYS show original PDF */}
                         {manuscript.mergedFileUrl && (
                           <button
                             onClick={() => handleViewPDF(manuscript.mergedFileUrl)}
                             className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                           >
-                            Original PDF
+                            📄 Original PDF
                           </button>
                         )}
 
-                        {manuscript.authorResponse?.responseSheet?.docxUrl && (
+
+                        {shouldShowAuthorResponseFiles && manuscript.authorResponse?.responseSheet?.docxUrl && (
                           <button
                             onClick={() => window.open(manuscript.authorResponse.responseSheet.docxUrl, "_blank")}
                             className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                           >
-                            Response Sheet
+                            📋 Response Sheet
                           </button>
                         )}
 
-                        {manuscript.authorResponse?.highlightedDocument?.url && (
+                        {shouldShowAuthorResponseFiles && manuscript.authorResponse?.highlightedDocument?.url && (
                           <button
                             onClick={() => window.open(manuscript.authorResponse.highlightedDocument.url, "_blank")}
                             className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                           >
-                            Highlighted Doc
+                            📝  Highlighted Doc
                           </button>
                         )}
 
-                        {manuscript.authorResponse?.cleanDocument?.url && (
+                        {shouldShowAuthorResponseFiles && manuscript.authorResponse?.cleanDocument?.url && (
                           <button
                             onClick={() => {
                               const url = manuscript.authorResponse.cleanDocument.url;
@@ -577,11 +622,18 @@ function ReviewerDashboard() {
                                 }
                               }
                             }}
-                            className="px-2 py-1 text-xs border border-green-600 text-green-600 rounded hover:bg-green-50 transition-colors"
+                            className="w-full px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                           >
-                            without highlighted Doc
+                            📝 Clean Document
                           </button>
                         )}
+
+                        {/* Show message if this is NOT a revision review */}
+                        {/* {!isRevisionReview && (
+                          <div className="text-xs text-gray-500 italic mt-2 p-2 bg-gray-50 rounded">
+                            ℹ️ Initial review - Author response files will appear after revision
+                          </div>
+                        )} */}
                       </div>
                     </div>
 
@@ -642,7 +694,6 @@ function ReviewerDashboard() {
                     {manuscript.status !== "Rejected" && (
                       <div className="w-full border-t border-[#e2e8f0] pt-4 mt-4">
                         {isBlocked ? (
-                          // BLOCKED MESSAGE - UPDATED with more info
                           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
                             <div className="text-red-800 text-lg font-semibold mb-2">
                               🚫 Review Access Revoked
@@ -654,7 +705,6 @@ function ReviewerDashboard() {
                               You can no longer submit a review.
                             </p>
 
-                            {/* Show previous reviews count if any */}
                             {previousReviewsCount > 0 && (
                               <div className="mt-3 p-2 bg-gray-100 rounded">
                                 <p className="text-gray-600 text-sm">
@@ -663,7 +713,6 @@ function ReviewerDashboard() {
                               </div>
                             )}
 
-                            {/* Show round info if multiple invitations */}
                             {currentRound > 1 && (
                               <p className="text-red-500 text-xs mt-3">
                                 ⚠️ You were invited for Round {currentRound} but did not submit review.
@@ -677,10 +726,14 @@ function ReviewerDashboard() {
                             )}
                           </div>
                         ) : (
-                          // NORMAL REVIEW FORM - BILKUL PURANA WAHI
                           <>
                             <h4 className="text-[#10b981] text-lg font-semibold mb-4">
-                              Add Review {currentRound > 1 ? `(Round ${currentRound})` : ''}
+                              Add Review
+                              {/* {isRevisionReview && (
+                                <span className="text-sm text-blue-600 ml-2">
+                                  - Revision {currentInvitationRevisionRound}
+                                </span>
+                              )} */}
                             </h4>
                             <div className="space-y-4">
                               <div>
