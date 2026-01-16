@@ -675,21 +675,20 @@ function EditorDashboard() {
 
 	// Handle send invitations
 	const handleSendInvitations = async () => {
-		setIsSendingInvitations(true); // Start loading
+		setIsSendingInvitations(true);
 		try {
-			// Filter out empty emails and trim whitespace
 			const emailArray = inviteEmails
 				.map((email) => email.trim())
 				.filter((email) => email.length > 0);
 
-			// Minimum 3, maximum 6 emails check
-			// if (emailArray.length < 3 || emailArray.length > 6) {
-			// 	addToast("Please enter between 3 and 6 email addresses", "error");
-			// 	setIsSendingInvitations(false);
-			// 	return;
-			// }
+			// Validation 1: Empty check
+			if (emailArray.length === 0) {
+				addToast("Please enter at least one email address", "error");
+				setIsSendingInvitations(false);
+				return;
+			}
 
-			// Validate email format
+			// Validation 2: Email format
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 			const invalidEmails = emailArray.filter(
 				(email) => !emailRegex.test(email)
@@ -704,23 +703,64 @@ function EditorDashboard() {
 				return;
 			}
 
+			// Validation 3: Duplicate emails in input
+			const hasDuplicates = (emails) => {
+				const lowercased = emails.map(e => e.toLowerCase());
+				return new Set(lowercased).size !== lowercased.length;
+			};
+
+			if (hasDuplicates(emailArray)) {
+				const getDuplicates = (emails) => {
+					const lowercased = emails.map(e => e.toLowerCase());
+					const seen = new Set();
+					const duplicates = new Set();
+
+					lowercased.forEach(email => {
+						if (seen.has(email)) duplicates.add(email);
+						seen.add(email);
+					});
+
+					return Array.from(duplicates);
+				};
+
+				addToast(
+					`Duplicate emails found: ${getDuplicates(emailArray).join(", ")}. Please remove duplicates.`,
+					"error"
+				);
+				setIsSendingInvitations(false);
+				return;
+			}
+
+			// Validation 4: Already invited check
+			const alreadyInvited = emailArray.filter((email) =>
+				inviteManuscript.invitations?.some(
+					(inv) => inv.email.toLowerCase() === email.toLowerCase()
+				)
+			);
+
+			if (alreadyInvited.length > 0) {
+				addToast(
+					`Following reviewers are already invited: ${alreadyInvited.join(", ")}`,
+					"error"
+				);
+				setIsSendingInvitations(false);
+				return;
+			}
+
+			// Rest of your API call...
 			const requestData = {
 				emails: emailArray,
 			};
 
-			// Add editor note if provided
 			if (editorNote.trim()) {
 				requestData.editorNote = editorNote.trim();
 				requestData.id = user._id;
-				requestData.fullName = formatFullName(
-					`${user.firstName} ${user.lastName}`
-				);
+				requestData.fullName = formatFullName(user);
 				requestData.edittorEmail = user.email;
 			}
 
 			await axios.post(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${inviteManuscript._id
-				}/invite-reviewers`,
+				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${inviteManuscript._id}/invite-reviewers`,
 				requestData,
 				{
 					headers: {
@@ -738,15 +778,13 @@ function EditorDashboard() {
 			setEditorNote("");
 			setInviteManuscript(null);
 
-			// Auto-refresh data to show new invitations
-			console.log("Refreshing data after sending invitations...");
 			await fetchUsers();
 			setForceRender(prev => !prev);
 		} catch (error) {
 			console.error("Error sending invitations:", error);
 			addToast("Failed to send invitations", "error");
 		} finally {
-			setIsSendingInvitations(false); // Stop loading
+			setIsSendingInvitations(false);
 		}
 	};
 

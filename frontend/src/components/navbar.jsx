@@ -22,18 +22,18 @@ const Navbar = () => {
   const dropdownRef = useRef(null);
   console.log("user", user)
 
-  const logoTarget =
-    user?.editor
-      ? '/journal/jics/editor/dashboard'
-      : user?.reviewer
-        ? '/journal/jics/reviewer/dashboard'
-        : '/';
-
-  // Build available roles from backend-provided role strings
   const rawRoles = (user?.availableRoles || user?.roles || []).map((r) =>
     (typeof r === 'string' ? r : r?.role) || 'author'
   );
   const hasRole = (role) => rawRoles.includes(role);
+
+  const logoTarget = hasRole('editor') && rawRoles.length === 1
+    ? '/journal/jics/editor/dashboard'
+    : location.pathname.includes('/editor')
+      ? '/journal/jics/editor/dashboard'
+      : location.pathname.includes('/reviewer')
+        ? '/journal/jics/reviewer/dashboard'
+        : '/';
   const availableRoles = [
     ...(hasRole('author')
       ? [{ key: 'author', label: 'Author', path: '/journal/jics/about/overview' }]
@@ -225,13 +225,25 @@ const Navbar = () => {
                     >
                       My Account
                     </Link>
-                    <Link
-                      to="/journal/jics/my-submissions"
-                      className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
-                      onClick={() => setUserMenuOpen(false)}
-                    >
-                      My Submissions
-                    </Link>
+                    {hasRole('author') && (
+                      <Link
+                        to="/journal/jics/my-submissions"
+                        className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        My Submissions
+                      </Link>
+                    )}
+
+                    {hasRole('editor') && (
+                      <Link
+                        to="/journal/jics/editor/dashboard"
+                        className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Editor Dashboard
+                      </Link>
+                    )}
                     <Link
                       to={`${BASE_URL}/subscriptions`}
                       className="block px-4 py-2 text-sm hover:bg-[#00acc1] hover:text-white transition-colors rounded-md mx-2"
