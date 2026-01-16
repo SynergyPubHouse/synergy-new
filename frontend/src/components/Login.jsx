@@ -136,7 +136,7 @@ function Login() {
 
       if (response.data) {
         console.log("Login response data:", response.data);
-        const userData = { ...response.data };
+        const userData = { ...response.data, loginTime: Date.now() };
         let redirectPath = from;
         if (
           userData.accountType === "editor" ||

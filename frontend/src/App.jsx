@@ -55,7 +55,7 @@ import CurrentIssue from "./pages/CurrentIssue";
 import ArticleDetail from "./pages/journal/jics/articles/ArticleDetail";
 import VerifyEmail from "./pages/VerifyEmail";
 import VerificationPending from "./pages/VerificationPending";
-
+import { useAutoLogout } from "./hooks/useAutoLogout";
 // Create Authentication Context
 const AuthContext = createContext(null);
 
@@ -108,7 +108,7 @@ function AppContent() {
     localStorage.removeItem("user");
     window.location.href = "/journal/jics/about/overview";
   };
-
+  useAutoLogout(logout);
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">

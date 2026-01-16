@@ -2026,101 +2026,90 @@ const ManuscriptPage = () => {
 			const frontendUrl = import.meta.env.VITE_FRONTEND_URL || "https://synergyworldpress.com";
 
 			// ============================================
-			// NOTIFY ALL EDITORS (Don't wait for completion)
+			// 🔥 FIX: AWAIT EDITOR NOTIFICATION
 			// ============================================
-			axios.post(
-				`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/notify-new-manuscript`,
-				{
-					manuscriptId: manuscriptIdForEmail,
-					manuscriptTitle: manuscriptTitle,
-					submittedBy: ((user.firstName || '') + ' ' + (user.lastName || '')).trim() || user.name || 'Unknown Author',
-					submitterEmail: user.email,
-					submissionDate: new Date().toLocaleString('en-US', {
-						year: 'numeric',
-						month: 'long',
-						day: 'numeric',
-						hour: '2-digit',
-						minute: '2-digit'
-					}),
-					status: "Under Review",
-					abstract: manuscript.abstract || '',
-					keywords: manuscript.keywords || '',
-					classification: manuscript.classification || []
-				},
-				{
-					headers: {
-						Authorization: `Bearer ${user.token}`,
-						'Content-Type': 'application/json'
+			try {
+				console.log('Sending editor notification...');
+				const editorNotificationResponse = await axios.post(
+					`${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/notify-new-manuscript`,
+					{
+						manuscriptId: manuscriptIdForEmail,
+						manuscriptTitle: manuscriptTitle,
+						submittedBy: ((user.firstName || '') + ' ' + (user.lastName || '')).trim() || user.name || 'Unknown Author',
+						submitterEmail: user.email,
+						submissionDate: new Date().toLocaleString('en-US', {
+							year: 'numeric',
+							month: 'long',
+							day: 'numeric',
+							hour: '2-digit',
+							minute: '2-digit'
+						}),
+						status: "Under Review",
+						abstract: manuscript.abstract || '',
+						keywords: manuscript.keywords || '',
+						classification: manuscript.classification || []
 					},
-				}
-			).then(editorNotificationResponse => {
-				console.log('Editor notification sent:', editorNotificationResponse.data);
-			}).catch(editorNotifyError => {
+					{
+						headers: {
+							Authorization: `Bearer ${user.token}`,
+							'Content-Type': 'application/json'
+						},
+						timeout: 10000 // 10 second timeout
+					}
+				);
+				console.log('Editor notification sent successfully:', editorNotificationResponse.data);
+			} catch (editorNotifyError) {
 				console.error('Error notifying editors:', editorNotifyError);
-			});
+				// Don't fail the whole process if editor notification fails
+				toast.warning('Manuscript submitted, but editor notification may have failed', {
+					position: "top-center",
+					autoClose: 3000,
+				});
+			}
 
 			// ============================================
-			// 🔥 SEND EMAIL TO ALL AUTHORS
+			// 🔥 SEND EMAIL TO ALL AUTHORS (with await)
 			// ============================================
 			if (authorEmails.size > 0) {
 				console.log('Sending emails to ' + authorEmails.size + ' author(s)');
 
 				const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">' +
-
-					// Header
 					'<div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 25px; text-align: center;">' +
 					'<h1 style="margin: 0; font-size: 22px; color: #101010ff;">Manuscript Submitted Successfully</h1>' +
 					'</div>' +
-
-					// Content
 					'<div style="padding: 25px;">' +
-
 					'<p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Dear Author,</p>' +
-
 					'<p style="color: #374151; font-size: 16px; margin-bottom: 20px; line-height: 1.6;">' +
 					'Your manuscript entitled "<strong>' + manuscriptTitle + '</strong>" has been successfully submitted and is now with the editors for review.' +
 					'</p>' +
-
-					// Manuscript Details
 					'<div style="background-color: #F0FDF4; padding: 20px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 25px;">' +
 					'<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Manuscript ID:</strong></p>' +
 					'<p style="margin: 0 0 15px 0; font-size: 18px; color: #1F2937; font-weight: 600;">' + manuscriptIdForEmail + '</p>' +
 					'<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Status:</strong></p>' +
 					'<p style="margin: 0; font-size: 16px; color: #00796B; font-weight: 600;">Under Review</p>' +
 					'</div>' +
-
 					'<p style="color: #374151; font-size: 15px; margin-bottom: 20px; line-height: 1.6;">' +
 					'Please use this ID in all future correspondence regarding this manuscript.' +
 					'</p>' +
-
-					// Important Note
 					'<div style="background-color: #FEF3C7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">' +
 					'<p style="color: #92400E; font-size: 14px; margin: 0; line-height: 1.6;">' +
 					'<strong>Note:</strong> Any change to the author list after submission is considered rare and exceptional. Once the list and order of authors has been established, it should not be altered without permission of all authors.' +
 					'</p>' +
 					'</div>' +
-
-					// View Submission Button
 					'<div style="text-align: center; margin: 25px 0;">' +
 					'<a href="' + frontendUrl + '/journal/jics/my-submissions" style="display: inline-block; background-color: #00796B; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">View My Submissions</a>' +
 					'</div>' +
-
 					'<p style="color: #374151; font-size: 15px; margin-top: 25px;">Sincerely,<br><strong>Editorial Office</strong></p>' +
-
 					'</div>' +
-
-					// Footer
 					'<div style="background-color: #F3F4F6; padding: 15px; text-align: center; border-top: 1px solid #E5E7EB;">' +
 					'<p style="color: #6B7280; font-size: 12px; margin: 0;">Synergy World Press | support@synergyworldpress.com</p>' +
 					'</div>' +
-
 					'</div>';
 
-				// 🔥 Send emails to all collected emails
-				Array.from(authorEmails).forEach((email) => {
+				// 🔥 Use Promise.allSettled to send all emails in parallel and wait for all
+				const emailPromises = Array.from(authorEmails).map((email) => {
 					console.log('Sending email to:', email);
-
-					axios.post(
+					return axios.post(
 						`${import.meta.env.VITE_BACKEND_URL}/api/send-email`,
 						{
 							to: email,
@@ -2131,15 +2120,31 @@ const ManuscriptPage = () => {
 							headers: {
 								Authorization: `Bearer ${user.token}`,
 							},
+							timeout: 10000 // 10 second timeout per email
 						}
 					).then((response) => {
 						console.log('Email sent successfully to ' + email, response.data);
+						return { email, success: true };
 					}).catch((emailError) => {
 						console.error('Failed to send email to ' + email + ':', emailError.response?.data || emailError.message);
+						return { email, success: false, error: emailError.message };
 					});
 				});
 
-				console.log('Email requests sent to ' + authorEmails.size + ' recipients');
+				// Wait for all emails to complete
+				const emailResults = await Promise.allSettled(emailPromises);
+
+				const successCount = emailResults.filter(r => r.status === 'fulfilled' && r.value.success).length;
+				const failCount = emailResults.length - successCount;
+
+				console.log(`Email sending complete: ${successCount} succeeded, ${failCount} failed`);
+
+				if (failCount > 0) {
+					toast.warning(`${successCount} emails sent, ${failCount} failed`, {
+						position: "top-center",
+						autoClose: 3000,
+					});
+				}
 			} else {
 				console.log('No author emails found to send');
 			}
@@ -2153,7 +2158,7 @@ const ManuscriptPage = () => {
 
 			setAcceptOrRejectPdf(false);
 
-			// Redirect to my submissions after short delay
+			// 🔥 NOW redirect after all operations complete
 			setTimeout(() => {
 				navigate(`${BASE_URL}/my-submissions`);
 			}, 1000);
