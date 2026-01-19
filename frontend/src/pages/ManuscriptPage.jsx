@@ -2851,7 +2851,7 @@ const ManuscriptPage = () => {
 			} else {
 				authorIdToUse = `temp-${Date.now()}-${newAuthor.email}`;
 				// Send invitation email for non-registered users
-				const frontendUrl = import.meta.env.VITE_FRONTEND_URL || "https://synergyworldpress.com";
+				const frontendUrl = "https://synergyworldpress.com";
 				try {
 					await axios.post(
 						`${import.meta.env.VITE_BACKEND_URL}/api/send-email`,

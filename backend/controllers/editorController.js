@@ -1742,7 +1742,7 @@ console.log("Editors to notify:", editors.map(e => e.email));
         console.log(`Found ${editors.length} editor(s)`);
 
         // Frontend URL for dashboard link
-        const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
+        const frontendUrl = "https://synergyworldpress.com";
 
         // Track successful and failed emails
         const emailResults = {
