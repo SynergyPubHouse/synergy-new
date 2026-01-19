@@ -325,6 +325,27 @@ function ReviewerDashboard() {
     }
   };
 
+  const hasReviewerAlreadySubmittedReview = (manuscript) => {
+    if (!manuscript.reviewerNotes || manuscript.reviewerNotes.length === 0) {
+      return false;
+    }
+
+
+    return manuscript.reviewerNotes.some(
+      (note) =>
+        note.addedBy?.email?.toLowerCase() === user?.email?.toLowerCase() ||
+        note.addedBy?.id === user?.id ||
+        note.addedBy?.id === user?._id
+    );
+  };
+
+
+  const isManuscriptStatusFinal = (status) => {
+    const finalStatuses = ["Accepted", "Reject", "Rejected", "Published"];
+    return finalStatuses.some(
+      (finalStatus) => status?.toLowerCase() === finalStatus.toLowerCase()
+    );
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f0f4f8] to-[#d9e2ec] p-8">
       <div className="max-w-7xl mx-auto">
@@ -463,6 +484,11 @@ function ReviewerDashboard() {
                   (inv) => inv.email?.toLowerCase() === user?.email?.toLowerCase()
                 ) || [];
 
+
+                const alreadySubmittedReview = hasReviewerAlreadySubmittedReview(manuscript);
+
+
+                const isFinalStatus = isManuscriptStatusFinal(manuscript.status);
                 console.log(`📧 All invitations for ${user?.email} in manuscript ${manuscript._id}:`,
                   allReviewerInvitations.map(inv => ({
                     status: inv.status,
@@ -503,7 +529,8 @@ function ReviewerDashboard() {
                 // Check accepted
                 const isAccepted = reviewerInvitation?.status === "accepted";
 
-                const canSubmitReview = isAccepted && !isBlocked;
+                const canSubmitReview = isAccepted && !isBlocked && !alreadySubmittedReview && !isFinalStatus;
+
 
                 // ═══════════════════════════════════════════════════════════════════
                 // 🔥 KEY FIX: Show author response files based on invitation revision round
@@ -638,7 +665,7 @@ function ReviewerDashboard() {
                     </div>
 
                     {/* Editor Notes */}
-                    {manuscript.editorNotes?.length > 0 && (
+                    {/* {manuscript.editorNotes?.length > 0 && (
                       <div className="mt-4 border-t border-[#e2e8f0] pt-4">
                         <h4 className="text-[#496580] text-sm font-semibold mb-2">
                           Editor Notes:
@@ -664,7 +691,7 @@ function ReviewerDashboard() {
                             ))}
                         </div>
                       </div>
-                    )}
+                    )} */}
 
                     {/* Your Previous Reviews */}
                     {manuscript.reviewerNotes?.length > 0 && (
@@ -691,105 +718,145 @@ function ReviewerDashboard() {
                     )}
 
                     {/* Review Form Section */}
-                    {manuscript.status !== "Rejected" && (
-                      <div className="w-full border-t border-[#e2e8f0] pt-4 mt-4">
-                        {isBlocked ? (
-                          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                            <div className="text-red-800 text-lg font-semibold mb-2">
-                              🚫 Review Access Revoked
-                            </div>
-                            <p className="text-red-700">
-                              Your invitation to review this manuscript has been <strong>blocked</strong> by the editor.
-                            </p>
-                            <p className="text-red-600 text-sm mt-2">
-                              You can no longer submit a review.
-                            </p>
-
-                            {previousReviewsCount > 0 && (
-                              <div className="mt-3 p-2 bg-gray-100 rounded">
-                                <p className="text-gray-600 text-sm">
-                                  📝 You previously submitted <strong>{previousReviewsCount}</strong> review(s) for this manuscript.
-                                </p>
-                              </div>
-                            )}
-
-                            {currentRound > 1 && (
-                              <p className="text-red-500 text-xs mt-3">
-                                ⚠️ You were invited for Round {currentRound} but did not submit review.
-                              </p>
-                            )}
-
-                            {reviewerInvitation?.reviewBlockedAt && (
-                              <p className="text-red-500 text-xs mt-3">
-                                Blocked on: {new Date(reviewerInvitation.reviewBlockedAt).toLocaleString()}
-                              </p>
-                            )}
+                    <div className="w-full border-t border-[#e2e8f0] pt-4 mt-4">
+                      {isBlocked ? (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                          <div className="text-red-800 text-lg font-semibold mb-2">
+                            🚫 Review Access Revoked
                           </div>
-                        ) : (
-                          <>
-                            <h4 className="text-[#10b981] text-lg font-semibold mb-4">
-                              Add Review
-                              {/* {isRevisionReview && (
-                                <span className="text-sm text-blue-600 ml-2">
-                                  - Revision {currentInvitationRevisionRound}
-                                </span>
-                              )} */}
-                            </h4>
-                            <div className="space-y-4">
-                              <div>
-                                <label className="block text-[#1a365d] mb-2">
-                                  Review Comments:
-                                </label>
-                                <textarea
-                                  value={reviewTexts[manuscript._id] || ""}
-                                  onChange={(e) =>
-                                    setReviewTexts((prev) => ({
-                                      ...prev,
-                                      [manuscript._id]: e.target.value,
-                                    }))
-                                  }
-                                  className="w-full h-32 bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
-                                  placeholder="Enter your review comments here..."
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[#1a365d] mb-2">
-                                  Recommendation:
-                                </label>
-                                <select
-                                  value={recommendations[manuscript._id] || ""}
-                                  onChange={(e) =>
-                                    setRecommendations((prev) => ({
-                                      ...prev,
-                                      [manuscript._id]: e.target.value,
-                                    }))
-                                  }
-                                  className="w-full bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
-                                >
-                                  <option value="">Select a recommendation</option>
-                                  <option value="Accept">Accept</option>
-                                  <option value="Minor Revision">Minor Revision</option>
-                                  <option value="Major Revision">Major Revision</option>
-                                  <option value="Reject">Reject</option>
-                                </select>
-                              </div>
-                              <div className="flex justify-end">
-                                <button
-                                  onClick={() => handleAddReview(manuscript._id)}
-                                  disabled={
-                                    !(reviewTexts[manuscript._id] || "").trim() ||
-                                    !(recommendations[manuscript._id] || "")
-                                  }
-                                  className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  Add Review
-                                </button>
-                              </div>
+                          <p className="text-red-700">
+                            Your invitation to review this manuscript has been <strong>blocked</strong> by the editor.
+                          </p>
+                          <p className="text-red-600 text-sm mt-2">
+                            You can no longer submit a review.
+                          </p>
+
+                          {previousReviewsCount > 0 && (
+                            <div className="mt-3 p-2 bg-gray-100 rounded">
+                              <p className="text-gray-600 text-sm">
+                                📝 You previously submitted <strong>{previousReviewsCount}</strong> review(s) for this manuscript.
+                              </p>
                             </div>
-                          </>
-                        )}
-                      </div>
-                    )}
+                          )}
+
+                          {currentRound > 1 && (
+                            <p className="text-red-500 text-xs mt-3">
+                              ⚠️ You were invited for Round {currentRound} but did not submit review.
+                            </p>
+                          )}
+
+                          {reviewerInvitation?.reviewBlockedAt && (
+                            <p className="text-red-500 text-xs mt-3">
+                              Blocked on: {new Date(reviewerInvitation.reviewBlockedAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      ) : isFinalStatus ? (
+
+                        < div className="bg-gray-50 border border-gray-300 rounded-lg p-6 text-center">
+                          <div className="text-gray-800 text-lg font-semibold mb-2">
+                            🔒 Manuscript Finalized
+                          </div>
+                          <p className="text-gray-700">
+                            This manuscript has been <strong>{manuscript.status}</strong>.
+                          </p>
+                          <p className="text-gray-600 text-sm mt-2">
+                            Reviews can no longer be submitted for finalized manuscripts (Accepted, Rejected, or Published).
+                          </p>
+                          {previousReviewsCount > 0 && (
+                            <div className="mt-3 p-2 bg-blue-100 rounded">
+                              <p className="text-blue-800 text-sm">
+                                📝 You submitted <strong>{previousReviewsCount}</strong> review(s) before finalization.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : alreadySubmittedReview ? (
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                          <div className="text-blue-800 text-lg font-semibold mb-2">
+                            ✅ Review Already Submitted
+                          </div>
+                          <p className="text-blue-700">
+                            You have already submitted your review for this manuscript.
+                          </p>
+                          <p className="text-blue-600 text-sm mt-2">
+                            You can only submit one review per manuscript.
+                          </p>
+                          <div className="mt-3 p-2 bg-blue-100 rounded">
+                            <p className="text-blue-800 text-sm">
+                              📝 Total reviews submitted: <strong>{previousReviewsCount}</strong>
+                            </p>
+                          </div>
+                        </div>
+                      ) : canSubmitReview ? (
+                        <>
+                          <h4 className="text-[#10b981] text-lg font-semibold mb-4">
+                            Add Review
+                          </h4>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-[#1a365d] mb-2">
+                                Review Comments:
+                              </label>
+                              <textarea
+                                value={reviewTexts[manuscript._id] || ""}
+                                onChange={(e) =>
+                                  setReviewTexts((prev) => ({
+                                    ...prev,
+                                    [manuscript._id]: e.target.value,
+                                  }))
+                                }
+                                className="w-full h-32 bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
+                                placeholder="Enter your review comments here..."
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[#1a365d] mb-2">
+                                Recommendation:
+                              </label>
+                              <select
+                                value={recommendations[manuscript._id] || ""}
+                                onChange={(e) =>
+                                  setRecommendations((prev) => ({
+                                    ...prev,
+                                    [manuscript._id]: e.target.value,
+                                  }))
+                                }
+                                className="w-full bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
+                              >
+                                <option value="">Select a recommendation</option>
+                                <option value="Accept">Accept</option>
+                                <option value="Minor Revision">Minor Revision</option>
+                                <option value="Major Revision">Major Revision</option>
+                                <option value="Reject">Reject</option>
+                              </select>
+                            </div>
+                            <div className="flex justify-end">
+                              <button
+                                onClick={() => handleAddReview(manuscript._id)}
+                                disabled={
+                                  !(reviewTexts[manuscript._id] || "").trim() ||
+                                  !(recommendations[manuscript._id] || "")
+                                }
+                                className="px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Submit Review
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                          <div className="text-yellow-800 text-lg font-semibold mb-2">
+                            ⚠️ Review Not Available
+                          </div>
+                          <p className="text-yellow-700">
+                            Please accept the invitation to submit your review.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -802,7 +869,7 @@ function ReviewerDashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }
 
