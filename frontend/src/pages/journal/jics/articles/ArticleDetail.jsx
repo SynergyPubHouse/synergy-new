@@ -213,7 +213,7 @@ const ArticleDetail = () => {
                 <p className="text-sm text-gray-700 font-mono">
                   {formatAuthors(article.authors)} ({article.issueYear}).
                   {article.title}.
-                  <em> Journal Name</em>,
+                  <em> Journal of Intelligent Computing System (JICS)</em>,
                   {article.issueVolume}({article.issueNumber}),
                   {article.pageStart && article.pageEnd ? ` ${article.pageStart}-${article.pageEnd}` : ''}.
                 </p>
