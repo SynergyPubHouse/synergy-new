@@ -11,25 +11,21 @@ const CurrentIssue = () => {
   const navigate = useNavigate();
 
   // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login', { state: { from: '/journal/jics/articles/current' } });
-    }
-  }, [user, authLoading, navigate]);
+  // useEffect(() => {
+  //   if (!authLoading && !user) {
+  //     navigate('/login', { state: { from: '/journal/jics/articles/current' } });
+  //   }
+  // }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (!user) return;
+  
 
     const fetchCurrentIssue = async () => {
       try {
         setLoading(true);
         const res = await axios.get(
           `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/published`,
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`
-            }
-          }
+         
         );
 
         if (res.data && res.data.data) {
