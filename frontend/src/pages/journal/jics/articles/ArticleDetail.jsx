@@ -86,7 +86,7 @@ const ArticleDetail = () => {
       try {
         const res = await axios.get(
           `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${id}`,
-          { headers: { Authorization: `Bearer ${user?.token}` } }
+         
         );
         setArticle(res.data.data || res.data);
       } catch (error) {
@@ -97,10 +97,10 @@ const ArticleDetail = () => {
       }
     };
 
-    if (id && user?.token) {
+    if (id ) {
       fetchArticle();
     }
-  }, [id, user?.token]);
+  }, [id]);
 
   if (loading) return <div className="p-8">Loading article...</div>;
   if (error) return <div className="p-8 text-red-600">{error}</div>;
@@ -154,9 +154,7 @@ const ArticleDetail = () => {
             </p>
           </div>
 
-          {/* ═══════════════════════════════════════════════════════ */}
-          {/* NEW: Issue Information Box */}
-          {/* ═══════════════════════════════════════════════════════ */}
+         
           {hasIssueInfo && (
             <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
               <h3 className="text-lg font-semibold text-[#00796b] mb-3 flex items-center">

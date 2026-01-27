@@ -13,6 +13,12 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 // Manuscript routes
+router.get("/manuscripts/published", manuscriptController.getPublishedManuscripts);
+router.get(
+	"/manuscripts/:manuscriptId",
+	
+	manuscriptController.getManuscriptById
+);
 router.post("/manuscripts", auth, manuscriptController.createManuscript);
 router.post(
 	"/manuscripts/preview",
@@ -29,12 +35,7 @@ router.get(
 	auth,
 	manuscriptController.getMySubmissions
 );
-router.get("/manuscripts/published", auth, manuscriptController.getPublishedManuscripts);
-router.get(
-	"/manuscripts/:manuscriptId",
-	auth,
-	manuscriptController.getManuscriptById
-);
+
 router.get(
 	"/manuscripts/:manuscriptId/notes",
 	auth,
