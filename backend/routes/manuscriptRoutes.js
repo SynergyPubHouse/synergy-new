@@ -6,6 +6,7 @@ const auth = require("../middleware/auth");
 const multer = require("multer");
 const os = require("os");
 
+
 // ---- Multer setup ----
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, os.tmpdir()),
@@ -14,11 +15,14 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 // Manuscript routes
 router.get("/manuscripts/published", manuscriptController.getPublishedManuscripts);
+	router.get("/manuscripts/most-viewed", manuscriptController.getMostViewedManuscripts);
+	router.post("/manuscripts/:manuscriptId/view", manuscriptController.incrementViewCount);
 router.get(
 	"/manuscripts/:manuscriptId",
 	
 	manuscriptController.getManuscriptById
 );
+
 router.post("/manuscripts", auth, manuscriptController.createManuscript);
 router.post(
 	"/manuscripts/preview",

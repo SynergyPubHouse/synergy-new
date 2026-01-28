@@ -54,7 +54,9 @@ const corsOptions = {
     "Authorization",
     "X-Requested-With",
     "Accept",
-    "X-CSRF-Token"
+    "X-CSRF-Token",
+    "x-visitor-id",
+    "X-Visitor-Id"
   ],
   exposedHeaders: ["Content-Range", "X-Content-Range"],
   maxAge: 86400,

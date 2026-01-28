@@ -19,6 +19,7 @@ const FormData = require("form-data");
 const { uploadToCloudinary } = require("../utils/cloudinary");
 const { uploadFileToDrive,deleteFileFromDrive, downloadDriveFileToTemp   } = require('../services/googleDriveOAuth');
 const sendEmail = require("../utils/sendEmail");
+const pdfParse = require('pdf-parse');
 // const { console } = require("inspector");
 const { 
     createJob, 
@@ -1530,40 +1531,119 @@ exports.withdrawManuscript = async (req, res) => {
         });
     }
 };
+const extractAuthorsFromPdfUrl = async (pdfUrl) => {
+    try {
+        if (!pdfUrl) return { authors: [], correspondingAuthor: null };
+
+        let downloadUrl = pdfUrl;
+
+        // Handle Google Drive URLs
+        if (pdfUrl.includes('drive.google.com')) {
+            const fileIdMatch = pdfUrl.match(/\/d\/([^\/]+)/);
+            if (fileIdMatch) {
+                downloadUrl = `https://drive.google.com/uc?export=download&id=${fileIdMatch[1]}`;
+            }
+        }
+
+        console.log('📥 Downloading PDF:', downloadUrl);
+
+        const response = await axios.get(downloadUrl, {
+            responseType: 'arraybuffer',
+            timeout: 30000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        });
+
+        const pdfBuffer = Buffer.from(response.data);
+        const data = await pdfParse(pdfBuffer);
+        const text = data.text;
+
+        console.log('📝 PDF Text Sample:', text.substring(0, 1500));
+
+        let authors = [];
+        let correspondingAuthor = null;
+
+        // ✅ Pattern for "AuthorsMr Gaganjot Kaur, Dr Meenu Gupta, Rakesh Kumar"
+        const authorsMatch = text.match(/Authors([A-Za-z\s,\.]+?)(?=Corresponding|$)/i);
+        if (authorsMatch) {
+            const authorsText = authorsMatch[1].trim();
+            authors = authorsText
+                .split(',')
+                .map(a => a.trim())
+                .filter(a => a && a.length > 2);
+            
+            console.log('🔍 Raw Authors Match:', authorsText);
+        }
+
+        // ✅ Pattern for "Corresponding Author(s)Rakesh Kumar"
+        const correspondingMatch = text.match(/Corresponding\s*Author\(s\)([A-Za-z\s\.]+?)(?=\n|$)/i);
+        if (correspondingMatch) {
+            correspondingAuthor = correspondingMatch[1].trim();
+            console.log('🔍 Raw Corresponding Match:', correspondingAuthor);
+        }
+
+        console.log('✅ Final Authors:', authors);
+        console.log('✅ Final Corresponding Author:', correspondingAuthor);
+
+        return { authors, correspondingAuthor };
+
+    } catch (error) {
+        console.error('❌ PDF extraction error:', error.message);
+        return { authors: [], correspondingAuthor: null };
+    }
+};
+
 
 // Get a single manuscript by ID
 exports.getManuscriptById = async (req, res) => {
-	try {
-		const manuscript = await Manuscript.findById(req.params.manuscriptId)
-			.populate("authors", "firstName middleName lastName email")
-			.populate(
-				"correspondingAuthor",
-				"firstName middleName lastName email"
-			)
-			.populate(
-				"assignedReviewers",
-				"firstName middleName lastName email"
-			)
-			.select("-reviewerNotes"); // Exclude reviewer notes from author view
+    try {
+        const manuscript = await Manuscript.findById(req.params.manuscriptId)
+            .populate("authors", "firstName middleName lastName email")
+            .populate("correspondingAuthor", "firstName middleName lastName email")
+            .populate("assignedReviewers", "firstName middleName lastName email")
+            .select("-reviewerNotes -uniqueViewers");
 
-		if (!manuscript) {
-			return res.status(404).json({
-				success: false,
-				message: "Manuscript not found",
-			});
-		}
+        if (!manuscript) {
+            return res.status(404).json({
+                success: false,
+                message: "Manuscript not found",
+            });
+        }
 
-		res.json({
-			success: true,
-			data: manuscript,
-		});
-	} catch (error) {
-		console.error("Error fetching manuscript:", error);
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
+        const doc = manuscript.toObject();
+
+        // ✅ Extract PDF authors if mergedFileUrl exists
+        const pdfUrl = doc.mergedFileUrl || doc.mergedDriveViewUrl;
+        console.log('🔍 Extracting authors from PDF URL:', pdfUrl);
+        
+        if (pdfUrl) {
+            try {
+                const pdfData = await extractAuthorsFromPdfUrl(pdfUrl);
+                doc.pdfAuthors = pdfData.authors;
+                doc.pdfCorrespondingAuthor = pdfData.correspondingAuthor;
+            } catch (err) {
+                console.log('PDF extraction failed');
+                doc.pdfAuthors = [];
+                doc.pdfCorrespondingAuthor = null;
+            }
+        } else {
+            doc.pdfAuthors = [];
+            doc.pdfCorrespondingAuthor = null;
+        }
+
+        res.json({
+            success: true,
+            data: doc,
+        });
+
+    } catch (error) {
+        console.error("Error fetching manuscript:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
 };
 
 // Endpoint: Build and download merged PDF (table + manuscript + cover letter + declaration)
@@ -2776,34 +2856,72 @@ exports.uploadPublishedPdf = async (req, res) => {
 
 // Controller
 exports.getPublishedManuscripts = async (req, res) => {
-  try {
-    const manuscripts = await Manuscript.find({ status: "Published" })
-      .populate("authors", "firstName middleName lastName email")
-      .populate("correspondingAuthor", "firstName middleName lastName email")
-      .populate("assignedReviewers", "firstName middleName lastName email")
-      .select("-reviewerNotes");
+    try {
+        const manuscripts = await Manuscript.find({ status: "Published" })
+            .populate("authors", "firstName middleName lastName email")
+            .populate("correspondingAuthor", "firstName middleName lastName email")
+            .populate("assignedReviewers", "firstName middleName lastName email")
+            .select("-reviewerNotes -uniqueViewers");
 
-    if (!manuscripts || manuscripts.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No published manuscripts found",
-      });
+        if (!manuscripts || manuscripts.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No published manuscripts found",
+            });
+        }
+
+        // Sort by pageStart
+        const sortedManuscripts = manuscripts.sort((a, b) => {
+            const aPage = a.pageStart;
+            const bPage = b.pageStart;
+
+            if (aPage !== null && bPage !== null) return aPage - bPage;
+            if (aPage !== null && bPage === null) return -1;
+            if (aPage === null && bPage !== null) return 1;
+            return new Date(b.publishedAt) - new Date(a.publishedAt);
+        });
+
+        // ✅ Extract PDF authors for each manuscript
+        const manuscriptsWithPdfAuthors = await Promise.all(
+            sortedManuscripts.map(async (manuscript) => {
+                const doc = manuscript.toObject();
+
+                // Try mergedFileUrl or mergedDriveViewUrl
+                const pdfUrl = doc.mergedFileUrl || doc.mergedDriveViewUrl;
+                
+                if (pdfUrl) {
+                    try {
+                        const pdfData = await extractAuthorsFromPdfUrl(pdfUrl);
+                        doc.pdfAuthors = pdfData.authors;
+                        doc.pdfCorrespondingAuthor = pdfData.correspondingAuthor;
+                    } catch (err) {
+                        console.log('PDF extraction failed for:', doc.customId);
+                        doc.pdfAuthors = [];
+                        doc.pdfCorrespondingAuthor = null;
+                    }
+                } else {
+                    doc.pdfAuthors = [];
+                    doc.pdfCorrespondingAuthor = null;
+                }
+
+                return doc;
+            })
+        );
+
+        res.json({
+            success: true,
+            count: manuscriptsWithPdfAuthors.length,
+            data: manuscriptsWithPdfAuthors,
+        });
+
+    } catch (error) {
+        console.error("Error fetching published manuscripts:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
     }
-
-    res.json({
-      success: true,
-      count: manuscripts.length,
-      data: manuscripts,
-    });
-  } catch (error) {
-    console.error("Error fetching published manuscripts:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
 };
-
 // ============================================
 // 🔥 NEW: JOB-BASED MANUSCRIPT CREATION
 // ============================================
@@ -4462,6 +4580,128 @@ exports.deleteManuscript = async (req, res) => {
 			message: "Server error while deleting manuscript",
 		});
 	}
+};
+
+
+// manuscriptController.js - Add these functions
+
+// Increment view count (No Auth Required)
+// controllers/manuscriptController.js
+
+exports.incrementViewCount = async (req, res) => {
+    try {
+        const { manuscriptId } = req.params;
+        const visitorId = req.headers['x-visitor-id'] || req.ip || 'anonymous';
+
+        // 🔍 Debug Log 1
+        console.log('📊 INCREMENT VIEW REQUEST:', { 
+            manuscriptId, 
+            visitorId 
+        });
+
+        const manuscript = await Manuscript.findById(manuscriptId);
+
+        if (!manuscript) {
+            console.log('❌ Manuscript NOT FOUND');
+            return res.status(404).json({
+                success: false,
+                message: "Manuscript not found",
+            });
+        }
+
+        // 🔍 Debug Log 2 - Check Status
+        console.log('📄 MANUSCRIPT FOUND:', {
+            title: manuscript.title,
+            status: manuscript.status,
+            currentViewCount: manuscript.viewCount
+        });
+
+        // Only count views for published manuscripts
+        if (manuscript.status !== "Published") {
+            console.log('⚠️ NOT PUBLISHED - Status:', manuscript.status);
+            return res.status(400).json({
+                success: false,
+                message: "View count only applies to published manuscripts",
+                currentStatus: manuscript.status
+            });
+        }
+
+        // Check if this visitor has viewed in the last 24 hours
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const recentView = manuscript.uniqueViewers?.find(
+            (viewer) =>
+                viewer.visitorId === visitorId &&
+                new Date(viewer.viewedAt) > twentyFourHoursAgo
+        );
+
+        if (!recentView) {
+            console.log('✅ NEW VIEW - Incrementing...');
+            
+            const updatedManuscript = await Manuscript.findByIdAndUpdate(
+                manuscriptId,
+                {
+                    $inc: { viewCount: 1 },
+                    $push: {
+                        uniqueViewers: {
+                            $each: [{ visitorId: visitorId, viewedAt: new Date() }],
+                            $slice: -1000,
+                        },
+                    },
+                    $set: { lastViewedAt: new Date() },
+                },
+                { new: true }
+            );
+
+            console.log('✅ VIEW COUNT UPDATED:', updatedManuscript.viewCount);
+
+            return res.json({
+                success: true,
+                message: "View count incremented",
+                isNewView: true,
+                viewCount: updatedManuscript.viewCount,
+            });
+        }
+
+        console.log('⏭️ Already viewed in last 24h');
+        
+        return res.json({
+            success: true,
+            message: "View already counted",
+            isNewView: false,
+            viewCount: manuscript.viewCount,
+        });
+    } catch (error) {
+        console.error("❌ ERROR:", error);
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+// Get most viewed manuscripts (No Auth Required)
+exports.getMostViewedManuscripts = async (req, res) => {
+    try {
+        const { limit = 10 } = req.query;
+
+        const manuscripts = await Manuscript.find({ status: "Published" })
+            .sort({ viewCount: -1 })
+            .limit(parseInt(limit))
+            .populate("authors", "firstName middleName lastName")
+            .select('title customId viewCount publishedAt issueVolume issueNumber issueYear');
+
+        res.json({
+            success: true,
+            count: manuscripts.length,
+            data: manuscripts,
+        });
+    } catch (error) {
+        console.error("Error fetching most viewed manuscripts:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
 };
 
 module.exports.convertDocxToPdf = convertDocxToPdf;

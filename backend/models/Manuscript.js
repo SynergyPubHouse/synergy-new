@@ -150,7 +150,18 @@ const manuscriptSchema = new mongoose.Schema(
 		},
 		
 
-		
+		viewCount: {
+    type: Number,
+    default: 0,
+},
+uniqueViewers: [{
+    visitorId: { type: String },
+    viewedAt: { type: Date, default: Date.now },
+}],
+lastViewedAt: {
+    type: Date,
+    default: null,
+},
        revisionAttempts: {
             type: Number,
             default: 0,
