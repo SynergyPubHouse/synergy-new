@@ -1838,7 +1838,16 @@ function EditorDashboard() {
 													<span>Original PDF</span>
 												</button>
 											)}
-
+	{manuscript.status === "Published" && (
+		<button
+			onClick={() => window.open(`/journal/jics/articles/${manuscript._id}`, "_blank")}
+			className="w-full px-3 py-2 text-sm bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded hover:from-indigo-600 hover:to-purple-700 transition-all font-medium flex items-center justify-center space-x-2 shadow-md"
+		>
+			<span>🌐</span>
+			<span>View Published Article</span>
+			<span className="text-xs opacity-75">({manuscript.customId || manuscript._id})</span>
+		</button>
+	)}
 											{/* Clean Final Manuscript Download - Yeh sabse upar rakhna, priority highest */}
 											{manuscript.authorResponse?.withoutHighlightedFileUrl && (
 												<button
