@@ -1139,14 +1139,29 @@ function EditorDashboard() {
 							📊 Manuscript Status Overview
 						</h2>
 
-						<button
-							onClick={handleOpenStatistics}
-							className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-md flex items-center space-x-2"
-						>
-							<span>📈</span>
-							<span>View Statistics</span>
-						</button>
+					<div className="flex items-center gap-4">
+    {/* View Statistics Button */}
+    <button
+        onClick={handleOpenStatistics}
+        className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-md flex items-center space-x-2 font-medium"
+    >
+        <span className="text-lg">Chart</span>
+        <span>View Statistics</span>
+    </button>
 
+    {/* Current Issue Button - Only show if any article is Published */}
+    {users.flatMap(u => u.manuscripts || []).some(m => m.status === "Published") && (
+        <a
+            href="/journal/jics/articles/current"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all duration-200 transform hover:scale-105 shadow-md flex items-center space-x-2 font-medium"
+        >
+            <span className="text-lg">Journal</span>
+            <span>Current Issue</span>
+        </a>
+    )}
+</div>
 						{/* <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
 							<p className="text-sm text-yellow-800">
 								<strong>📝 Note:</strong> Rejected manuscripts

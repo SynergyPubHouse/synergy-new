@@ -308,8 +308,18 @@ section: {
     type: String,
     default: "Manuscript",
 },
-
-
+pdfAuthors: {
+    type: [String],
+    default: []
+},
+pdfCorrespondingAuthor: {
+    type: String,
+    default: null
+},
+citationCount: {
+    type: Number,
+    default: 0
+}
 	},
 	{ timestamps: true }
 );

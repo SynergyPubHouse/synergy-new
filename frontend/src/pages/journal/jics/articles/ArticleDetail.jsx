@@ -335,15 +335,35 @@
                   )}
 
                   {/* 👁️ Views Card */}
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-3 rounded-lg border border-green-200">
-                    <p className="text-xs text-green-600 uppercase tracking-wide">Total Views</p>
-                    <p className="text-2xl font-bold text-green-700">
-                      {formatViewCount(viewCount)}
-                    </p>
-                    <p className="text-xs text-green-500">
-                      {viewCount === 1 ? 'reader' : 'readers'}
-                    </p>
-                  </div>
+                  <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-5 rounded-xl border-2 border-purple-200 shadow-lg">
+    <div className="grid grid-cols-2 gap-6 text-center">
+        {/* Total Views */}
+        <div>
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">
+                Total Views
+            </p>
+            <p className="text-4xl font-extrabold text-blue-800">
+                {formatViewCount(viewCount)}
+            </p>
+            <p className="text-xs text-blue-500 mt-1">
+                readers worldwide
+            </p>
+        </div>
+
+        {/* Citations */}
+        <div>
+            <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">
+                Citations
+            </p>
+            <p className="text-4xl font-extrabold text-purple-800">
+                {article.citationCount || 0}
+            </p>
+            <p className="text-xs text-purple-500 mt-1">
+                cited in research papers
+            </p>
+        </div>
+    </div>
+</div>
                 </div>
 
                 {/* Citation - ✅ Use PDF authors for citation */}

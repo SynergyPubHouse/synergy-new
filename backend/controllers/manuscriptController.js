@@ -1614,24 +1614,7 @@ exports.getManuscriptById = async (req, res) => {
         const doc = manuscript.toObject();
 
         // ✅ Extract PDF authors if mergedFileUrl exists
-        const pdfUrl = doc.mergedFileUrl || doc.mergedDriveViewUrl;
-        console.log('🔍 Extracting authors from PDF URL:', pdfUrl);
-        
-        if (pdfUrl) {
-            try {
-                const pdfData = await extractAuthorsFromPdfUrl(pdfUrl);
-                doc.pdfAuthors = pdfData.authors;
-                doc.pdfCorrespondingAuthor = pdfData.correspondingAuthor;
-            } catch (err) {
-                console.log('PDF extraction failed');
-                doc.pdfAuthors = [];
-                doc.pdfCorrespondingAuthor = null;
-            }
-        } else {
-            doc.pdfAuthors = [];
-            doc.pdfCorrespondingAuthor = null;
-        }
-
+       
         res.json({
             success: true,
             data: doc,
@@ -2603,9 +2586,7 @@ exports.uploadPublishedPdf = async (req, res) => {
     try {
         const { manuscriptId } = req.params;
 
-        // ═══════════════════════════════════════════════════════
-        // NEW: Extract Issue Info from request body
-        // ═══════════════════════════════════════════════════════
+        // NEW: Yeh fields ab frontend se aayenge
         const {
             issueVolume,
             issueNumber,
@@ -2613,8 +2594,21 @@ exports.uploadPublishedPdf = async (req, res) => {
             issueTitle,
             pageStart,
             pageEnd,
-            section
+            section,
+            pdfAuthors,          
+            pdfCorrespondingAuthor 
         } = req.body;
+e
+        let authorsArray = [];
+        if (pdfAuthors) {
+            try {
+                authorsArray = typeof pdfAuthors === "string" 
+                    ? JSON.parse(pdfAuthors) 
+                    : pdfAuthors;
+            } catch (e) {
+                authorsArray = pdfAuthors.split(',').map(a => a.trim()).filter(a => a);
+            }
+        }
 
         if (!req.file) {
             return res.status(400).json({
@@ -2625,7 +2619,6 @@ exports.uploadPublishedPdf = async (req, res) => {
 
         tempFiles = [req.file.path];
 
-        // Find manuscript
         const manuscript = await Manuscript.findById(manuscriptId)
             .populate("authors", "firstName lastName email")
             .populate("correspondingAuthor", "firstName lastName email");
@@ -2641,37 +2634,28 @@ exports.uploadPublishedPdf = async (req, res) => {
         const timestamp = Date.now();
         const fileName = 'published_' + customId + '_' + timestamp + '.pdf';
 
-        // Upload PDF to Cloudinary
-        const uploadedPdf = await uploadToCloudinary(
-            req.file.path,
-            "published_manuscripts",
-            "raw",
-            fileName
-        );
-
+        // Upload to Cloudinary & Drive (same as before)
+        const uploadedPdf = await uploadToCloudinary(req.file.path, "published_manuscripts", "raw", fileName);
         const driveResult = await uploadFileToDrive(req.file.path, {
             filename: fileName,
             mimeType: 'application/pdf',
             makePublic: true,
         });
 
-        if (!driveResult || !driveResult.success || !driveResult.driveFileId) {
+        if (!driveResult?.success || !driveResult.driveFileId) {
             throw new Error("Google Drive upload failed");
         }
 
-        // 🔥 Save published date
         const publishedDate = new Date();
 
-        // Update manuscript with PDF URLs
+        // Update manuscript
         manuscript.publishedFileUrl = uploadedPdf.secure_url;
         manuscript.publishedDriveFileId = driveResult.driveFileId;
         manuscript.publishedDriveViewUrl = driveResult.webViewLink || "";
         manuscript.status = "Published";
         manuscript.publishedAt = publishedDate;
 
-        // ═══════════════════════════════════════════════════════
-        // NEW: Save Issue Info to manuscript
-        // ═══════════════════════════════════════════════════════
+        // Issue info
         if (issueVolume) manuscript.issueVolume = parseInt(issueVolume);
         if (issueNumber) manuscript.issueNumber = parseInt(issueNumber);
         if (issueYear) manuscript.issueYear = parseInt(issueYear);
@@ -2680,153 +2664,26 @@ exports.uploadPublishedPdf = async (req, res) => {
         if (pageEnd) manuscript.pageEnd = parseInt(pageEnd);
         if (section) manuscript.section = section;
 
+       
+        manuscript.pdfAuthors = authorsArray;
+        manuscript.pdfCorrespondingAuthor = pdfCorrespondingAuthor?.trim() || null;
+
         await manuscript.save();
 
-        // Cleanup temp file
+        // Cleanup
         await cleanupFiles(tempFiles);
-        tempFiles = [];
 
-        // ═══════════════════════════════════════════════════════
-        // EMAIL NOTIFICATION TO AUTHORS (Updated with Issue Info)
-        // ═══════════════════════════════════════════════════════
-        const authorEmails = new Set();
+     
 
-        if (manuscript.correspondingAuthor?.email) {
-            authorEmails.add(manuscript.correspondingAuthor.email.toLowerCase());
-        }
-
-        if (manuscript.authors?.length) {
-            manuscript.authors.forEach(author => {
-                if (author?.email) {
-                    authorEmails.add(author.email.toLowerCase());
-                }
-            });
-        }
-
-        if (authorEmails.size > 0) {
-            const frontendUrl = process.env.FRONTEND_URL || "https://synergyworldpress.com";
-
-            // Format date for email display
-            const formattedDate = publishedDate.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-
-            // ═══════════════════════════════════════════════════════
-            // NEW: Issue info for email
-            // ═══════════════════════════════════════════════════════
-            const hasIssueInfo = manuscript.issueVolume && manuscript.issueNumber && manuscript.issueYear;
-            
-            const issueInfoText = hasIssueInfo
-                ? 'Vol ' + manuscript.issueVolume + ', No ' + manuscript.issueNumber + ', ' + manuscript.issueYear + (manuscript.issueTitle ? ' - ' + manuscript.issueTitle : '')
-                : '';
-
-            const pageInfoText = (manuscript.pageStart && manuscript.pageEnd)
-                ? 'Pages ' + manuscript.pageStart + '-' + manuscript.pageEnd
-                : '';
-
-            const sectionText = manuscript.section || 'Research Article';
-
-            const emailSubject = 'Congratulations! Your Manuscript Has Been Published - ' + customId;
-
-            const emailHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FFFFFF;">' +
-
-                // Header
-                '<div style="background: linear-gradient(135deg, #00796B 0%, #00ACC1 100%); color: white; padding: 30px; text-align: center;">' +
-                '<h1 style="margin: 0; font-size: 24px; color: #1c1c1cff;">Congratulations!</h1>' +
-                '<p style="margin: 10px 0 0 0; font-size: 16px; color: #1c1c1cff;">Your Manuscript Has Been Published</p>' +
-                '</div>' +
-
-                // Content
-                '<div style="padding: 30px;">' +
-
-                '<p style="color: #374151; font-size: 16px; margin-bottom: 20px;">Dear Author,</p>' +
-
-                '<p style="color: #374151; font-size: 16px; margin-bottom: 20px; line-height: 1.6;">' +
-                'We are pleased to inform you that your manuscript has been <strong>successfully published</strong> in the Journal of Innovative Computer Science (JICS).' +
-                '</p>' +
-
-                // Manuscript Details
-                '<div style="background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #00796B; margin-bottom: 25px;">' +
-                
-                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Manuscript ID:</strong></p>' +
-                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + customId + '</p>' +
-                
-                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Title:</strong></p>' +
-                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + (manuscript.title || 'Untitled') + '</p>' +
-                
-                // NEW: Issue Info in Email
-                (hasIssueInfo ? (
-                    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published In:</strong></p>' +
-                    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + issueInfoText + '</p>'
-                ) : '') +
-
-                // NEW: Section
-                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Section:</strong></p>' +
-                '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + sectionText + '</p>' +
-
-                // NEW: Page Numbers
-                (pageInfoText ? (
-                    '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Page Numbers:</strong></p>' +
-                    '<p style="margin: 0 0 15px 0; font-size: 16px; color: #1F2937;">' + pageInfoText + '</p>'
-                ) : '') +
-                
-                '<p style="margin: 0 0 10px 0; font-size: 14px; color: #6B7280;"><strong>Published Date:</strong></p>' +
-                '<p style="margin: 0; font-size: 16px; color: #1F2937; font-weight: 600;">' + formattedDate + '</p>' +
-                
-                '</div>' +
-
-                // Download Button
-                '<div style="text-align: center; margin: 30px 0;">' +
-                '<a href="' + manuscript.publishedFileUrl + '" style="display: inline-block; background-color: #00796B; color: white; padding: 14px 35px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">Download Published PDF</a>' +
-                '</div>' +
-
-                '<p style="color: #374151; font-size: 15px; line-height: 1.6;">' +
-                'Thank you for choosing <strong>Synergy World Press</strong> for publishing your research.' +
-                '</p>' +
-
-                '<p style="color: #374151; font-size: 15px; margin-top: 25px;">Best regards,<br><strong>Synergy World Press Editorial Team</strong></p>' +
-
-                '</div>' +
-
-                // Footer
-                '<div style="background-color: #F3F4F6; padding: 20px; text-align: center; border-top: 1px solid #E5E7EB;">' +
-                '<p style="color: #6B7280; font-size: 12px; margin: 0 0 5px 0;">Journal of Innovative Computer Science (JICS)</p>' +
-                '<p style="color: #6B7280; font-size: 12px; margin: 0;">' +
-                '<a href="' + frontendUrl + '" style="color: #00796B; text-decoration: none;">synergyworldpress.com</a> | ' +
-                '<a href="mailto:support@synergyworldpress.com" style="color: #00796B; text-decoration: none;">support@synergyworldpress.com</a>' +
-                '</p>' +
-                '</div>' +
-
-                '</div>';
-
-            // Send email to all authors
-            const emailPromises = Array.from(authorEmails).map(email => {
-                return sendEmail({
-                    to: email,
-                    subject: emailSubject,
-                    html: emailHtml
-                }).catch(err => console.error('[uploadPublishedPdf] Failed to send email to ' + email + ':', err));
-            });
-
-            await Promise.all(emailPromises);
-            console.log('[uploadPublishedPdf] Emails sent to ' + authorEmails.size + ' author(s)');
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // NEW: Return issue info in response
-        // ═══════════════════════════════════════════════════════
         return res.json({
             success: true,
-            message: "Published PDF uploaded and emails sent successfully",
+            message: "Manuscript published successfully",
             data: {
                 manuscriptId: manuscript._id,
-                customId: customId,
+                customId,
                 publishedFileUrl: manuscript.publishedFileUrl,
                 publishedAt: manuscript.publishedAt,
                 status: manuscript.status,
-                // Issue Info
                 issueVolume: manuscript.issueVolume,
                 issueNumber: manuscript.issueNumber,
                 issueYear: manuscript.issueYear,
@@ -2834,22 +2691,18 @@ exports.uploadPublishedPdf = async (req, res) => {
                 section: manuscript.section,
                 pageStart: manuscript.pageStart,
                 pageEnd: manuscript.pageEnd,
+                pdfAuthors: manuscript.pdfAuthors,                  
+                pdfCorrespondingAuthor: manuscript.pdfCorrespondingAuthor
             }
         });
 
     } catch (error) {
         console.error("[uploadPublishedPdf] Error:", error);
-
-        if (tempFiles.length > 0) {
-            await cleanupFiles(tempFiles).catch(err =>
-                console.error("[uploadPublishedPdf] Cleanup failed:", err)
-            );
-        }
-
+        if (tempFiles.length > 0) await cleanupFiles(tempFiles).catch(() => {});
         return res.status(500).json({
             success: false,
-            message: "Failed to process published PDF",
-            error: process.env.NODE_ENV === "development" ? error.message : "Internal server error"
+            message: "Failed to publish manuscript",
+            error: error.message
         });
     }
 };
@@ -2882,31 +2735,7 @@ exports.getPublishedManuscripts = async (req, res) => {
         });
 
         // ✅ Extract PDF authors for each manuscript
-        const manuscriptsWithPdfAuthors = await Promise.all(
-            sortedManuscripts.map(async (manuscript) => {
-                const doc = manuscript.toObject();
-
-                // Try mergedFileUrl or mergedDriveViewUrl
-                const pdfUrl = doc.mergedFileUrl || doc.mergedDriveViewUrl;
-                
-                if (pdfUrl) {
-                    try {
-                        const pdfData = await extractAuthorsFromPdfUrl(pdfUrl);
-                        doc.pdfAuthors = pdfData.authors;
-                        doc.pdfCorrespondingAuthor = pdfData.correspondingAuthor;
-                    } catch (err) {
-                        console.log('PDF extraction failed for:', doc.customId);
-                        doc.pdfAuthors = [];
-                        doc.pdfCorrespondingAuthor = null;
-                    }
-                } else {
-                    doc.pdfAuthors = [];
-                    doc.pdfCorrespondingAuthor = null;
-                }
-
-                return doc;
-            })
-        );
+              const manuscriptsWithPdfAuthors = sortedManuscripts.map(manuscript => manuscript.toObject());
 
         res.json({
             success: true,
