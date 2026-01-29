@@ -2595,11 +2595,10 @@ exports.uploadPublishedPdf = async (req, res) => {
             pageStart,
             pageEnd,
             section,
-            pdfAuthors,           // ← Ye naye hain
-            pdfCorrespondingAuthor // ← Ye bhi
+            pdfAuthors,          
+            pdfCorrespondingAuthor 
         } = req.body;
-
-        // pdfAuthors ko array mein convert kar do agar string aaye
+e
         let authorsArray = [];
         if (pdfAuthors) {
             try {
@@ -2665,7 +2664,7 @@ exports.uploadPublishedPdf = async (req, res) => {
         if (pageEnd) manuscript.pageEnd = parseInt(pageEnd);
         if (section) manuscript.section = section;
 
-        // 🔥 YE NAye FIELDS SAVE KAR DO
+       
         manuscript.pdfAuthors = authorsArray;
         manuscript.pdfCorrespondingAuthor = pdfCorrespondingAuthor?.trim() || null;
 
@@ -2674,7 +2673,7 @@ exports.uploadPublishedPdf = async (req, res) => {
         // Cleanup
         await cleanupFiles(tempFiles);
 
-        // Email logic same rahega (tum chaaho to email mein bhi pdfAuthors use kar sakte ho)
+     
 
         return res.json({
             success: true,
@@ -2692,7 +2691,7 @@ exports.uploadPublishedPdf = async (req, res) => {
                 section: manuscript.section,
                 pageStart: manuscript.pageStart,
                 pageEnd: manuscript.pageEnd,
-                pdfAuthors: manuscript.pdfAuthors,                   // ← return bhi kar do
+                pdfAuthors: manuscript.pdfAuthors,                  
                 pdfCorrespondingAuthor: manuscript.pdfCorrespondingAuthor
             }
         });
