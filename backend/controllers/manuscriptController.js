@@ -2598,7 +2598,7 @@ exports.uploadPublishedPdf = async (req, res) => {
             pdfAuthors,          
             pdfCorrespondingAuthor 
         } = req.body;
-e
+
         let authorsArray = [];
         if (pdfAuthors) {
             try {
