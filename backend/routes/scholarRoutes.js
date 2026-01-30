@@ -445,12 +445,15 @@ ${JSON.stringify(schemaData, null, 2)}
         </div>
     </div>
     
-    <script>
-        // Redirect after meta tags are read
-        setTimeout(function() {
-            window.location.href = "${articleUrl}";
-        }, 100);
-    </script>
+ <script>
+ 
+  if (window.location.pathname.startsWith('/scholar/article/')) {
+   
+    setTimeout(() => {
+      window.location.replace('/journal/jics/articles/${article._id}');
+    }, 1000);
+  }
+</script>
 </body>
 </html>`;
 }
