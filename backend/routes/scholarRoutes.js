@@ -256,7 +256,7 @@ ${JSON.stringify(schemaData, null, 2)}
     </script>
     
     <!-- Auto-redirect to React App -->
-    <meta http-equiv="refresh" content="0; url=${articleUrl}">
+    
     
     <!-- Styling for fallback display -->
     <style>
@@ -445,13 +445,10 @@ ${JSON.stringify(schemaData, null, 2)}
         </div>
     </div>
     
- <script>
- 
-  if (window.location.pathname.startsWith('/scholar/article/')) {
-   
-    setTimeout(() => {
-      window.location.replace('/journal/jics/articles/${article._id}');
-    }, 1000);
+<script>
+  
+  if (window.location.pathname.startsWith('/scholar/article/') && !navigator.userAgent.match(/bot|crawler|spider|Googlebot|bingbot|Yandex|DuckDuckBot|Baiduspider/i)) {
+    window.location.replace('/journal/jics/articles/${article._id}');
   }
 </script>
 </body>
@@ -467,6 +464,8 @@ function generateErrorHtml(title, message) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="googlebot" content="index, follow">
+<link rel="alternate" href="${scholarUrl}" media="only screen and (max-width: 640px)">
     <title>${title} | JICS</title>
     <style>
         body {
