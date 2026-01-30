@@ -1,15 +1,18 @@
 RewriteEngine On
 RewriteBase /
 
-
+# Redirect article URLs to the Google Scholar friendly page (302 = temporary redirect, prevents loop issues)
 RewriteRule ^journal/jics/articles/([a-f0-9]{24})$ /scholar/article/$1 [R=302,L]
 RewriteRule ^journal/jics/articles/([a-f0-9]{24})/?$ /scholar/article/$1 [R=302,L]
 
-
+# Proxy all /scholar/article/ requests to backend API (keeps the nice clean URL in browser)
 RewriteRule ^scholar/article/(.+)$ https://api.synergyworldpress.com/scholar/article/$1 [R=301,L]
+
+# Proxy sitemap and robots.txt to backend
 RewriteRule ^sitemap\.xml$ https://api.synergyworldpress.com/sitemap.xml [R=301,L]
 RewriteRule ^robots\.txt$ https://api.synergyworldpress.com/robots.txt [R=301,L]
 
+# React SPA fallback - serve index.html for all non-file/non-directory requests
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [L]
