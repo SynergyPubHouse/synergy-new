@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /api/
+
+
+User-agent: Googlebot
+Allow: /
+Allow: /scholar/
+Allow: /journal/
+Allow: /sitemap.xml
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Googlebot-News
+Allow: /
+
+Sitemap: https://synergyworldpress.com/sitemap.xml

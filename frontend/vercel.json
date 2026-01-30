@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/scholar/article/:id",
+      "destination": "https://api.synergyworldpress.com/scholar/article/:id"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://api.synergyworldpress.com/sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "https://api.synergyworldpress.com/robots.txt"
+    }
+  ]
+}
