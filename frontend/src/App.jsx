@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext, useEffect } from "react";
-
+import { HelmetProvider } from 'react-helmet-async';
 import {
   BrowserRouter as Router,
   Route,
@@ -305,10 +305,12 @@ export const useAuth = () => React.useContext(AuthContext);
 
 function App() {
   return (
-    <Router>
-      <ScrollToTop />
-      <AppContent />
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <ScrollToTop />
+        <AppContent />
+      </Router>
+    </HelmetProvider>
   );
 }
 
