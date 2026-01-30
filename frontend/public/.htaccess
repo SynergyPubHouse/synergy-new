@@ -1,17 +1,26 @@
 RewriteEngine On
 RewriteBase /
 
+# ================================================
+# 1. Scholar / SEO friendly articles — sirf bots ke liye
+# ================================================
+RewriteCond %{HTTP_USER_AGENT} Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebookexternalhit|twitterbot [NC]
+RewriteRule ^journal/jics/articles/([a-f0-9]{24})$ https://api.synergyworldpress.com/scholar/article/$1 [P,L]
 
-RewriteRule ^journal/jics/articles/([a-f0-9]{24})$ /scholar/article/$1 [R=301,L]
+# ================================================
+# 2. Normal users — React frontend article page
+# ================================================
+RewriteRule ^journal/jics/articles/([a-f0-9]{24})/?$ index.html [L]
 
-# 2. Backup rule 
-RewriteRule ^journal/jics/articles/([a-f0-9]{24})/?$ /scholar/article/$1 [R=301,L]
+# ================================================
+# 3. Sitemap & robots.txt — serve API content on same domain
+# ================================================
+RewriteRule ^sitemap\.xml$ https://api.synergyworldpress.com/sitemap.xml [P,L]
+RewriteRule ^robots\.txt$ https://api.synergyworldpress.com/robots.txt [P,L]
 
-RewriteRule ^scholar/article/(.+)$ https://api.synergyworldpress.com/scholar/article/$1 [R=301,L]
-RewriteRule ^sitemap\.xml$ https://api.synergyworldpress.com/sitemap.xml [R=301,L]
-RewriteRule ^robots\.txt$ https://api.synergyworldpress.com/robots.txt [R=301,L]
-
-# React App 
+# ================================================
+# 4. React App — other frontend routes
+# ================================================
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [L]
