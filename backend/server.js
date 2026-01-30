@@ -7,6 +7,8 @@ const os = require("os");          // 🔥 ADD THIS
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 const connectDB = require("./config/db");
 const googleAuthRoutes = require('./routes/googleAuthRoutes');
+const scholarRoutes = require('./routes/scholarRoutes');
+const sitemapRoutes = require('./routes/sitemapRoutes');
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, os.tmpdir()),
     filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
@@ -81,7 +83,25 @@ app.use((req, res, next) => {
   });
   next();
 });
+app.use('/scholar', scholarRoutes);
+app.use('/', sitemapRoutes);
 
+app.get('/robots.txt', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(`User-agent: *
+Allow: /
+
+User-agent: Googlebot
+Allow: /scholar/
+Allow: /journal/
+
+Sitemap: https://synergyworldpress.com/sitemap.xml
+
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+`);
+});
 // ============================================
 // ROUTES
 // ============================================
