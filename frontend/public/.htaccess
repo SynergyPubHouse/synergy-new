@@ -2,25 +2,25 @@ RewriteEngine On
 RewriteBase /
 
 # ================================================
-# 1. Scholar / SEO friendly articles — sirf bots ke liye
+# 1. Sitemap & robots.txt — Redirect to API
 # ================================================
-RewriteCond %{HTTP_USER_AGENT} Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebookexternalhit|twitterbot [NC]
-RewriteRule ^journal/jics/articles/([a-f0-9]{24})$ https://api.synergyworldpress.com/scholar/article/$1 [P,L]
+RewriteRule ^sitemap\.xml$ https://api.synergyworldpress.com/sitemap.xml [R=301,L]
+RewriteRule ^robots\.txt$ https://api.synergyworldpress.com/robots.txt [R=301,L]
 
 # ================================================
-# 2. Normal users — React frontend article page
+# 2. Scholar articles — sirf bots ke liye (Redirect)
 # ================================================
-RewriteRule ^journal/jics/articles/([a-f0-9]{24})/?$ index.html [L]
+RewriteCond %{HTTP_USER_AGENT} (Googlebot|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebookexternalhit|twitterbot|linkedinbot) [NC]
+RewriteRule ^journal/jics/articles/([a-f0-9]{24})/?$ https://api.synergyworldpress.com/scholar/article/$1 [R=302,L]
 
 # ================================================
-# 3. Sitemap & robots.txt — serve API content on same domain
+# 3. Static files — serve directly
 # ================================================
-RewriteRule ^sitemap\.xml$ https://api.synergyworldpress.com/sitemap.xml [P,L]
-RewriteRule ^robots\.txt$ https://api.synergyworldpress.com/robots.txt [P,L]
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
 
 # ================================================
-# 4. React App — other frontend routes
+# 4. React App — all other routes
 # ================================================
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [L]
