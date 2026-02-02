@@ -45,7 +45,7 @@ function ContactUs() {
               <FaMapMarkerAlt className="text-[#00acc1] text-2xl mx-auto" />
               <h3 className="text-lg font-semibold text-[#00796b] mt-3">Our Office</h3>
               <p className="mt-2 text-[#212121]">
-                Chandigarh University<br />
+                S4, 904, Harmony Homes, Panipat Haryana, 132103<br />
                 Mohali, INDIA
               </p>
             </motion.div>
@@ -58,7 +58,7 @@ function ContactUs() {
               <FaPhone className="text-[#00acc1] text-2xl mx-auto" />
               <h3 className="text-lg font-semibold text-[#00796b] mt-3">Call Us</h3>
               <p className="mt-2 text-[#212121]">
-                +91 62840012XX<br />
+                +91  8708951544<br />
                 Mon–Fri, 9am–4pm
               </p>
             </motion.div>
@@ -71,7 +71,7 @@ function ContactUs() {
               <FaEnvelope className="text-[#00acc1] text-2xl mx-auto" />
               <h3 className="text-lg font-semibold text-[#00796b] mt-3">Email Us</h3>
               <p className="mt-2 text-[#212121]">
-                support@synergyworldpress.com<br />
+                synergyworldpress@gmail.com<br />
                 Response within 24 hours
               </p>
             </motion.div>
