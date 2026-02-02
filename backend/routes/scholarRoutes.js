@@ -26,42 +26,36 @@ const formatScholarDate = (dateString) => {
     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
 };
 
-
 router.get('/article/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        
+        console.log('[Scholar Route] Requested ID:', id);
 
         // Validate MongoDB ObjectId
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).send(generateErrorHtml('Invalid Article ID', 'The article ID format is incorrect.'));
         }
 
-        // ===== SAME QUERY AS YOUR getManuscriptById =====
         const manuscript = await Manuscript.findById(id)
             .populate("authors", "firstName middleName lastName email")
             .populate("correspondingAuthor", "firstName middleName lastName email");
 
-        // Check if exists
         if (!manuscript) {
             return res.status(404).send(generateErrorHtml('Article Not Found', 'The requested article does not exist.'));
         }
 
-        // Check if published (optional - remove if you want unpublished too)
         if (manuscript.status !== 'Published') {
             return res.status(404).send(generateErrorHtml('Article Not Available', 'This article has not been published yet.'));
         }
 
         const article = manuscript.toObject();
 
-        // ===== FORMAT AUTHORS =====
+        // Format authors
         let authors = [];
-
-        // Priority 1: PDF extracted authors
         if (article.pdfAuthors && Array.isArray(article.pdfAuthors) && article.pdfAuthors.length > 0) {
             authors = article.pdfAuthors.filter(a => a && a.trim());
-        }
-        // Priority 2: Database authors
-        else if (article.authors && Array.isArray(article.authors) && article.authors.length > 0) {
+        } else if (article.authors && Array.isArray(article.authors) && article.authors.length > 0) {
             authors = article.authors
                 .map(author => {
                     if (typeof author === 'string') return author;
@@ -75,12 +69,11 @@ router.get('/article/:id', async (req, res) => {
                 .filter(name => name && name.trim());
         }
 
-        // Fallback
         if (authors.length === 0) {
             authors = ['Unknown Author'];
         }
 
-        // ===== CORRESPONDING AUTHOR =====
+        // Corresponding author
         let correspondingAuthor = '';
         if (article.pdfCorrespondingAuthor) {
             correspondingAuthor = article.pdfCorrespondingAuthor;
@@ -92,7 +85,7 @@ router.get('/article/:id', async (req, res) => {
             ].filter(p => p && p.trim()).join(' ');
         }
 
-        // ===== DATES =====
+        // Dates
         const publishedDate = formatScholarDate(article.publishedAt || article.submissionDate);
         const isoDate = article.publishedAt
             ? new Date(article.publishedAt).toISOString()
@@ -100,13 +93,12 @@ router.get('/article/:id', async (req, res) => {
                 ? new Date(article.submissionDate).toISOString()
                 : new Date().toISOString();
 
-        // ===== URLs =====
+        // URLs
         const baseUrl = 'https://synergyworldpress.com';
         const pdfUrl = article.publishedFileUrl || '';
         const articleUrl = `${baseUrl}/journal/jics/articles/${article._id}`;
-        const scholarUrl = `${baseUrl}/scholar/article/${article._id}`;
 
-        // ===== GENERATE HTML =====
+        // Generate HTML
         const html = generateScholarHtml({
             article,
             authors,
@@ -118,32 +110,25 @@ router.get('/article/:id', async (req, res) => {
             baseUrl
         });
 
-        // Send response
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+        res.setHeader('Cache-Control', 'public, max-age=3600');
         res.send(html);
 
     } catch (error) {
-        console.error('Scholar route error:', error);
+        console.error('[Scholar Route] Error:', error);
         res.status(500).send(generateErrorHtml('Server Error', error.message));
     }
 });
 
-// =====================================================
-// HTML GENERATOR FUNCTION
-// =====================================================
+// HTML Generator Function
 function generateScholarHtml({ article, authors, correspondingAuthor, publishedDate, isoDate, pdfUrl, articleUrl, baseUrl }) {
     
-    // Schema.org JSON-LD
     const schemaData = {
         "@context": "https://schema.org",
         "@type": "ScholarlyArticle",
         "headline": article.title,
         "name": article.title,
-        "author": authors.map(name => ({
-            "@type": "Person",
-            "name": name
-        })),
+        "author": authors.map(name => ({ "@type": "Person", "name": name })),
         "datePublished": isoDate,
         "dateModified": article.updatedAt ? new Date(article.updatedAt).toISOString() : isoDate,
         "publisher": {
@@ -165,19 +150,9 @@ function generateScholarHtml({ article, authors, correspondingAuthor, publishedD
 
     if (article.issueVolume) schemaData.volumeNumber = String(article.issueVolume);
     if (article.issueNumber) schemaData.issueNumber = String(article.issueNumber);
-    if (article.pageStart && article.pageEnd) {
-        schemaData.pagination = `${article.pageStart}-${article.pageEnd}`;
-    }
-    if (pdfUrl) {
-        schemaData.encoding = {
-            "@type": "MediaObject",
-            "contentUrl": pdfUrl,
-            "encodingFormat": "application/pdf"
-        };
-    }
-    if (article.doi) {
-        schemaData.sameAs = `https://doi.org/${article.doi}`;
-    }
+    if (article.pageStart && article.pageEnd) schemaData.pagination = `${article.pageStart}-${article.pageEnd}`;
+    if (pdfUrl) schemaData.encoding = { "@type": "MediaObject", "contentUrl": pdfUrl, "encodingFormat": "application/pdf" };
+    if (article.doi) schemaData.sameAs = `https://doi.org/${article.doi}`;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -185,16 +160,11 @@ function generateScholarHtml({ article, authors, correspondingAuthor, publishedD
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- ================================================ -->
-    <!-- BASIC META TAGS -->
-    <!-- ================================================ -->
     <title>${escapeHtml(article.title)} | JICS - Synergy World Press</title>
     <meta name="description" content="${escapeHtml((article.abstract || '').substring(0, 160))}">
     <meta name="robots" content="index, follow">
     
-    <!-- ================================================ -->
-    <!-- 🔴 GOOGLE SCHOLAR META TAGS (REQUIRED) -->
-    <!-- ================================================ -->
+    <!-- Google Scholar Meta Tags -->
     <meta name="citation_title" content="${escapeHtml(article.title)}">
     ${authors.map(author => `<meta name="citation_author" content="${escapeHtml(author)}">`).join('\n    ')}
     <meta name="citation_publication_date" content="${publishedDate}">
@@ -214,9 +184,7 @@ function generateScholarHtml({ article, authors, correspondingAuthor, publishedD
     <meta name="citation_language" content="en">
     <meta name="citation_fulltext_world_readable" content="">
     
-    <!-- ================================================ -->
-    <!-- DUBLIN CORE META TAGS -->
-    <!-- ================================================ -->
+    <!-- Dublin Core -->
     <meta name="DC.title" content="${escapeHtml(article.title)}">
     ${authors.map(author => `<meta name="DC.creator" content="${escapeHtml(author)}">`).join('\n    ')}
     <meta name="DC.date" content="${publishedDate}">
@@ -227,9 +195,7 @@ function generateScholarHtml({ article, authors, correspondingAuthor, publishedD
     ${article.abstract ? `<meta name="DC.description" content="${escapeHtml(article.abstract)}">` : ''}
     ${article.keywords ? `<meta name="DC.subject" content="${escapeHtml(article.keywords)}">` : ''}
     
-    <!-- ================================================ -->
-    <!-- OPEN GRAPH META TAGS -->
-    <!-- ================================================ -->
+    <!-- Open Graph -->
     <meta property="og:title" content="${escapeHtml(article.title)}">
     <meta property="og:description" content="${escapeHtml((article.abstract || '').substring(0, 200))}">
     <meta property="og:type" content="article">
@@ -238,9 +204,7 @@ function generateScholarHtml({ article, authors, correspondingAuthor, publishedD
     <meta property="article:published_time" content="${isoDate}">
     ${authors[0] ? `<meta property="article:author" content="${escapeHtml(authors[0])}">` : ''}
     
-    <!-- ================================================ -->
-    <!-- TWITTER CARDS -->
-    <!-- ================================================ -->
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="${escapeHtml(article.title)}">
     <meta name="twitter:description" content="${escapeHtml((article.abstract || '').substring(0, 200))}">
@@ -248,233 +212,81 @@ function generateScholarHtml({ article, authors, correspondingAuthor, publishedD
     <!-- Canonical URL -->
     <link rel="canonical" href="${articleUrl}">
     
-    <!-- ================================================ -->
-    <!-- SCHEMA.ORG JSON-LD STRUCTURED DATA -->
-    <!-- ================================================ -->
+    <!-- Schema.org JSON-LD -->
     <script type="application/ld+json">
 ${JSON.stringify(schemaData, null, 2)}
     </script>
     
-    <!-- Auto-redirect to React App -->
-    
-    
-    <!-- Styling for fallback display -->
     <style>
         * { box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            line-height: 1.6;
-            color: #333;
-            background: #f9f9f9;
-        }
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #00796b;
-            font-size: 1.8rem;
-            margin-bottom: 15px;
-            line-height: 1.3;
-        }
-        .authors {
-            color: #555;
-            margin-bottom: 20px;
-            font-size: 1rem;
-        }
-        .meta-info {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-            padding: 15px;
-            background: #f0f7f6;
-            border-radius: 8px;
-        }
-        .meta-item {
-            text-align: center;
-        }
-        .meta-item label {
-            display: block;
-            font-size: 0.75rem;
-            color: #777;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-        }
-        .meta-item span {
-            font-weight: 600;
-            color: #00796b;
-        }
-        .abstract {
-            background: #fafafa;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid #00796b;
-            margin: 20px 0;
-        }
-        .abstract h2 {
-            margin-top: 0;
-            color: #00796b;
-            font-size: 1.1rem;
-        }
-        .keywords {
-            margin: 20px 0;
-        }
-        .keyword-tag {
-            display: inline-block;
-            background: #e0f2f1;
-            color: #00796b;
-            padding: 5px 12px;
-            border-radius: 20px;
-            margin: 3px;
-            font-size: 0.85rem;
-        }
-        .actions {
-            margin-top: 25px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .btn {
-            display: inline-block;
-            padding: 12px 24px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        .btn-primary {
-            background: #00796b;
-            color: white;
-        }
-        .btn-primary:hover {
-            background: #00695c;
-        }
-        .btn-secondary {
-            background: #e0e0e0;
-            color: #333;
-        }
-        .btn-secondary:hover {
-            background: #d0d0d0;
-        }
-        .redirect-notice {
-            background: #e3f2fd;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            margin-top: 30px;
-        }
-        .redirect-notice a {
-            color: #1976d2;
-        }
-        .corresponding {
-            font-size: 0.9rem;
-            color: #666;
-            margin-top: 5px;
-        }
+        body { font-family: Georgia, serif; max-width: 900px; margin: 0 auto; padding: 40px 20px; line-height: 1.8; color: #333; background: #fff; }
+        .header { border-bottom: 3px solid #00796b; padding-bottom: 20px; margin-bottom: 30px; }
+        .journal { color: #00796b; font-size: 14px; margin-bottom: 10px; }
+        h1 { color: #1a1a1a; font-size: 28px; margin-bottom: 15px; line-height: 1.3; }
+        .authors { color: #555; margin-bottom: 10px; }
+        .meta { color: #777; font-size: 14px; }
+        .meta span { margin-right: 20px; }
+        .abstract { background: #f8f9fa; padding: 25px; border-left: 4px solid #00796b; margin: 30px 0; }
+        .abstract h2 { color: #00796b; margin-top: 0; font-size: 18px; }
+        .keywords { margin: 25px 0; }
+        .keyword { display: inline-block; background: #e0f2f1; color: #00796b; padding: 5px 15px; border-radius: 20px; margin: 3px; font-size: 14px; }
+        .pdf-btn { display: inline-block; background: #00796b; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; }
+        .pdf-btn:hover { background: #00695c; }
+        .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #999; font-size: 13px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <article>
+    <article>
+        <header class="header">
+            <div class="journal">📚 Journal of Intelligent Computing System (JICS) | Synergy World Press</div>
             <h1>${escapeHtml(article.title)}</h1>
-            
-            <p class="authors">
-                <strong>Authors:</strong> ${authors.map(a => escapeHtml(a)).join(', ')}
-            </p>
-            
-            ${correspondingAuthor ? `<p class="corresponding"><strong>Corresponding Author:</strong> ${escapeHtml(correspondingAuthor)}</p>` : ''}
-            
-            ${(article.issueVolume || article.pageStart || article.publishedAt) ? `
-            <div class="meta-info">
-                ${article.issueVolume ? `
-                <div class="meta-item">
-                    <label>Volume / Issue</label>
-                    <span>Vol ${article.issueVolume}, No ${article.issueNumber || 'N/A'}</span>
-                </div>
-                ` : ''}
-                ${article.pageStart && article.pageEnd ? `
-                <div class="meta-item">
-                    <label>Pages</label>
-                    <span>${article.pageStart} - ${article.pageEnd}</span>
-                </div>
-                ` : ''}
-                ${article.publishedAt ? `
-                <div class="meta-item">
-                    <label>Published</label>
-                    <span>${new Date(article.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                </div>
-                ` : ''}
-                ${article.doi ? `
-                <div class="meta-item">
-                    <label>DOI</label>
-                    <span><a href="https://doi.org/${article.doi}" target="_blank">${article.doi}</a></span>
-                </div>
-                ` : ''}
+            <p class="authors"><strong>Authors:</strong> ${authors.map(a => escapeHtml(a)).join('; ')}</p>
+            ${correspondingAuthor ? `<p class="authors"><strong>Corresponding Author:</strong> ${escapeHtml(correspondingAuthor)}</p>` : ''}
+            <div class="meta">
+                ${article.issueVolume ? `<span><strong>Volume:</strong> ${article.issueVolume}</span>` : ''}
+                ${article.issueNumber ? `<span><strong>Issue:</strong> ${article.issueNumber}</span>` : ''}
+                ${article.pageStart && article.pageEnd ? `<span><strong>Pages:</strong> ${article.pageStart}-${article.pageEnd}</span>` : ''}
+                ${article.publishedAt ? `<span><strong>Published:</strong> ${new Date(article.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>` : ''}
             </div>
-            ` : ''}
-            
-            ${article.abstract ? `
-            <div class="abstract">
-                <h2>Abstract</h2>
-                <p>${escapeHtml(article.abstract)}</p>
-            </div>
-            ` : ''}
-            
-            ${article.keywords ? `
-            <div class="keywords">
-                <strong>Keywords:</strong>
-                ${article.keywords.split(',').map(k => `<span class="keyword-tag">${escapeHtml(k.trim())}</span>`).join('')}
-            </div>
-            ` : ''}
-            
-            <div class="actions">
-                ${pdfUrl ? `<a href="${pdfUrl}" class="btn btn-primary" target="_blank">📄 Download PDF</a>` : ''}
-                <a href="${articleUrl}" class="btn btn-secondary">🔗 View Full Article</a>
-            </div>
-        </article>
+            ${article.doi ? `<p class="meta" style="margin-top: 10px;"><strong>DOI:</strong> <a href="https://doi.org/${article.doi}">${article.doi}</a></p>` : ''}
+        </header>
         
-        <div class="redirect-notice">
-            <p>🔄 Redirecting to full article page...</p>
-            <p><a href="${articleUrl}">Click here if not redirected automatically</a></p>
-        </div>
-    </div>
+        ${article.abstract ? `
+        <section class="abstract">
+            <h2>Abstract</h2>
+            <p>${escapeHtml(article.abstract)}</p>
+        </section>
+        ` : ''}
+        
+        ${article.keywords ? `
+        <section class="keywords">
+            <strong>Keywords:</strong>
+            ${article.keywords.split(',').map(k => `<span class="keyword">${escapeHtml(k.trim())}</span>`).join('')}
+        </section>
+        ` : ''}
+        
+        ${pdfUrl ? `<a href="${pdfUrl}" class="pdf-btn" target="_blank">📄 Download Full Text (PDF)</a>` : ''}
+    </article>
     
-<script>
-  
-  if (window.location.pathname.startsWith('/scholar/article/') && !navigator.userAgent.match(/bot|crawler|spider|Googlebot|bingbot|Yandex|DuckDuckBot|Baiduspider/i)) {
-    window.location.replace('/journal/jics/articles/${article._id}');
-  }
-</script>
+    <footer class="footer">
+        <p>© ${new Date().getFullYear()} Synergy World Press. All rights reserved.</p>
+        <p>ISSN: XXXX-XXXX | <a href="${baseUrl}">synergyworldpress.com</a></p>
+    </footer>
 </body>
 </html>`;
 }
 
-// =====================================================
-// ERROR HTML GENERATOR
-// =====================================================
+// Error HTML Generator
 function generateErrorHtml(title, message) {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="googlebot" content="index, follow">
-<link rel="alternate" href="${scholarUrl}" media="only screen and (max-width: 640px)">
+    <meta name="robots" content="noindex, nofollow">
     <title>${title} | JICS</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 100px auto;
-            padding: 20px;
-            text-align: center;
-        }
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center; }
         h1 { color: #d32f2f; }
         a { color: #00796b; }
     </style>
