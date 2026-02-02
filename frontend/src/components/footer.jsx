@@ -15,7 +15,7 @@ function Footer() {
               About Synergy World Press
             </h3>
             <p className="leading-relaxed">
-              Advancing interdisciplinary research through accessible publishing solutions. 
+              Advancing interdisciplinary research through accessible publishing solutions.
               Committed to innovation, integrity, and global collaboration.
             </p>
           </div>
@@ -25,9 +25,9 @@ function Footer() {
             <h3 className="text-xl font-bold text-white mb-4">Quick Links</h3>
             <ul className="space-y-2">
               {[
-                 { name: "JICS", path: "/journal/jics" },
-                 { name: "About Us", path: "/about" },
-                 { name: "Developers", path: "/team" },
+                { name: "JICS", path: "/journal/jics" },
+                { name: "About Us", path: "/about" },
+                { name: "Developers", path: "/team" },
                 // { name: "Publish With Us", path: "/publish" },
                 // { name: "For Editors", path: "/editors" },
                 // { name: "For Reviewers", path: "/reviewers" },
@@ -91,7 +91,7 @@ function Footer() {
             <p className="mt-4">
               Need help? <br />
               <a href="mailto:support@synergyworldpress.com" className="text-[#00acc1] hover:text-[#0097a7]">
-                support@synergyworldpress.com
+                synergyworldpress@gmail.com
               </a>
             </p>
           </div>
@@ -108,8 +108,8 @@ function Footer() {
           </p>
           <p className="mt-2">
             Designed by the{" "}
-            <Link 
-              to={`/team`} 
+            <Link
+              to={`/team`}
               className="text-[#00acc1] hover:text-[#0097a7]"
             >
               Synergy Team
