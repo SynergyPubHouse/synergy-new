@@ -3,7 +3,12 @@ import os
 import json
 import re
 from pathlib import Path
-import pymupdf
+
+try:
+    import pymupdf
+except ImportError:
+    pymupdf = None
+
 import docx2txt
 
 def log(msg):
@@ -11,6 +16,9 @@ def log(msg):
 
 def extract_pdf_metadata_title(file_path):
     """Extract title from PDF metadata"""
+    if pymupdf is None:
+        log("PyMuPDF not available, skipping PDF metadata title extraction")
+        return None
     try:
         doc = pymupdf.open(file_path)
         metadata = doc.metadata
@@ -29,6 +37,9 @@ def extract_title_from_first_lines(file_path):
     Extract title from the very first lines of the PDF.
     Combines consecutive lines until hitting author/affiliation markers.
     """
+    if pymupdf is None:
+        log("PyMuPDF not available, skipping PDF first-lines title extraction")
+        return None
     try:
         doc = pymupdf.open(file_path)
         page = doc[0]
@@ -168,6 +179,8 @@ def extract_title_from_text_content(lines):
     return None
 
 def extract_pdf_text(file_path):
+    if pymupdf is None:
+        raise RuntimeError("PyMuPDF (pymupdf) is not installed")
     doc = pymupdf.open(file_path)
     text = "\n".join(page.get_text("text") for page in doc)
     doc.close()
