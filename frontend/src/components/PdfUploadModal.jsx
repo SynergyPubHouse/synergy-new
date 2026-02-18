@@ -1,6 +1,6 @@
 // components/PdfUploadModal.jsx
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
 function PdfUploadModal({ isOpen, onClose, manuscript, userToken, onSuccess }) {
@@ -36,6 +36,26 @@ function PdfUploadModal({ isOpen, onClose, manuscript, userToken, onSuccess }) {
         "Case Study",
         "Editorial"
     ];
+
+    // Pre-populate authors from manuscript's registered authors when modal opens
+    useEffect(() => {
+        if (!isOpen || !manuscript) return;
+
+        // Pre-populate authors list
+        if (manuscript.authors?.length > 0 && pdfAuthorsList.length === 0) {
+            const names = manuscript.authors
+                .map(a => [a.firstName, a.middleName, a.lastName].filter(p => p && p.trim()).join(' '))
+                .filter(name => name.trim());
+            if (names.length > 0) setPdfAuthorsList(names);
+        }
+
+        // Pre-select corresponding author
+        if (manuscript.correspondingAuthor && !pdfCorrespondingAuthor) {
+            const ca = manuscript.correspondingAuthor;
+            const caName = [ca.firstName, ca.middleName, ca.lastName].filter(p => p && p.trim()).join(' ');
+            if (caName.trim()) setPdfCorrespondingAuthor(caName);
+        }
+    }, [isOpen, manuscript]);
 
     // Check if issue info is filled
     const hasIssueInfo = issueVolume && issueNumber && issueYear;
