@@ -1,19 +1,20 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
-import { Helmet } from 'react-helmet-async';  // 👈 NEW: Add this import
+import { Helmet } from "react-helmet-async";
 import { useAuth } from "../../../../App";
-import { pdfjs } from 'react-pdf';
+import { pdfjs } from "react-pdf";
 
-const cdnUrl = 'https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js';
+const cdnUrl = "https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js";
 pdfjs.GlobalWorkerOptions.workerSrc = cdnUrl;
 
 // Generate unique visitor ID
 const getVisitorId = () => {
-  let visitorId = localStorage.getItem('visitorId');
+  let visitorId = localStorage.getItem("visitorId");
   if (!visitorId) {
-    visitorId = 'visitor_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-    localStorage.setItem('visitorId', visitorId);
+    visitorId =
+      "visitor_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now();
+    localStorage.setItem("visitorId", visitorId);
   }
   return visitorId;
 };
@@ -29,7 +30,7 @@ const ArticleDetail = () => {
   const viewCountedRef = useRef(false);
 
   // =====================================================
-  // 🔴 NEW: GOOGLE SCHOLAR META TAGS COMPONENT
+  // GOOGLE SCHOLAR META TAGS COMPONENT
   // =====================================================
   const ScholarMetaTags = () => {
     if (!article) return null;
@@ -42,10 +43,13 @@ const ArticleDetail = () => {
       if (!article?.authors || !Array.isArray(article.authors)) {
         return [];
       }
-      return article.authors.map(author => {
-        const nameParts = [author.firstName, author.middleName, author.lastName]
-          .filter(part => part && part.trim() !== '');
-        return nameParts.join(' ');
+      return article.authors.map((author) => {
+        const nameParts = [
+          author.firstName,
+          author.middleName,
+          author.lastName,
+        ].filter((part) => part && part.trim() !== "");
+        return nameParts.join(" ");
       });
     };
 
@@ -54,55 +58,58 @@ const ArticleDetail = () => {
     // Format date for Google Scholar (YYYY/MM/DD)
     const getPublishedDate = () => {
       const date = article.publishedAt || article.submissionDate;
-      if (!date) return '';
+      if (!date) return "";
       const d = new Date(date);
-      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
     };
 
     const publishedDate = getPublishedDate();
     const articleUrl = `https://synergyworldpress.com/journal/jics/articles/${article._id}`;
-    const pdfUrl = article.publishedFileUrl || '';
+    const pdfUrl = article.publishedFileUrl || "";
 
     // Schema.org JSON-LD structured data
     const schemaData = {
       "@context": "https://schema.org",
       "@type": "ScholarlyArticle",
-      "headline": article.title,
-      "name": article.title,
-      "author": authors.map(name => ({
+      headline: article.title,
+      name: article.title,
+      author: authors.map((name) => ({
         "@type": "Person",
-        "name": name
+        name: name,
       })),
-      "datePublished": article.publishedAt || article.submissionDate,
-      "dateModified": article.updatedAt || article.publishedAt || article.submissionDate,
-      "publisher": {
+      datePublished: article.publishedAt || article.submissionDate,
+      dateModified:
+        article.updatedAt || article.publishedAt || article.submissionDate,
+      publisher: {
         "@type": "Organization",
-        "name": "Synergy World Press",
-        "url": "https://synergyworldpress.com"
+        name: "Synergy World Press",
+        url: "https://synergyworldpress.com",
       },
-      "isPartOf": {
+      isPartOf: {
         "@type": "Periodical",
-        "name": "Journal of Intelligent Computing System (JICS)",
-        "issn": "XXXX-XXXX"  // 🔴 Apna ISSN yahan dalo
+        name: "Journal of Intelligent Computing System (JICS)",
+        issn: "XXXX-XXXX",
       },
-      "description": article.abstract || '',
-      "keywords": article.keywords || '',
-      "url": articleUrl,
-      "mainEntityOfPage": articleUrl,
-      "inLanguage": "en"
+      description: article.abstract || "",
+      keywords: article.keywords || "",
+      url: articleUrl,
+      mainEntityOfPage: articleUrl,
+      inLanguage: "en",
     };
 
     // Add optional fields
-    if (article.issueVolume) schemaData.volumeNumber = String(article.issueVolume);
-    if (article.issueNumber) schemaData.issueNumber = String(article.issueNumber);
+    if (article.issueVolume)
+      schemaData.volumeNumber = String(article.issueVolume);
+    if (article.issueNumber)
+      schemaData.issueNumber = String(article.issueNumber);
     if (article.pageStart && article.pageEnd) {
       schemaData.pagination = `${article.pageStart}-${article.pageEnd}`;
     }
     if (pdfUrl) {
       schemaData.encoding = {
         "@type": "MediaObject",
-        "contentUrl": pdfUrl,
-        "encodingFormat": "application/pdf"
+        contentUrl: pdfUrl,
+        encodingFormat: "application/pdf",
       };
     }
     if (article.doi) {
@@ -113,14 +120,21 @@ const ArticleDetail = () => {
       <Helmet>
         {/* ===== Basic Meta Tags ===== */}
         <title>{article.title} | JICS - Synergy World Press</title>
-        <meta name="description" content={article.abstract?.substring(0, 160) || ''} />
+        <meta
+          name="description"
+          content={article.abstract?.substring(0, 160) || ""}
+        />
 
-        {/* ===== 🔴 GOOGLE SCHOLAR META TAGS ===== */}
+        {/* ===== GOOGLE SCHOLAR META TAGS ===== */}
         <meta name="citation_title" content={article.title} />
 
         {/* Each author needs separate meta tag */}
         {authors.map((author, index) => (
-          <meta key={`author-${index}`} name="citation_author" content={author} />
+          <meta
+            key={`author-${index}`}
+            name="citation_author"
+            content={author}
+          />
         ))}
 
         {/* Publication date */}
@@ -128,11 +142,14 @@ const ArticleDetail = () => {
         <meta name="citation_online_date" content={publishedDate} />
 
         {/* Journal info */}
-        <meta name="citation_journal_title" content="Journal of Intelligent Computing System (JICS)" />
+        <meta
+          name="citation_journal_title"
+          content="Journal of Intelligent Computing System (JICS)"
+        />
         <meta name="citation_journal_abbrev" content="JICS" />
         <meta name="citation_publisher" content="Synergy World Press" />
 
-        {/* 🔴 ISSN - Apna ISSN yahan dalo */}
+        {/* ISSN */}
         <meta name="citation_issn" content="XXXX-XXXX" />
 
         {/* Volume & Issue */}
@@ -151,15 +168,11 @@ const ArticleDetail = () => {
           <meta name="citation_lastpage" content={String(article.pageEnd)} />
         )}
 
-        {/* 🔴 PDF URL - Very Important for Google Scholar */}
-        {pdfUrl && (
-          <meta name="citation_pdf_url" content={pdfUrl} />
-        )}
+        {/* PDF URL - Very Important for Google Scholar */}
+        {pdfUrl && <meta name="citation_pdf_url" content={pdfUrl} />}
 
         {/* DOI */}
-        {article.doi && (
-          <meta name="citation_doi" content={article.doi} />
-        )}
+        {article.doi && <meta name="citation_doi" content={article.doi} />}
 
         {/* Abstract */}
         {article.abstract && (
@@ -196,32 +209,37 @@ const ArticleDetail = () => {
 
         {/* ===== OPEN GRAPH TAGS ===== */}
         <meta property="og:title" content={article.title} />
-        <meta property="og:description" content={article.abstract?.substring(0, 200) || ''} />
+        <meta
+          property="og:description"
+          content={article.abstract?.substring(0, 200) || ""}
+        />
         <meta property="og:type" content="article" />
         <meta property="og:url" content={articleUrl} />
         <meta property="og:site_name" content="Synergy World Press" />
-        <meta property="article:published_time" content={article.publishedAt || article.submissionDate} />
-        {authors[0] && (
-          <meta property="article:author" content={authors[0]} />
-        )}
+        <meta
+          property="article:published_time"
+          content={article.publishedAt || article.submissionDate}
+        />
+        {authors[0] && <meta property="article:author" content={authors[0]} />}
 
         {/* ===== TWITTER CARDS ===== */}
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content={article.title} />
-        <meta name="twitter:description" content={article.abstract?.substring(0, 200) || ''} />
+        <meta
+          name="twitter:description"
+          content={article.abstract?.substring(0, 200) || ""}
+        />
 
         {/* ===== Canonical URL ===== */}
         <link rel="canonical" href={articleUrl} />
 
         {/* ===== Schema.org JSON-LD ===== */}
-        <script type="application/ld+json">
-          {JSON.stringify(schemaData)}
-        </script>
+        <script type="application/ld+json">{JSON.stringify(schemaData)}</script>
       </Helmet>
     );
   };
   // =====================================================
-  // END OF NEW CODE
+  // END OF META TAGS
   // =====================================================
 
   // Increment view count - No Auth Required
@@ -235,9 +253,9 @@ const ArticleDetail = () => {
         {},
         {
           headers: {
-            'x-visitor-id': visitorId,
+            "x-visitor-id": visitorId,
           },
-        }
+        },
       );
 
       if (res.data.success) {
@@ -249,61 +267,48 @@ const ArticleDetail = () => {
     }
   }, [id]);
 
-  // Fetch PDF as blob
-  const fetchPdfBlob = useCallback(async (url) => {
-    if (!url) return null;
-    try {
-      setIsPdfLoading(true);
-      const res = await axios.get(url, {
-        responseType: 'blob',
-        headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
-      });
-      return res.data;
-    } catch (err) {
-      console.error('Error fetching PDF blob:', err);
-      return null;
-    } finally {
-      setIsPdfLoading(false);
-    }
-  }, [user]);
+  // Fetch PDF as blob (for download only)
+  const fetchPdfBlob = useCallback(
+    async (url) => {
+      if (!url) return null;
+      try {
+        setIsPdfLoading(true);
+        const res = await axios.get(url, {
+          responseType: "blob",
+          headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
+        });
+        return res.data;
+      } catch (err) {
+        console.error("Error fetching PDF blob:", err);
+        return null;
+      } finally {
+        setIsPdfLoading(false);
+      }
+    },
+    [user],
+  );
 
-  // Open PDF in new tab
-  const handleViewPdf = async () => {
+  // ✅ NEW: Open PDF in new tab - Direct URL (no blob, no about:blank)
+  const handleViewPdf = () => {
     if (!article?.publishedFileUrl) return;
-    const blob = await fetchPdfBlob(article.publishedFileUrl);
-    if (!blob) {
-      alert('Unable to load PDF for viewing.');
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    const newWindow = window.open();
-    if (newWindow) {
-      newWindow.document.write(`
-        <html>
-          <head>
-            <title>${article.title || 'PDF Viewer'}</title>
-            <style>body { margin: 0; } iframe { width: 100%; height: 100vh; border: none; }</style>
-          </head>
-          <body><iframe src="${url}"></iframe></body>
-        </html>
-      `);
-      newWindow.document.close();
-      newWindow.onbeforeunload = () => URL.revokeObjectURL(url);
-    }
+    window.open(article.publishedFileUrl, "_blank", "noopener,noreferrer");
   };
 
-  // Download PDF
+  // Download PDF (still uses blob for proper download)
   const handleDownloadPdf = async () => {
     if (!article?.publishedFileUrl) return;
     const blob = await fetchPdfBlob(article.publishedFileUrl);
     if (!blob) {
-      alert('Unable to download PDF.');
+      alert("Unable to download PDF.");
       return;
     }
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    const safeTitle = (article.title || 'article').replace(/[^a-z0-9_.-]/gi, '_');
+    const safeTitle = (article.title || "article").replace(
+      /[^a-z0-9_.-]/gi,
+      "_",
+    );
     link.download = `${safeTitle}.pdf`;
     document.body.appendChild(link);
     link.click();
@@ -317,7 +322,7 @@ const ArticleDetail = () => {
       setLoading(true);
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${id}`
+          `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${id}`,
         );
         const articleData = res.data.data || res.data;
         setArticle(articleData);
@@ -349,71 +354,64 @@ const ArticleDetail = () => {
 
   // Format view count
   const formatViewCount = (count) => {
-    if (!count) return '0';
+    if (!count) return "0";
     if (count >= 1000000) {
-      return (count / 1000000).toFixed(1) + 'M';
+      return (count / 1000000).toFixed(1) + "M";
     } else if (count >= 1000) {
-      return (count / 1000).toFixed(1) + 'K';
+      return (count / 1000).toFixed(1) + "K";
     }
     return count.toString();
   };
 
-  // ✅ Get authors - PDF first, then API fallback
+  // Get authors - PDF first, then API fallback
   const getAuthors = () => {
-    // PDF authors first (from backend)
     if (article?.pdfAuthors && article.pdfAuthors.length > 0) {
-      return article.pdfAuthors.join(', ');
+      return article.pdfAuthors.join(", ");
     }
 
-    // Fallback to API authors
-    if (!article?.authors || !Array.isArray(article.authors) || article.authors.length === 0) {
-      return 'Unknown authors';
+    if (
+      !article?.authors ||
+      !Array.isArray(article.authors) ||
+      article.authors.length === 0
+    ) {
+      return "Unknown authors";
     }
 
     return article.authors
-      .map(author => {
-        const nameParts = [author.firstName, author.middleName, author.lastName]
-          .filter(part => part && part.trim() !== '');
-        return nameParts.join(' ');
+      .map((author) => {
+        const nameParts = [
+          author.firstName,
+          author.middleName,
+          author.lastName,
+        ].filter((part) => part && part.trim() !== "");
+        return nameParts.join(" ");
       })
-      .join(', ');
+      .join(", ");
   };
 
-  // ✅ Get corresponding author
+  // Get corresponding author
   const getCorrespondingAuthor = () => {
-    // PDF corresponding author first
     if (article?.pdfCorrespondingAuthor) {
       return article.pdfCorrespondingAuthor;
     }
 
-    // Fallback to API
     if (article?.correspondingAuthor) {
       const { firstName, middleName, lastName } = article.correspondingAuthor;
-      return [firstName, middleName, lastName].filter(p => p && p.trim()).join(' ');
+      return [firstName, middleName, lastName]
+        .filter((p) => p && p.trim())
+        .join(" ");
     }
 
     return null;
   };
 
-  // Format authors for citation (always use API authors)
-  const formatAuthorsForCitation = (authors) => {
-    if (!authors || !Array.isArray(authors)) return 'Unknown authors';
-    return authors
-      .map(author => {
-        const nameParts = [author.firstName, author.middleName, author.lastName]
-          .filter(part => part && part.trim() !== '');
-        return nameParts.join(' ');
-      })
-      .join(', ');
-  };
-
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
@@ -431,17 +429,16 @@ const ArticleDetail = () => {
   if (error) return <div className="p-8 text-red-600">{error}</div>;
   if (!article) return <div className="p-8">Article not found.</div>;
 
-  const hasIssueInfo = article.issueVolume && article.issueNumber && article.issueYear;
+  const hasIssueInfo =
+    article.issueVolume && article.issueNumber && article.issueYear;
 
   return (
     <div className="min-h-screen bg-[#f9f9f9] text-[#212121] py-12">
-
-      {/* 🔴 NEW: Google Scholar Meta Tags - Add this line */}
+      {/* Google Scholar Meta Tags */}
       <ScholarMetaTags />
 
       <div className="container mx-auto px-6 md:px-20">
         <div className="bg-white rounded-xl shadow-md p-6 border border-[#e0e0e0] mt-[50px]">
-
           {/* Title with View Count Badge */}
           <div className="mb-6">
             <div className="flex justify-between items-start flex-wrap gap-4">
@@ -449,7 +446,7 @@ const ArticleDetail = () => {
                 {article.title}
               </h1>
 
-              {/* 👁️ View Count Badge */}
+              {/* View Count Badge */}
               <div className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2 rounded-full border border-blue-200 shadow-sm">
                 <svg
                   className="w-5 h-5 text-blue-600"
@@ -477,15 +474,16 @@ const ArticleDetail = () => {
               </div>
             </div>
 
-            {/* ✅ Authors from PDF */}
+            {/* Authors from PDF */}
             <p className="mt-2 text-sm text-[#757575]">
               <span className="font-medium">Authors:</span> {getAuthors()}
             </p>
 
-            {/* ✅ Corresponding Author */}
+            {/* Corresponding Author */}
             {getCorrespondingAuthor() && (
               <p className="mt-1 text-xs text-[#9e9e9e]">
-                <span className="font-medium">Corresponding Author:</span> {getCorrespondingAuthor()}
+                <span className="font-medium">Corresponding Author:</span>{" "}
+                {getCorrespondingAuthor()}
               </p>
             )}
           </div>
@@ -500,7 +498,9 @@ const ArticleDetail = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* Issue */}
                 <div className="bg-white p-3 rounded-lg border border-gray-200">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Issue</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">
+                    Issue
+                  </p>
                   <p className="text-lg font-semibold text-gray-800">
                     Vol {article.issueVolume}, No {article.issueNumber}
                   </p>
@@ -510,15 +510,21 @@ const ArticleDetail = () => {
                 {/* Section */}
                 {article.section && (
                   <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Section</p>
-                    <p className="text-lg font-semibold text-gray-800">{article.section}</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">
+                      Section
+                    </p>
+                    <p className="text-lg font-semibold text-gray-800">
+                      {article.section}
+                    </p>
                   </div>
                 )}
 
                 {/* Pages */}
                 {article.pageStart && article.pageEnd && (
                   <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Pages</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">
+                      Pages
+                    </p>
                     <p className="text-lg font-semibold text-gray-800">
                       {article.pageStart} - {article.pageEnd}
                     </p>
@@ -528,14 +534,16 @@ const ArticleDetail = () => {
                 {/* Published Date */}
                 {article.publishedAt && (
                   <div className="bg-white p-3 rounded-lg border border-gray-200">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Published</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">
+                      Published
+                    </p>
                     <p className="text-lg font-semibold text-gray-800">
                       {formatDate(article.publishedAt)}
                     </p>
                   </div>
                 )}
 
-                {/* 👁️ Views Card */}
+                {/* Views Card */}
                 <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-5 rounded-xl border-2 border-purple-200 shadow-lg">
                   <div className="grid grid-cols-2 gap-6 text-center">
                     {/* Total Views */}
@@ -567,21 +575,26 @@ const ArticleDetail = () => {
                 </div>
               </div>
 
-              {/* Citation - ✅ Use PDF authors for citation */}
+              {/* Citation */}
               <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Cite This Article</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                  Cite This Article
+                </p>
                 <p className="text-sm text-gray-700 font-mono">
                   {getAuthors()} ({article.issueYear}).
                   {article.title}.
                   <em> Journal of Intelligent Computing System (JICS)</em>,
                   {article.issueVolume}({article.issueNumber}),
-                  {article.pageStart && article.pageEnd ? ` ${article.pageStart}-${article.pageEnd}` : ''}.
+                  {article.pageStart && article.pageEnd
+                    ? ` ${article.pageStart}-${article.pageEnd}`
+                    : ""}
+                  .
                 </p>
                 <button
                   onClick={() => {
-                    const citation = `${getAuthors()} (${article.issueYear}). ${article.title}. Journal of Intelligent Computing System (JICS), ${article.issueVolume}(${article.issueNumber})${article.pageStart && article.pageEnd ? `, ${article.pageStart}-${article.pageEnd}` : ''}.`;
+                    const citation = `${getAuthors()} (${article.issueYear}). ${article.title}. Journal of Intelligent Computing System (JICS), ${article.issueVolume}(${article.issueNumber})${article.pageStart && article.pageEnd ? `, ${article.pageStart}-${article.pageEnd}` : ""}.`;
                     navigator.clipboard.writeText(citation);
-                    alert('Citation copied to clipboard!');
+                    alert("Citation copied to clipboard!");
                   }}
                   className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
                 >
@@ -594,13 +607,16 @@ const ArticleDetail = () => {
           {/* Metadata */}
           <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-[#757575]">
             <div>
-              <span className="font-medium">Manuscript ID:</span> {article.customId || article._id}
+              <span className="font-medium">Manuscript ID:</span>{" "}
+              {article.customId || article._id}
             </div>
             <div>
-              <span className="font-medium">Article Type:</span> {article.type || 'Manuscript'}
+              <span className="font-medium">Article Type:</span>{" "}
+              {article.type || "Manuscript"}
             </div>
             <div>
-              <span className="font-medium">Submission Date:</span> {formatDate(article.submissionDate)}
+              <span className="font-medium">Submission Date:</span>{" "}
+              {formatDate(article.submissionDate)}
             </div>
             {/* Show views in metadata if no issue info */}
             {!hasIssueInfo && (
@@ -618,10 +634,12 @@ const ArticleDetail = () => {
             {/* Abstract */}
             <div>
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-[#00796b] mb-2">Abstract</h3>
+                <h3 className="text-lg font-semibold text-[#00796b] mb-2">
+                  Abstract
+                </h3>
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-sm text-[#424242] whitespace-pre-line">
-                    {article.abstract || 'No abstract available'}
+                    {article.abstract || "No abstract available"}
                   </p>
                 </div>
               </div>
@@ -629,9 +647,11 @@ const ArticleDetail = () => {
               {/* Keywords */}
               {article.keywords && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-[#00796b] mb-2">Keywords</h3>
+                  <h3 className="text-lg font-semibold text-[#00796b] mb-2">
+                    Keywords
+                  </h3>
                   <div className="flex flex-wrap gap-2">
-                    {article.keywords.split(',').map((keyword, index) => (
+                    {article.keywords.split(",").map((keyword, index) => (
                       <span
                         key={index}
                         className="px-3 py-1 bg-gray-100 text-sm text-gray-700 rounded-full"
@@ -648,45 +668,58 @@ const ArticleDetail = () => {
             <div>
               {article.classification && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-[#00796b] mb-2">Classification</h3>
+                  <h3 className="text-lg font-semibold text-[#00796b] mb-2">
+                    Classification
+                  </h3>
                   <ul className="space-y-2">
-                    {parseClassification(article.classification).map((item, index) => (
-                      <li key={index} className="text-sm text-[#424242] flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
+                    {parseClassification(article.classification).map(
+                      (item, index) => (
+                        <li
+                          key={index}
+                          className="text-sm text-[#424242] flex items-start"
+                        >
+                          <span className="mr-2">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ),
+                    )}
                   </ul>
                 </div>
               )}
 
               {article.additionalInfo && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-[#00796b] mb-2">Additional Information</h3>
-                  <p className="text-sm text-[#424242]">{article.additionalInfo}</p>
+                  <h3 className="text-lg font-semibold text-[#00796b] mb-2">
+                    Additional Information
+                  </h3>
+                  <p className="text-sm text-[#424242]">
+                    {article.additionalInfo}
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* ✅ UPDATED: Action Buttons */}
           <div className="mt-8 pt-6 border-t border-gray-200">
             <div className="flex flex-wrap gap-3">
               {article.publishedFileUrl ? (
                 <>
+                  {/* ✅ View PDF - Opens direct URL, no loading needed */}
                   <button
                     onClick={handleViewPdf}
-                    disabled={isPdfLoading}
-                    className="px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white rounded-lg transition-colors text-sm disabled:opacity-50"
+                    className="px-4 py-2 bg-[#00796b] hover:bg-[#00acc1] text-white rounded-lg transition-colors text-sm"
                   >
-                    {isPdfLoading ? 'Loading...' : '👁️ View PDF'}
+                    👁️ View PDF
                   </button>
+
+                  {/* Download PDF - Still uses blob for proper download */}
                   <button
                     onClick={handleDownloadPdf}
                     disabled={isPdfLoading}
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm disabled:opacity-50"
                   >
-                    {isPdfLoading ? 'Processing...' : '📥 Download PDF'}
+                    {isPdfLoading ? "Processing..." : "📥 Download PDF"}
                   </button>
                 </>
               ) : (
