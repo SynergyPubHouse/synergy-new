@@ -45,7 +45,7 @@ const manuscriptSchema = new mongoose.Schema(
 		type: {
 			type: String,
 			required: true,
-			enum: ["Manuscript", "Research Article", "Review Article","SI: Data Driven Intelligent Computing and Applied AI Modeling for Smart Urban Systems"],
+			enum: ["Manuscript", "Research Article", "Review Article", "SI: Data Driven Intelligent Computing and Applied AI Modeling for Smart Urban Systems"],
 			default: "Manuscript",
 		},
 		classification: {
@@ -148,178 +148,178 @@ const manuscriptSchema = new mongoose.Schema(
 			],
 			default: "Saved",
 		},
-		
+
 
 		viewCount: {
-    type: Number,
-    default: 0,
-},
-uniqueViewers: [{
-    visitorId: { type: String },
-    viewedAt: { type: Date, default: Date.now },
-}],
-lastViewedAt: {
-    type: Date,
-    default: null,
-},
-       revisionAttempts: {
-            type: Number,
-            default: 0,
-            min: 0,
-        },
-        maxRevisionAttempts: {
-            type: Number,
-            default: 3,
-            min: 1,
-        },
-        revisionLocked: {
-            type: Boolean,
-            default: false,
-        },
+			type: Number,
+			default: 0,
+		},
+		uniqueViewers: [{
+			visitorId: { type: String },
+			viewedAt: { type: Date, default: Date.now },
+		}],
+		lastViewedAt: {
+			type: Date,
+			default: null,
+		},
+		revisionAttempts: {
+			type: Number,
+			default: 0,
+			min: 0,
+		},
+		maxRevisionAttempts: {
+			type: Number,
+			default: 3,
+			min: 1,
+		},
+		revisionLocked: {
+			type: Boolean,
+			default: false,
+		},
 
 
 		assignedReviewers: [
 			{
 				type: mongoose.Schema.Types.ObjectId,
 				ref: "Reviewer",
-				required: false, 
+				required: false,
 			},
 		],
 		invitations: [
-  {
-    email: { type: String, required: true },
-    invitedAt: { type: Date, default: Date.now },
-    
-    status: {
-      type: String,
-      enum: ["pending", "accepted", "rejected", "expired","blocked"],  
-      default: "pending",
-    },
+			{
+				email: { type: String, required: true },
+				invitedAt: { type: Date, default: Date.now },
 
-    acceptedAt: { type: Date },
-    rejectedAt: { type: Date },
-    rejectionReason: { type: String, default: "" },
+				status: {
+					type: String,
+					enum: ["pending", "accepted", "rejected", "expired"],
+					default: "pending",
+				},
 
-   
-    expiresAt: {          
-      type: Date,
-      default: () => new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
-    },
-    remindedAt: {         
-      type: Date,
-      default: null
-    },
-    expiredAt: {           
-      type: Date,
-      default: null
-    },
+				acceptedAt: { type: Date },
+				rejectedAt: { type: Date },
+				rejectionReason: { type: String, default: "" },
 
-	 reviewReminderSentAt: {     
-      type: Date,
-      default: null
-    },
-    reviewBlockedAt: {         
-      type: Date,
-      default: null
-    },
-    isReviewBlocked: {          
-      type: Boolean,
-      default: false
-    },
-reviewSubmittedAt: { type: Date, default: null },
-    reviewRound: { type: Number, default: 1 },
-    isRevisionReview: { type: Boolean, default: false },
-	 revisionRound: { type: Number, default: 0 },
-	 
-  },
-],
+
+				expiresAt: {
+					type: Date,
+					default: () => new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+				},
+				remindedAt: {
+					type: Date,
+					default: null
+				},
+				expiredAt: {
+					type: Date,
+					default: null
+				},
+
+				reviewReminderSentAt: {
+					type: Date,
+					default: null
+				},
+				reviewBlockedAt: {
+					type: Date,
+					default: null
+				},
+				isReviewBlocked: {
+					type: Boolean,
+					default: false
+				},
+				reviewSubmittedAt: { type: Date, default: null },
+				reviewRound: { type: Number, default: 1 },
+				isRevisionReview: { type: Boolean, default: false },
+				revisionRound: { type: Number, default: 0 },
+
+			},
+		],
 		authorNotes: [noteSchema],
 		editorNotes: [noteSchema],
 		editorNotesForAuthor: [noteSchema],
 		reviewerNotes: [noteSchema],
 		reviewDocxUrl: {
-    type: String,
-    default: "",
-},
-	authorResponse: {
-		// Response Sheet (Author Response) - now stored as PDF
-		docxUrl: { type: String, default: "" },
-		pdfUrl: { type: String, default: "" },
-		// Google Drive fields for response PDF
-		responseDriveFileId: { type: String, default: "" },
-		responseDriveViewUrl: { type: String, default: "" },
-		uploadedAt: { type: Date },
-		
-		// Highlighted Document - PDF format
-		highlightedFileUrl: { type: String, default: "" },
-		highlightedUploadedAt: { type: Date },
-		
-		// Without Highlighted Document - DOCX format
-		withoutHighlightedFileUrl: { type: String, default: "" },
-		withoutHighlightedUploadedAt: { type: Date },
-		
-		// Metadata
-		lastUpdated: { type: Date, default: Date.now },
-		submissionCount: { type: Number, default: 0 },
-	},
+			type: String,
+			default: "",
+		},
+		authorResponse: {
+			// Response Sheet (Author Response) - now stored as PDF
+			docxUrl: { type: String, default: "" },
+			pdfUrl: { type: String, default: "" },
+			// Google Drive fields for response PDF
+			responseDriveFileId: { type: String, default: "" },
+			responseDriveViewUrl: { type: String, default: "" },
+			uploadedAt: { type: Date },
+
+			// Highlighted Document - PDF format
+			highlightedFileUrl: { type: String, default: "" },
+			highlightedUploadedAt: { type: Date },
+
+			// Without Highlighted Document - DOCX format
+			withoutHighlightedFileUrl: { type: String, default: "" },
+			withoutHighlightedUploadedAt: { type: Date },
+
+			// Metadata
+			lastUpdated: { type: Date, default: Date.now },
+			submissionCount: { type: Number, default: 0 },
+		},
 
 		revisionCombinedPdfUrl: { type: String, default: "" },
 		// Google Drive fields for combined revision PDF
 		revisionCombinedDriveFileId: { type: String, default: "" },
 		revisionCombinedDriveViewUrl: { type: String, default: "" },
 		highlightedRevisionFileUrl: { type: String, default: "" },
-publishedFileUrl: {
-    type: String,
-    default: "",
-},
-	// Google Drive fields for published PDF
-	publishedDriveFileId: { type: String, default: "" },
-	publishedDriveViewUrl: { type: String, default: "" },
-	publishedAt: {
+		publishedFileUrl: {
+			type: String,
+			default: "",
+		},
+		// Google Drive fields for published PDF
+		publishedDriveFileId: { type: String, default: "" },
+		publishedDriveViewUrl: { type: String, default: "" },
+		publishedAt: {
 			type: Date,
 			default: null,
 		},
 
 		issueVolume: {
-    type: Number,
-    default: null,
-},
-issueNumber: {
-    type: Number,
-    default: null,
-},
-issueYear: {
-    type: Number,
-    default: null,
-},
-issueTitle: {
-    type: String,
-    default: "",
-},
-pageStart: {
-    type: Number,
-    default: null,
-},
-pageEnd: {
-    type: Number,
-    default: null,
-},
-section: {
-    type: String,
-    default: "Manuscript",
-},
-pdfAuthors: {
-    type: [String],
-    default: []
-},
-pdfCorrespondingAuthor: {
-    type: String,
-    default: null
-},
-citationCount: {
-    type: Number,
-    default: 0
-}
+			type: Number,
+			default: null,
+		},
+		issueNumber: {
+			type: Number,
+			default: null,
+		},
+		issueYear: {
+			type: Number,
+			default: null,
+		},
+		issueTitle: {
+			type: String,
+			default: "",
+		},
+		pageStart: {
+			type: Number,
+			default: null,
+		},
+		pageEnd: {
+			type: Number,
+			default: null,
+		},
+		section: {
+			type: String,
+			default: "Manuscript",
+		},
+		pdfAuthors: {
+			type: [String],
+			default: []
+		},
+		pdfCorrespondingAuthor: {
+			type: String,
+			default: null
+		},
+		citationCount: {
+			type: Number,
+			default: 0
+		}
 	},
 	{ timestamps: true }
 );

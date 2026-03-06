@@ -4,49 +4,49 @@ const Manuscript = require('../models/Manuscript');
 const sendEmail = require('../utils/sendEmail');
 
 const runStrictReviewDeadline = async () => {
-    
+
 
     const now = new Date();
     let reminded = 0;
     let blocked = 0;
 
     try {
-      const manuscripts = await Manuscript.find({
-  invitations: {
-    $elemMatch: {
-      status: "accepted",
-      reviewSubmittedAt: null,
-      isReviewBlocked: false
-    }
-  }
-});
-      for (const manuscript of manuscripts) {
-  let saveNeeded = false;
+        const manuscripts = await Manuscript.find({
+            invitations: {
+                $elemMatch: {
+                    status: "accepted",
+                    reviewSubmittedAt: null,
+                    isReviewBlocked: false
+                }
+            }
+        });
+        for (const manuscript of manuscripts) {
+            let saveNeeded = false;
 
-  for (const inv of manuscript.invitations) {
-    if (inv.status !== "accepted") continue;
-    if (inv.isReviewBlocked) continue;
-    if (inv.reviewSubmittedAt) continue;
-    if (!inv.acceptedAt) continue;
+            for (const inv of manuscript.invitations) {
+                if (inv.status !== "accepted") continue;
+                if (inv.isReviewBlocked) continue;
+                if (inv.reviewSubmittedAt) continue;
+                if (!inv.acceptedAt) continue;
 
-    const minutesSinceAccept = (now - new Date(inv.acceptedAt)) / (1000 * 60);
+                const minutesSinceAccept = (now - new Date(inv.acceptedAt)) / (1000 * 60);
 
- if (minutesSinceAccept >= 1440   && !inv.reviewReminderSentAt) {
-  await sendReminderEmail(manuscript, inv);
-  inv.reviewReminderSentAt = now;
-  reminded++;           // ✅ add this
-  saveNeeded = true;
-}
+                if (minutesSinceAccept >= 1440 && !inv.reviewReminderSentAt) {
+                    await sendReminderEmail(manuscript, inv);
+                    inv.reviewReminderSentAt = now;
+                    reminded++;           // ✅ add this
+                    saveNeeded = true;
+                }
 
-    if (minutesSinceAccept >= 7200 && !inv.isReviewBlocked) {
-  await sendAccessRevokedEmail(manuscript, inv);
-  inv.isReviewBlocked = true;
-  inv.reviewBlockedAt = now;
-  inv.status = "blocked";
-  blocked++;            // ✅ add this
-  saveNeeded = true;
-}
-  }
+                if (minutesSinceAccept >= 7200 && !inv.isReviewBlocked) {
+                    await sendAccessRevokedEmail(manuscript, inv);
+                    inv.isReviewBlocked = true;
+                    inv.reviewBlockedAt = now;
+                    inv.status = "expired";
+                    blocked++;            // ✅ add this
+                    saveNeeded = true;
+                }
+            }
 
             if (saveNeeded) await manuscript.save();
         }
@@ -135,7 +135,7 @@ const sendAccessRevokedEmail = async (manuscript, inv) => {
 
     await sendEmail({
         to: inv.email,
-        bcc: 'synergyworldpress@gmail.com', 
+        bcc: 'synergyworldpress@gmail.com',
         subject: `Review Assignment Withdrawn – "${manuscript.title}"`,
         html
     });
