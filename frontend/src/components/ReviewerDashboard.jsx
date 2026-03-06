@@ -518,12 +518,11 @@ function ReviewerDashboard() {
                   acceptedAt: reviewerInvitation?.acceptedAt
                 });
 
-                // Check blocked
+                // Check blocked (review deadline expired - distinguished by isReviewBlocked flag)
                 const isBlocked =
-                  reviewerInvitation?.status === "blocked" ||
                   reviewerInvitation?.isReviewBlocked === true ||
                   allReviewerInvitations.some(
-                    (inv) => inv.status === "blocked" || inv.isReviewBlocked === true
+                    (inv) => inv.isReviewBlocked === true
                   );
 
                 // Check accepted

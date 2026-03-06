@@ -27,8 +27,7 @@ function EditorDashboard() {
 
 				console.log("Fetching users with token:", user.token); // Debug log
 				const response = await axios.get(
-					`${
-						import.meta.env.VITE_BACKEND_URL
+					`${import.meta.env.VITE_BACKEND_URL
 					}/api/auth/editor/users-with-manuscripts`,
 					{
 						headers: {
@@ -57,8 +56,7 @@ function EditorDashboard() {
 
 				console.log("Fetching reviewers with token:", user.token); // Debug log
 				const response = await axios.get(
-					`${
-						import.meta.env.VITE_BACKEND_URL
+					`${import.meta.env.VITE_BACKEND_URL
 					}/api/auth/editor/reviewers`,
 					{
 						headers: {
@@ -123,8 +121,7 @@ function EditorDashboard() {
 
 				// Add the note first
 				await axios.post(
-					`${
-						import.meta.env.VITE_BACKEND_URL
+					`${import.meta.env.VITE_BACKEND_URL
 					}/api/auth/editor/manuscripts/${manuscriptId}/notes`,
 					noteData,
 					{
@@ -138,8 +135,7 @@ function EditorDashboard() {
 			if (newStatus === "Under Review") {
 				// First assign reviewers
 				await axios.put(
-					`${
-						import.meta.env.VITE_BACKEND_URL
+					`${import.meta.env.VITE_BACKEND_URL
 					}/api/manuscripts/${manuscriptId}/assign-reviewers`,
 					{ reviewers: selectedReviewers },
 					{
@@ -152,8 +148,7 @@ function EditorDashboard() {
 
 			// Then update the status
 			await axios.patch(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${manuscriptId}/status`,
 				{ status: newStatus },
 				{
@@ -176,8 +171,7 @@ function EditorDashboard() {
 			setSelectedReviewers([]);
 
 			alert(
-				`Manuscript ${
-					newStatus === "Rejected" ? "rejected" : "sent for review"
+				`Manuscript ${newStatus === "Rejected" ? "rejected" : "sent for review"
 				} successfully`
 			);
 		} catch (error) {
@@ -225,8 +219,7 @@ function EditorDashboard() {
 			);
 
 			await axios.patch(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/${manuscriptId}/status`,
 				{ status: newStatus },
 				{
@@ -261,8 +254,7 @@ function EditorDashboard() {
 			);
 
 			await axios.patch(
-				`${
-					import.meta.env.VITE_BACKEND_URL
+				`${import.meta.env.VITE_BACKEND_URL
 				}/api/auth/editor/manuscripts/bulk-update-status`,
 				{
 					manuscriptIds,
@@ -318,8 +310,7 @@ function EditorDashboard() {
 	const handleAcceptManuscript = async () => {
 		try {
 			await axios.put(
-				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${
-					selectedManuscript._id
+				`${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${selectedManuscript._id
 				}/status`,
 				{
 					status: "Accepted",
@@ -429,15 +420,13 @@ function EditorDashboard() {
 								<button
 									key={index}
 									onClick={() => handleUserClick(user)}
-									className={`w-full text-left p-3 rounded-lg transition-all ${
-										selectedUser === user
+									className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser === user
 											? "bg-[#496580] text-white"
 											: "bg-[#f8fafc] text-[#1a365d] hover:bg-gray-100"
-									}`}
+										}`}
 								>
-									{`${user.firstName} ${
-										user.middleName || ""
-									} ${user.lastName}`}{" "}
+									{`${user.firstName} ${user.middleName || ""
+										} ${user.lastName}`}{" "}
 									- {user.email}
 								</button>
 							))}
@@ -460,11 +449,10 @@ function EditorDashboard() {
 										onClick={() =>
 											setShowBulkActions(!showBulkActions)
 										}
-										className={`px-3 py-1 text-sm rounded ${
-											showBulkActions
+										className={`px-3 py-1 text-sm rounded ${showBulkActions
 												? "bg-red-500 text-white hover:bg-red-600"
 												: "bg-blue-500 text-white hover:bg-blue-600"
-										}`}
+											}`}
 									>
 										{showBulkActions
 											? "❌ Cancel Bulk"
@@ -612,24 +600,23 @@ function EditorDashboard() {
 														Status:
 													</p>
 													<span
-														className={`px-2 py-1 rounded text-xs font-semibold ${
-															manuscript.status ===
-															"Pending"
+														className={`px-2 py-1 rounded text-xs font-semibold ${manuscript.status ===
+																"Pending"
 																? "bg-blue-100 text-blue-800"
 																: manuscript.status ===
-																  "Under Review"
-																? "bg-yellow-100 text-yellow-800"
-																: manuscript.status ===
-																  "Reviewed"
-																? "bg-purple-100 text-purple-800"
-																: manuscript.status ===
-																  "Accepted"
-																? "bg-green-100 text-green-800"
-																: manuscript.status ===
-																  "Rejected"
-																? "bg-red-100 text-red-800"
-																: "bg-gray-100 text-gray-800"
-														}`}
+																	"Under Review"
+																	? "bg-yellow-100 text-yellow-800"
+																	: manuscript.status ===
+																		"Reviewed"
+																		? "bg-purple-100 text-purple-800"
+																		: manuscript.status ===
+																			"Accepted"
+																			? "bg-green-100 text-green-800"
+																			: manuscript.status ===
+																				"Rejected"
+																				? "bg-red-100 text-red-800"
+																				: "bg-gray-100 text-gray-800"
+															}`}
 													>
 														{manuscript.status}
 													</span>
@@ -665,19 +652,18 @@ function EditorDashboard() {
 																"Pending"
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Pending"
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
+																"Pending"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-blue-500 text-white hover:bg-blue-600"
-														}`}
+															}`}
 														disabled={
 															manuscript.status ===
 															"Pending"
 														}
 													>
 														{manuscript.status ===
-														"Pending"
+															"Pending"
 															? "✓ Currently Pending"
 															: "🔄 Set to Pending"}
 													</button>
@@ -690,19 +676,18 @@ function EditorDashboard() {
 																"review"
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Under Review"
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
+																"Under Review"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-[#496580] text-white hover:bg-[#3a5269]"
-														}`}
+															}`}
 														disabled={
 															manuscript.status ===
 															"Under Review"
 														}
 													>
 														{manuscript.status ===
-														"Under Review"
+															"Under Review"
 															? "✓ Under Review"
 															: "👥 Send to Review"}
 													</button>
@@ -715,19 +700,18 @@ function EditorDashboard() {
 																"Reviewed"
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Reviewed"
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
+																"Reviewed"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-purple-500 text-white hover:bg-purple-600"
-														}`}
+															}`}
 														disabled={
 															manuscript.status ===
 															"Reviewed"
 														}
 													>
 														{manuscript.status ===
-														"Reviewed"
+															"Reviewed"
 															? "✓ Reviewed"
 															: "✅ Mark as Reviewed"}
 													</button>
@@ -739,19 +723,18 @@ function EditorDashboard() {
 																manuscript
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Accepted"
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
+																"Accepted"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-green-500 text-white hover:bg-green-600"
-														}`}
+															}`}
 														disabled={
 															manuscript.status ===
 															"Accepted"
 														}
 													>
 														{manuscript.status ===
-														"Accepted"
+															"Accepted"
 															? "✓ Accepted"
 															: "🎉 Accept"}
 													</button>
@@ -764,19 +747,18 @@ function EditorDashboard() {
 																"reject"
 															)
 														}
-														className={`px-3 py-1 text-sm rounded ${
-															manuscript.status ===
-															"Rejected"
+														className={`px-3 py-1 text-sm rounded ${manuscript.status ===
+																"Rejected"
 																? "bg-gray-400 text-white cursor-not-allowed"
 																: "bg-red-500 text-white hover:bg-red-600"
-														}`}
+															}`}
 														disabled={
 															manuscript.status ===
 															"Rejected"
 														}
 													>
 														{manuscript.status ===
-														"Rejected"
+															"Rejected"
 															? "✓ Rejected"
 															: "❌ Reject"}
 													</button>
@@ -792,65 +774,65 @@ function EditorDashboard() {
 													{/* Auto-workflow buttons */}
 													{manuscript.status ===
 														"Under Review" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Pending"
-																)
-															}
-															className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-														>
-															🔙 Reset to Pending
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Pending"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+															>
+																🔙 Reset to Pending
+															</button>
+														)}
 
 													{manuscript.status ===
 														"Pending" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Under Review"
-																)
-															}
-															className="px-3 py-1 text-sm bg-[#496580] text-white rounded hover:bg-[#3a5269]"
-														>
-															🚀 Quick Send to
-															Review
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Under Review"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-[#496580] text-white rounded hover:bg-[#3a5269]"
+															>
+																🚀 Quick Send to
+																Review
+															</button>
+														)}
 
 													{manuscript.status ===
 														"Under Review" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Reviewed"
-																)
-															}
-															className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
-														>
-															✅ Auto-Mark
-															Reviewed
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Reviewed"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-purple-500 text-white rounded hover:bg-purple-600"
+															>
+																✅ Auto-Mark
+																Reviewed
+															</button>
+														)}
 
 													{manuscript.status ===
 														"Reviewed" && (
-														<button
-															onClick={() =>
-																handleDirectStatusUpdate(
-																	manuscript._id,
-																	"Accepted"
-																)
-															}
-															className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
-														>
-															🎯 Auto-Accept
-														</button>
-													)}
+															<button
+																onClick={() =>
+																	handleDirectStatusUpdate(
+																		manuscript._id,
+																		"Accepted"
+																	)
+																}
+																className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+															>
+																🎯 Auto-Accept
+															</button>
+														)}
 												</div>
 											</div>
 										</div>
@@ -859,7 +841,7 @@ function EditorDashboard() {
 									{/* Note Input Section */}
 									{showNoteInput &&
 										selectedManuscript?._id ===
-											manuscript._id && (
+										manuscript._id && (
 											<div className="mt-4 border-t border-[#e2e8f0] pt-4">
 												{showNoteInput === "review" && (
 													<>
@@ -906,16 +888,16 @@ function EditorDashboard() {
 																									.target
 																									.checked
 																									? [
-																											...prev,
-																											reviewerId,
-																									  ]
+																										...prev,
+																										reviewerId,
+																									]
 																									: prev.filter(
-																											(
-																												id
-																											) =>
-																												id !==
-																												reviewerId
-																									  )
+																										(
+																											id
+																										) =>
+																											id !==
+																											reviewerId
+																									)
 																						);
 																					}}
 																					className="form-checkbox h-5 w-5 text-[#496580]"
@@ -976,12 +958,11 @@ function EditorDashboard() {
 																}
 																className="px-4 py-2 bg-[#496580] text-white rounded hover:bg-[#3a5269] disabled:opacity-50 disabled:cursor-not-allowed"
 															>
-																{`Confirm Send to Review${
-																	selectedReviewers.length >
-																	0
+																{`Confirm Send to Review${selectedReviewers.length >
+																		0
 																		? ` (${selectedReviewers.length} selected)`
 																		: ""
-																}`}
+																	}`}
 															</button>
 														</div>
 													</>
