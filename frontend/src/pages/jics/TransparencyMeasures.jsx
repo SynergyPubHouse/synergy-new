@@ -5,7 +5,7 @@ const TransparencyMeasures = () => (
     <h2 className="text-3xl font-extrabold text-[#00796b] mb-6 tracking-tight">
       Transparency Measures
     </h2>
-    
+
     <p className="text-[#212121] mb-8 text-lg leading-relaxed text-justify">
       To ensure fairness and transparency in our peer review process, we implement the following measures:
     </p>

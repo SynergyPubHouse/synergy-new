@@ -29,7 +29,7 @@ const formatScholarDate = (dateString) => {
 router.get('/article/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         console.log('[Scholar Route] Requested ID:', id);
 
         // Validate MongoDB ObjectId
@@ -122,7 +122,7 @@ router.get('/article/:id', async (req, res) => {
 
 // HTML Generator Function
 function generateScholarHtml({ article, authors, correspondingAuthor, publishedDate, isoDate, pdfUrl, articleUrl, baseUrl }) {
-    
+
     const schemaData = {
         "@context": "https://schema.org",
         "@type": "ScholarlyArticle",

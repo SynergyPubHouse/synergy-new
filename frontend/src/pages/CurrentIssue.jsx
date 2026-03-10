@@ -61,12 +61,26 @@ const CurrentIssue = () => {
     return `pp. ${article.pageStart}-${article.pageEnd}`;
   };
 
+  const formatIssueDate = (article) => {
+    if (article.issueTitle) return `${article.issueTitle} ${article.issueYear || ''}`.trim();
+
+    if (article.publishedAt) {
+      return new Date(article.publishedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+
+    return article.issueYear ? article.issueYear.toString() : '';
+  };
+
   if (authLoading || loading) {
     return <div className="text-center mt-20 text-lg">Loading...</div>;
   }
 
   if (error) return <div className="text-center mt-20 text-red-500">{error}</div>;
-  
+
   if (!articles || articles.length === 0) {
     return <div className="text-center mt-20 text-gray-500">No current issues available.</div>;
   }
@@ -109,23 +123,30 @@ const CurrentIssue = () => {
 
               {/* Badges */}
               <div className="flex flex-wrap gap-2 mb-3">
+                {/* Journal Name Badge */}
+                <span className="px-2 py-1 bg-[#e0f2f1] text-[#00796b] text-xs font-medium rounded-md border border-[#00796b]/20">
+                  📚 JICS
+                </span>
+
+                {/* Volume & Issue Badge */}
+                {(item.issueVolume || item.issueNumber) && (
+                  <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-md border border-purple-200">
+                    🏷️ Vol. {item.issueVolume || '-'}, Issue {item.issueNumber || '-'}
+                  </span>
+                )}
                 {item.section && (
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-md border border-blue-200">
                     📂 {item.section}
                   </span>
                 )}
                 {formatPageInfo(item) && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-md border border-green-200">
                     📄 {formatPageInfo(item)}
                   </span>
                 )}
                 {item.publishedAt && (
-                  <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                    📅 {new Date(item.publishedAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
+                  <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md border border-gray-200">
+                    📅 {formatIssueDate(item)}
                   </span>
                 )}
               </div>
@@ -137,17 +158,17 @@ const CurrentIssue = () => {
 
               {/* Actions */}
               <div className="flex justify-between items-center">
-              <a
-  href={`/journal/jics/articles/${item._id}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="inline-flex items-center gap-2 text-[#00acc1] font-semibold hover:text-[#00796b] transition-all hover:gap-3"
->
-  Read Full Article
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-  </svg>
-</a>
+                <a
+                  href={`/journal/jics/articles/${item._id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-[#00acc1] font-semibold hover:text-[#00796b] transition-all hover:gap-3"
+                >
+                  Read Full Article
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
                 {item.publishedFileUrl ? (
                   <a
                     href={item.publishedFileUrl}

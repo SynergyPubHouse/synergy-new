@@ -17,6 +17,51 @@ const Overview = () => (
         There are no publication or article processing charges (APCs). We are committed to supporting open-access publishing while ensuring that authors face no financial barriers in disseminating their work.
       </p>
 
+      {/* Publication Details Table */}
+      <div className="mt-10 overflow-hidden rounded-xl border border-gray-200 shadow-sm">
+        <div className="bg-[#00796b] px-6 py-3">
+          <h3 className="text-white font-bold text-lg">About the Publication</h3>
+        </div>
+        <table className="w-full text-left border-collapse">
+          <tbody>
+            <tr className="border-b border-gray-100">
+              <th className="px-6 py-4 bg-gray-50 text-sm font-bold text-[#00796b] w-1/3">Journal Title</th>
+              <td className="px-6 py-4 text-sm text-gray-700">Journal of Intelligent Computing System (JICS)</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <th className="px-6 py-4 bg-gray-50 text-sm font-bold text-[#00796b]">Starting Year</th>
+              <td className="px-6 py-4 text-sm text-gray-700">2024</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <th className="px-6 py-4 bg-gray-50 text-sm font-bold text-[#00796b]">Frequency</th>
+              <td className="px-6 py-4 text-sm text-gray-700">Quarterly (4 issues per year)</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <th className="px-6 py-4 bg-gray-50 text-sm font-bold text-[#00796b]">Format</th>
+              <td className="px-6 py-4 text-sm text-gray-700">Online / Open Access</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <th className="px-6 py-4 bg-gray-50 text-sm font-bold text-[#00796b]">Subject</th>
+              <td className="px-6 py-4 text-sm text-gray-700">Computer Science, Artificial Intelligence, Machine Learning</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <th className="px-6 py-4 bg-gray-50 text-sm font-bold text-[#00796b]">Language</th>
+              <td className="px-6 py-4 text-sm text-gray-700">English</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <th className="px-6 py-4 bg-gray-50 text-sm font-bold text-[#00796b]">Publisher Name</th>
+              <td className="px-6 py-4 text-sm text-gray-700">Synergy World Press</td>
+            </tr>
+            <tr>
+              <th className="px-6 py-4 bg-gray-50 text-sm font-bold text-[#00796b]">Publisher Address</th>
+              <td className="px-6 py-4 text-sm text-gray-700">
+                S4, 904, Harmony Homes, Panipat, Haryana, 132103, INDIA
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       {/* Editorial Leadership - Single Card */}
       <div className="mt-10 border-l-4 border-[#00796b] bg-gradient-to-r from-gray-50 to-white p-6 rounded-r-xl shadow-sm hover:shadow-md transition-all duration-300">
         {/* Header with Title & Link */}
