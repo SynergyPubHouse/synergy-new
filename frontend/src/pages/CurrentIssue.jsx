@@ -129,14 +129,14 @@ const CurrentIssue = () => {
                 </span>
 
                 {/* Volume & Issue Badge */}
-                {(item.issueVolume || item.issueNumber) && (
-                  <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-md border border-purple-200">
-                    🏷️ Vol. {item.issueVolume || '-'}, Issue {item.issueNumber || '-'}
-                  </span>
-                )}
                 {item.section && (
                   <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-md border border-blue-200">
                     📂 {item.section}
+                  </span>
+                )}
+                {(item.issueVolume || item.issueNumber) && (
+                  <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-md border border-purple-200">
+                    🏷️ Vol. {item.issueVolume || '-'}, Issue {item.issueNumber || '-'}
                   </span>
                 )}
                 {formatPageInfo(item) && (
