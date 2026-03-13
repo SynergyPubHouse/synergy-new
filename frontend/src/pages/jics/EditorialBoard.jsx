@@ -144,9 +144,63 @@ const editorialMembers = [
   { name: 'Dr. Debabrata Bej', affiliation: 'Indian Institute of Technology Kharagpur, India', specialization: 'Sensor, Embedded system and IoT', role: 'Area Editors' },
   { name: 'Mohan Krishna Mannava', affiliation: 'University of Connecticut, USA', specialization: 'Big Data Analytics & Machine Learning', role: 'Associate Editors' },
   { name: 'Milankumar Rana', affiliation: 'University of the Cumberlands, USA', specialization: 'Cloud Computing, Quantum Computing, AIOps, MLOps', role: 'Area Editors' },
-  { name: 'Monu Sharma', affiliation: 'Valley Health System, Winchester Virginia, USA', role: 'Editorial Team Member' },
-  { name: 'Dr. Ahmed Hussein Ali', affiliation: 'Al-Iraqia University, Baghdad, Iraq', role: 'Editorial Team Member' },
+  {
+    name: 'Monu Sharma',
+    designation: 'Sr. IT Solutions Architect',
+    affiliation: 'Valley Health System, Winchester, Virginia, USA',
+    email: 'monu.sharma@ieee.org',
+    role: 'Editorial Team Member'
+  },
+  {
+    name: 'Dr. Ahmed Hussein Ali',
+    designation: 'Assistant Professor',
+    department: 'Computer Science',
+    affiliation: 'Al-Iraqia University, Baghdad, Iraq',
+    email: 'ahmed.ali@aliraqia.edu.iq',
+    role: 'Editorial Team Member'
+  },
+  {
+    name: 'Dr. Shakeel Ahmed',
+    designation: 'Associate Professor',
+    department: 'School of Computer Science, Faculty of Innovation and Technology',
+    affiliation: "Taylor's University, Subang Jaya 47500, Selangor, Malaysia",
+    email: 'shakeel.ahmed@taylors.edu.sa',
+    role: 'Editorial Team Member'
+  },
+  {
+    name: 'Prof. (Dr.) Anand Nayyar',
+    designation: 'Professor, Scientist, Vice-Chairman (Research) and Director (IoT and Intelligent Systems Lab)',
+    department: 'School of Computer Science and Artificial Intelligence (SCA)',
+    affiliation: 'Duy Tan University, Da Nang 550000, Viet Nam',
+    email: 'anandnayyar@duytan.edu.vn',
+    role: 'Editorial Team Member'
+  },
+  {
+    name: 'Dr. Parvathaneni Naga Srinivasu',
+    designation: 'Research Head and Associate Professor',
+    department: 'Amrita School of Computing',
+    affiliation: 'Amrita Vishwa Vidyapeetham, Amaravati Campus, Amaravati 522503, Andhra Pradesh.',
+    email: 'p_nagasrinivasu@av.amrita.edu',
+    role: 'Editorial Team Member'
+  },
+  {
+    name: 'Dr. Hemanth.K.S',
+    designation: 'Associate Professor',
+    department: 'Department of Computer Science',
+    affiliation: 'Christ University Yeshwanthpur Campus, Nalagadderanahalli, Peenya, Bengaluru, Karnataka 560073.',
+    email: 'hemanth.ks@christuniversity.in',
+    role: 'Editorial Team Member'
+  },
+  {
+    name: 'Dr. Nassreddine, Ghalia',
+    designation: 'Chairperson and Associate Professor',
+    department: 'Information Technology and Systems',
+    affiliation: 'Rafik Hariri University, Lebanon',
+    email: 'nassreddinega@rhu.edu.lb',
+    role: 'Editorial Team Member'
+  },
 ];
+
 
 // Gender diversity data
 const genderData = [
@@ -158,10 +212,10 @@ const genderData = [
 
 // Role order for display
 const roleOrder = [
-  'Managing Editor',
-  'Area Editors',
-  'Associate Editors',
   'Editorial Team Member',
+  'Associate Editors',
+  'Area Editors',
+  'Managing Editor',
   'Honorary Editor',
   'Editorial Board',
   'Former Associate Editors',
@@ -527,9 +581,9 @@ const GenderDiversity = () => (
 );
 
 // Editor Card Component
-const EditorCard = ({ name, affiliation, specialization }) => (
-  <div className="bg-white border border-gray-100 rounded-xl p-5 hover:shadow-lg hover:border-[#00796b]/30 transition-all duration-300 group">
-    <div className="flex items-start gap-4">
+const EditorCard = ({ name, designation, department, affiliation, email, specialization }) => (
+  <div className="bg-white border border-gray-100 rounded-xl p-5 hover:shadow-lg hover:border-[#00796b]/30 transition-all duration-300 group h-full">
+    <div className="flex items-start gap-4 h-full">
       {/* Avatar */}
       <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00796b] to-[#26a69a] flex items-center justify-center text-white font-bold text-lg flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
         {name.charAt(0).toUpperCase()}
@@ -540,7 +594,15 @@ const EditorCard = ({ name, affiliation, specialization }) => (
         <h4 className="text-base font-bold text-[#212121] group-hover:text-[#00796b] transition-colors">
           {name}
         </h4>
-        <p className="text-sm text-gray-500 mt-1 line-clamp-1">{affiliation}</p>
+        {designation && <p className="text-sm font-medium text-[#00796b] mt-1">{designation}</p>}
+        {department && <p className="text-xs font-semibold text-gray-700 mt-1">{department}</p>}
+        <p className="text-xs text-gray-600 mt-1 leading-relaxed">{affiliation}</p>
+        {email && (
+          <a href={`mailto:${email}`} className="text-xs text-[#00796b] hover:underline mt-1 inline-flex items-center gap-1">
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+            <span className="truncate">{email}</span>
+          </a>
+        )}
         {specialization && (
           <p className="text-xs text-[#00796b]/80 mt-2 line-clamp-1">
             {specialization}
@@ -650,7 +712,10 @@ const EditorialBoard = () => {
                     <EditorCard
                       key={index}
                       name={member.name}
+                      designation={member.designation}
+                      department={member.department}
                       affiliation={member.affiliation}
+                      email={member.email}
                       specialization={member.specialization}
                     />
                   ))}

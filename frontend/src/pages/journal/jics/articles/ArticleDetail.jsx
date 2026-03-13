@@ -415,6 +415,21 @@ const ArticleDetail = () => {
     });
   };
 
+  // Format Issue Date (e.g., "Jan 28, 2026")
+  const formatIssueDate = () => {
+    // If the editor manually specified an issue title (e.g., "Special Issue"), use it
+    if (article.issueTitle) return `${article.issueTitle} ${article.issueYear || ''}`.trim();
+
+    if (article.publishedAt) {
+      return new Date(article.publishedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+    return article.issueYear || '';
+  };
+
   // Parse classification
   const parseClassification = (classification) => {
     if (!classification) return [];
@@ -439,6 +454,13 @@ const ArticleDetail = () => {
 
       <div className="container mx-auto px-6 md:px-20">
         <div className="bg-white rounded-xl shadow-md p-6 border border-[#e0e0e0] mt-[50px]">
+          {/* Bibliographic Details Banner */}
+          {hasIssueInfo && (
+            <p className="text-sm font-semibold text-[#00796b] uppercase tracking-wider mb-3 flex items-center flex-wrap gap-2">
+              <span>Volume {article.issueVolume}, Issue {article.issueNumber}, {formatIssueDate()}</span>
+            </p>
+          )}
+
           {/* Title with View Count Badge */}
           <div className="mb-6">
             <div className="flex justify-between items-start flex-wrap gap-4">
@@ -504,7 +526,7 @@ const ArticleDetail = () => {
                   <p className="text-lg font-semibold text-gray-800">
                     Vol {article.issueVolume}, No {article.issueNumber}
                   </p>
-                  <p className="text-sm text-gray-600">{article.issueYear}</p>
+                  <p className="text-sm text-gray-600">{formatIssueDate()}</p>
                 </div>
 
                 {/* Section */}

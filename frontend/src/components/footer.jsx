@@ -91,7 +91,7 @@ function Footer() {
             <p className="mt-4">
               Need help? <br />
               <a href="mailto:support@synergyworldpress.com" className="text-[#00acc1] hover:text-[#0097a7]">
-                synergyworldpress@gmail.com
+                support@synergyworldpress.com, synergyworldpress@gmail.com
               </a>
             </p>
           </div>

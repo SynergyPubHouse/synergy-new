@@ -45,8 +45,7 @@ function ContactUs() {
               <FaMapMarkerAlt className="text-[#00acc1] text-2xl mx-auto" />
               <h3 className="text-lg font-semibold text-[#00796b] mt-3">Our Office</h3>
               <p className="mt-2 text-[#212121]">
-                S4, 904, Harmony Homes, Panipat Haryana, 132103<br />
-                Mohali, INDIA
+                S4, 904, Harmony Homes, Panipat, Haryana, 132103<br />INDIA
               </p>
             </motion.div>
 
