@@ -11,6 +11,9 @@ RewriteRule ^robots\.txt$ https://api.synergyworldpress.com/robots.txt [R=301,L]
 # 2. CRAWLERS / BOTS ONLY – Serve Scholar HTML with full meta tags
 #    This is critical for Google Scholar, Rich Results Test, Bing, etc.
 # ================================================
+RewriteCond %{HTTP_USER_AGENT} (Googlebot|Googlebot-Scholar|Google-InspectionTool|Bingbot|Yandex|DuckDuckBot|Baiduspider|facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Discordbot|Applebot) [NC]
+RewriteRule ^journal/jics/articles/current/?$ https://api.synergyworldpress.com/scholar/articles-listing [R=302,L]
+
 RewriteCond %{HTTP_USER_AGENT} (Googlebot|Google-InspectionTool|Bingbot|Yandex|DuckDuckBot|Baiduspider|facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Discordbot|Applebot) [NC]
 RewriteRule ^journal/jics/articles/([a-f0-9]{24})/?$ https://api.synergyworldpress.com/scholar/article/$1 [R=302,L]
 
