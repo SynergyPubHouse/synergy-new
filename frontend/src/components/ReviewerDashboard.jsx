@@ -28,8 +28,10 @@ function ReviewerDashboard() {
   const [reviewTexts, setReviewTexts] = useState({}); // { [manuscriptId]: string }
   const [recommendations, setRecommendations] = useState({}); // { [manuscriptId]: string }
   const [pendingInvitations, setPendingInvitations] = useState([]);
+  const [completedReviews, setCompletedReviews] = useState([]);
   const [showRejectForm, setShowRejectForm] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [certificateFilter, setCertificateFilter] = useState("all");
 
   const fetchManuscripts = useCallback(async () => {
     try {
@@ -146,12 +148,30 @@ function ReviewerDashboard() {
     }
   }, [user]);
 
+  const fetchCompletedReviews = useCallback(async () => {
+    try {
+      if (!user || !user.token) return;
+
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/completed-reviews`,
+        {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }
+      );
+      setCompletedReviews(response.data);
+    } catch (error) {
+      console.error("Error fetching completed reviews:", error);
+    }
+  }, [user]);
+
+
   useEffect(() => {
     if (user && user.token) {
       fetchManuscripts();
       fetchInvitations();
+      fetchCompletedReviews();
     }
-  }, [user, fetchManuscripts, fetchInvitations]);
+  }, [user, fetchManuscripts, fetchInvitations, fetchCompletedReviews]);
 
   const handleUserClick = (user) => {
     console.log("=== Reviewer Dashboard Debug ===");
@@ -346,6 +366,65 @@ function ReviewerDashboard() {
       (finalStatus) => status?.toLowerCase() === finalStatus.toLowerCase()
     );
   };
+  const handleDownloadCertificate = async (month, year) => {
+    try {
+      if (!user || !user.token) {
+        alert("You must be logged in to download certificates");
+        navigate("/login");
+        return;
+      }
+
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/certificates/download?month=${month}&year=${year}`,
+        {
+          headers: { Authorization: `Bearer ${user.token}` },
+          responseType: 'blob', // Important for file downloads
+        }
+      );
+
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+      ];
+      const monthName = monthNames[month];
+
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Certificate_of_Reviewing_${monthName}_${year}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading certificate:", error);
+      alert(error.response?.data?.message || "Failed to download certificate. It may not be available yet.");
+    }
+  };
+
+  const filteredCertificates = completedReviews.filter((review) => {
+    if (certificateFilter === "all") return true;
+
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    if (certificateFilter === "thisMonth") {
+      return review.month === currentMonth && review.year === currentYear;
+    }
+
+    if (certificateFilter === "past3Months") {
+      const reviewDate = new Date(review.year, review.month, 1);
+      const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, 1); // -2 because current month is inclusive
+      return reviewDate >= threeMonthsAgo;
+    }
+
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f0f4f8] to-[#d9e2ec] p-8">
       <div className="max-w-7xl mx-auto">
@@ -441,6 +520,101 @@ function ReviewerDashboard() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Completed Reviews / Certificates Section */}
+        {completedReviews.length > 0 && (
+          <div className="bg-white rounded-lg p-6 shadow-lg border border-[#e2e8f0] mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 border-b border-[#e2e8f0] pb-4">
+              <h2 className="text-2xl font-semibold text-[#496580] mb-4 md:mb-0">
+                📜 My Monthly Certificates ({filteredCertificates.length})
+              </h2>
+
+              <div className="flex bg-gray-100 rounded-full p-1 border border-gray-200 shadow-sm self-start md:self-auto">
+                <button
+                  onClick={() => setCertificateFilter("thisMonth")}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                    certificateFilter === "thisMonth"
+                      ? "bg-white text-[#10b981] shadow"
+                      : "text-gray-500 hover:text-[#496580]"
+                  }`}
+                >
+                  This Month
+                </button>
+                <button
+                  onClick={() => setCertificateFilter("past3Months")}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                    certificateFilter === "past3Months"
+                      ? "bg-white text-[#10b981] shadow"
+                      : "text-gray-500 hover:text-[#496580]"
+                  }`}
+                >
+                  Past 3 Months
+                </button>
+                <button
+                  onClick={() => setCertificateFilter("all")}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                    certificateFilter === "all"
+                      ? "bg-white text-[#10b981] shadow"
+                      : "text-gray-500 hover:text-[#496580]"
+                  }`}
+                >
+                  All Time
+                </button>
+              </div>
+            </div>
+
+            {filteredCertificates.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-gray-500 text-lg">No certificates found for this time period.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredCertificates.map((review) => {
+                const unlockDate = new Date(review.unlockDate);
+                const monthNames = [
+                  "January", "February", "March", "April", "May", "June",
+                  "July", "August", "September", "October", "November", "December",
+                ];
+                const monthName = monthNames[review.month];
+                
+                return (
+                  <div
+                    key={`${review.year}-${review.month}`}
+                    className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0] flex flex-col justify-between"
+                  >
+                    <div>
+                      <h3 className="text-xl font-semibold text-[#1a365d] mb-1">
+                        {monthName} {review.year}
+                      </h3>
+                      <p className="text-[#496580] font-medium text-sm mb-1">
+                        Manuscripts Reviewed: <span className="text-[#10b981] font-bold text-lg">{review.reviewCount}</span>
+                      </p>
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-[#e2e8f0]">
+                      {review.isUnlocked ? (
+                        <button
+                          onClick={() => handleDownloadCertificate(review.month, review.year)}
+                          className="w-full px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] transition duration-200 flex items-center justify-center space-x-2"
+                        >
+                          <span>⬇️ Download Certificate</span>
+                        </button>
+                      ) : (
+                        <div className="w-full px-4 py-2 bg-gray-100 text-gray-500 rounded text-center border border-gray-200 cursor-not-allowed text-sm">
+                          <span className="block font-medium mb-1">🔒 Locked</span>
+                          <span className="text-xs">
+                            Available after {unlockDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric', day: 'numeric' })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              </div>
+            )}
           </div>
         )}
 

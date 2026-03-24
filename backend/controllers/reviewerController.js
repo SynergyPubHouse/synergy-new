@@ -534,22 +534,15 @@ exports.submitReview = async (req, res) => {
         try {
           const reviewerName = formatFullName(reviewer);
           console.log(
-            `[Certificate] Generating certificate for reviewer: ${reviewerName} (${reviewer.email})`
+            `[Certificate] Sending thank you email for reviewer: ${reviewerName} (${reviewer.email})`
           );
-
-          const pdfBuffer = await generateCertificatePdf({
-            reviewerName,
-            date: new Date(),
-          });
 
           await sendEmail({
             to: reviewer.email,
-            subject: "Certificate of Reviewing – JICS",
+            subject: "Thank You for Reviewing – JICS",
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: linear-gradient(135deg, #1a3a6e 0%, #2563EB 100%); color: white; padding: 25px; text-align: center;">
-                  <h1 style="margin: 0; font-size: 22px;">🎓 Certificate of Reviewing</h1>
-                </div>
+              
                 <div style="padding: 25px;">
                   <p style="color: #374151; font-size: 15px;">Dear ${reviewerName},</p>
                   <p style="color: #374151; font-size: 15px;">
@@ -557,8 +550,9 @@ exports.submitReview = async (req, res) => {
                     in the <strong>Journal of Intelligent Computing System (JICS)</strong>.
                   </p>
                   <p style="color: #374151; font-size: 15px;">
-                    Please find your <strong>Certificate of Reviewing</strong> attached to this email.
+                    Your <strong>Monthly Certificate of Reviewing</strong> will be available to download from your Reviewer Dashboard on the 1st of the upcoming month, which aggregates your contributions for this month.
                   </p>
+                  
                   <p style="color: #6B7280; font-size: 13px; margin-top: 30px;">
                     Warm regards,<br/>The Editorial Team<br/>Synergy World Press
                   </p>
@@ -570,22 +564,15 @@ exports.submitReview = async (req, res) => {
                 </div>
               </div>
             `,
-            attachments: [
-              {
-                filename: "Certificate_of_Reviewing_JICS.pdf",
-                content: pdfBuffer,
-                contentType: "application/pdf",
-              },
-            ],
           });
 
           console.log(
-            `[Certificate] Certificate emailed successfully to ${reviewer.email}`
+            `[Certificate] Thank you email sent successfully to ${reviewer.email}`
           );
-        } catch (certError) {
+        } catch (emailErr) {
           console.error(
-            "[Certificate] Failed to generate/send certificate:",
-            certError
+            "[Certificate] Failed to send thank you email:",
+            emailErr
           );
         }
       })();
@@ -1001,6 +988,161 @@ exports.rejectInvitation = async (req, res) => {
     res.status(500).json({
       message: "Error rejecting invitation",
       error: error.message,
+    });
+  }
+};
+
+// Get completed reviews for certificates (Aggregated by month)
+exports.getCompletedReviews = async (req, res) => {
+  try {
+    const reviewerEmail = req.user.email.toLowerCase().trim();
+
+    // Find all manuscripts where this reviewer has a submitted review
+    const manuscripts = await Manuscript.find({
+      invitations: {
+        $elemMatch: {
+          email: reviewerEmail,
+          status: "accepted",
+          reviewSubmittedAt: { $ne: null }
+        }
+      }
+    })
+      .select("invitations customId")
+      .lean();
+
+    // Group reviews by month-year
+    const monthlyGroups = {};
+
+    manuscripts.forEach(manuscript => {
+      // Find the specific invitation that corresponds to the submitted review
+      const acceptedInvitations = manuscript.invitations.filter((inv) =>
+        inv.email.toLowerCase() === reviewerEmail && inv.status === "accepted" && inv.reviewSubmittedAt
+      );
+
+      if (acceptedInvitations.length === 0) return;
+
+      // Latest submitted invitation
+      const latestInvitation = acceptedInvitations.sort((a, b) => {
+        return new Date(b.reviewSubmittedAt) - new Date(a.reviewSubmittedAt);
+      })[0];
+
+      const submittedDate = new Date(latestInvitation.reviewSubmittedAt);
+
+      const monthYearKey = `${submittedDate.getFullYear()}-${submittedDate.getMonth()}`;
+
+      if (!monthlyGroups[monthYearKey]) {
+        // Calculate unlock date: 1st of the month AFTER the next month
+        const unlockDate = new Date(submittedDate.getFullYear(), submittedDate.getMonth() + 1, 1);
+
+        monthlyGroups[monthYearKey] = {
+          month: submittedDate.getMonth(), // 0-11
+          year: submittedDate.getFullYear(),
+          reviewCount: 0,
+          unlockDate: unlockDate,
+          isUnlocked: new Date() >= unlockDate
+        };
+      }
+
+      monthlyGroups[monthYearKey].reviewCount += 1;
+    });
+
+    const completedReviews = Object.values(monthlyGroups);
+
+    // Sort by newest month first
+    completedReviews.sort((a, b) => {
+      if (b.year !== a.year) return b.year - a.year;
+      return b.month - a.month;
+    });
+
+    res.json(completedReviews);
+  } catch (error) {
+    console.error("Error fetching completed reviews:", error);
+    res.status(500).json({
+      message: "Error fetching completed reviews",
+      error: error.message
+    });
+  }
+};
+
+exports.downloadCertificate = async (req, res) => {
+  try {
+    const month = parseInt(req.query.month);
+    const year = parseInt(req.query.year);
+    const reviewerEmail = req.user.email.toLowerCase().trim();
+
+    if (isNaN(month) || isNaN(year)) {
+      return res.status(400).json({ message: "Valid month and year query parameters are required." });
+    }
+
+    const manuscripts = await Manuscript.find({
+      invitations: {
+        $elemMatch: {
+          email: reviewerEmail,
+          status: "accepted",
+          reviewSubmittedAt: { $ne: null }
+        }
+      }
+    }).lean();
+
+    let reviewCount = 0;
+
+    manuscripts.forEach(manuscript => {
+      const acceptedInvitations = manuscript.invitations.filter((inv) =>
+        inv.email.toLowerCase() === reviewerEmail && inv.status === "accepted" && inv.reviewSubmittedAt
+      );
+
+      if (acceptedInvitations.length === 0) return;
+
+      const latestInvitation = acceptedInvitations.sort((a, b) => {
+        return new Date(b.reviewSubmittedAt) - new Date(a.reviewSubmittedAt);
+      })[0];
+
+      const submittedDate = new Date(latestInvitation.reviewSubmittedAt);
+
+      if (submittedDate.getFullYear() === year && submittedDate.getMonth() === month) {
+        reviewCount += 1;
+      }
+    });
+
+    if (reviewCount === 0) {
+      return res.status(404).json({ message: "No submitted reviews found for this month and year." });
+    }
+
+    const unlockDate = new Date(year, month + 1, 1);
+
+    if (new Date() < unlockDate) {
+      return res.status(403).json({ message: "Certificate is not yet available for download" });
+    }
+
+    // Get reviewer name
+    let reviewer = await Reviewer.findById(req.user._id);
+    if (!reviewer) {
+      reviewer = await Reviewer.findOne({ email: req.user.email });
+    }
+    const reviewerName = formatFullName(reviewer);
+
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+    const monthName = monthNames[month];
+
+    // Generate PDF
+    const pdfBuffer = await generateCertificatePdf({
+      reviewerName,
+      date: new Date(year, month, 1),
+      reviewCount
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Certificate_of_Reviewing_${monthName}_${year}.pdf"`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error("Error downloading certificate:", error);
+    res.status(500).json({
+      message: "Error downloading certificate",
+      error: error.message
     });
   }
 };
