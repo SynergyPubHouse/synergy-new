@@ -1,6 +1,8 @@
 const Manuscript = require("../models/Manuscript");
 const multer = require("multer");
 const path = require("path");
+const { pipeline } = require("stream");
+const { promisify } = require("util");
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 const { FileUploadManager } = require("../utils/fileUpload");
 const { uploadToSharedFolder } = require("../utils/sharedDriveUpload");
@@ -20,6 +22,13 @@ const FormData = require("form-data");
 // At the top of manuscriptController.js
 const { uploadToCloudinary } = require("../utils/cloudinary");
 const {
+  buildPublishedManuscriptKey,
+  deletePublishedManuscriptFromS3,
+  getPublishedManuscriptFromS3,
+  getPublishedManuscriptPublicUrl,
+  uploadPublishedManuscriptToS3,
+} = require("../services/s3Service");
+const {
   uploadFileToDrive,
   deleteFileFromDrive,
   downloadDriveFileToTemp,
@@ -35,6 +44,8 @@ const {
   failJob,
   STATUS,
 } = require("../utils/jobProcessor");
+
+const streamPipeline = promisify(pipeline);
 
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
@@ -100,6 +111,10 @@ async function cleanupFiles(filePaths) {
       console.error(`Error cleaning up file ${filePath}:`, error);
     }
   }
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 const isUserAuthor = (manuscript, userId) => {
@@ -2776,6 +2791,11 @@ exports.uploadRevisionFiles = async (req, res) => {
 
 exports.uploadPublishedPdf = async (req, res) => {
   let tempFiles = [];
+  let s3ObjectKey = null;
+  let driveFileId = null;
+  let manuscriptSaved = false;
+  let previousPublishedFileUrl = "";
+  let publishedPdfUrl = "";
 
   try {
     const { manuscriptId } = req.params;
@@ -2826,15 +2846,15 @@ exports.uploadPublishedPdf = async (req, res) => {
       });
     }
 
+    previousPublishedFileUrl = manuscript.publishedFileUrl || "";
+
     const customId = manuscript.customId || manuscript._id.toString();
     const timestamp = Date.now();
     const fileName = "published_" + customId + "_" + timestamp + ".pdf";
+    publishedPdfUrl = getPublishedManuscriptPublicUrl(fileName);
 
-    // Upload to Cloudinary & Drive (same as before)
-    const uploadedPdf = await uploadToCloudinary(
-      req.file.path,
-      "published_manuscripts",
-      "raw",
+    s3ObjectKey = await uploadPublishedManuscriptToS3(
+      fsSync.createReadStream(req.file.path),
       fileName,
     );
     const driveResult = await uploadFileToDrive(req.file.path, {
@@ -2847,10 +2867,12 @@ exports.uploadPublishedPdf = async (req, res) => {
       throw new Error("Google Drive upload failed");
     }
 
+    driveFileId = driveResult.driveFileId;
+
     const publishedDate = new Date();
 
     // Update manuscript
-    manuscript.publishedFileUrl = uploadedPdf.secure_url;
+    manuscript.publishedFileUrl = publishedPdfUrl;
     manuscript.publishedDriveFileId = driveResult.driveFileId;
     manuscript.publishedDriveViewUrl = driveResult.webViewLink || "";
     manuscript.status = "Published";
@@ -2869,9 +2891,7 @@ exports.uploadPublishedPdf = async (req, res) => {
     manuscript.pdfCorrespondingAuthor = pdfCorrespondingAuthor?.trim() || null;
 
     await manuscript.save();
-
-    // Cleanup
-    await cleanupFiles(tempFiles);
+    manuscriptSaved = true;
 
     return res.json({
       success: true,
@@ -2895,12 +2915,130 @@ exports.uploadPublishedPdf = async (req, res) => {
     });
   } catch (error) {
     console.error("[uploadPublishedPdf] Error:", error);
-    if (tempFiles.length > 0) await cleanupFiles(tempFiles).catch(() => { });
+
+    if (!manuscriptSaved) {
+      if (driveFileId) {
+        await deleteFileFromDrive(driveFileId).catch((cleanupError) => {
+          console.error(
+            "[uploadPublishedPdf] Failed to delete Drive file during rollback:",
+            cleanupError,
+          );
+        });
+      }
+
+      if (s3ObjectKey && previousPublishedFileUrl !== publishedPdfUrl) {
+        await deletePublishedManuscriptFromS3(s3ObjectKey).catch(
+          (cleanupError) => {
+            console.error(
+              "[uploadPublishedPdf] Failed to delete S3 object during rollback:",
+              cleanupError,
+            );
+          },
+        );
+      }
+    }
+
     return res.status(500).json({
       success: false,
       message: "Failed to publish manuscript",
       error: error.message,
     });
+  } finally {
+    if (tempFiles.length > 0) {
+      await cleanupFiles(tempFiles).catch(() => { });
+    }
+  }
+};
+
+exports.streamPublishedPdf = async (req, res) => {
+  try {
+    const requestedFilename = String(req.params.filename || "").trim();
+    const normalizedFilename = path.basename(requestedFilename);
+
+    if (
+      !normalizedFilename ||
+      normalizedFilename !== requestedFilename ||
+      !normalizedFilename.toLowerCase().endsWith(".pdf")
+    ) {
+      return res.status(404).send("PDF not found");
+    }
+
+    const escapedFilename = escapeRegex(normalizedFilename);
+    const filenamePattern = new RegExp(`${escapedFilename}$`);
+
+    console.log("[streamPublishedPdf] Lookup debug", {
+      requestedFilename: normalizedFilename,
+      escapedFilename,
+      regex: filenamePattern.toString(),
+      dbName: mongoose.connection?.name || null,
+      modelName: Manuscript.modelName,
+    });
+
+    const manuscript = await Manuscript.findOne({
+      publishedFileUrl: { $regex: filenamePattern },
+    })
+      .select("_id publishedFileUrl")
+      .lean();
+
+    console.log("[streamPublishedPdf] Matched manuscript", {
+      manuscriptId: manuscript?._id?.toString() || null,
+      publishedFileUrl: manuscript?.publishedFileUrl || null,
+    });
+
+    if (!manuscript) {
+      return res.status(404).send("PDF not found");
+    }
+
+    const s3ObjectKey = buildPublishedManuscriptKey(normalizedFilename);
+    const pdfObject = await getPublishedManuscriptFromS3(s3ObjectKey, {
+      byteRange: req.headers.range,
+    });
+
+    if (pdfObject.contentRange) {
+      res.status(206);
+      res.setHeader("Content-Range", pdfObject.contentRange);
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${normalizedFilename.replace(/"/g, "")}"`,
+    );
+
+    if (pdfObject.acceptRanges) {
+      res.setHeader("Accept-Ranges", pdfObject.acceptRanges);
+    }
+
+    if (pdfObject.contentLength !== null) {
+      res.setHeader("Content-Length", String(pdfObject.contentLength));
+    }
+
+    if (pdfObject.etag) {
+      res.setHeader("ETag", pdfObject.etag);
+    }
+
+    if (pdfObject.lastModified) {
+      res.setHeader(
+        "Last-Modified",
+        new Date(pdfObject.lastModified).toUTCString(),
+      );
+    }
+
+    await streamPipeline(pdfObject.body, res);
+  } catch (error) {
+    console.error("[streamPublishedPdf] Error:", error);
+
+    const isNotFound =
+      error?.name === "NoSuchKey" || error?.$metadata?.httpStatusCode === 404;
+
+    if (res.headersSent) {
+      res.destroy(error);
+      return;
+    }
+
+    return res
+      .status(isNotFound ? 404 : 500)
+      .send(isNotFound ? "PDF not found" : "Failed to load PDF");
   }
 };
 
