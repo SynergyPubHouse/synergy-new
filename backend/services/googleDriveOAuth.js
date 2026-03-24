@@ -177,6 +177,7 @@ function buildDriveViewUrl(fileId) {
 // ═══════════════════════════════════════════════════════════════
 async function uploadFileToDrive(localFilePath, options = {}) {
   const drive = getDriveClient();
+  let uploadedFileId = null;
 
   console.log("📤 Starting upload (OAuth2)...");
   console.log("📁 File:", localFilePath);
@@ -216,6 +217,7 @@ async function uploadFileToDrive(localFilePath, options = {}) {
 
     const fileId = createResp?.data?.id;
     if (!fileId) throw new Error("Drive did not return file ID");
+    uploadedFileId = fileId;
 
     console.log("✅ Uploaded! ID:", fileId);
 
@@ -249,6 +251,18 @@ async function uploadFileToDrive(localFilePath, options = {}) {
     };
 
   } catch (error) {
+    if (uploadedFileId) {
+      try {
+        await drive.files.delete({ fileId: uploadedFileId });
+        console.log("🗑️ Rolled back Drive upload:", uploadedFileId);
+      } catch (cleanupError) {
+        console.error(
+          "❌ Drive rollback failed after upload error:",
+          cleanupError.message,
+        );
+      }
+    }
+
     console.error("❌ Upload Error:", error.message);
     throw error;
   }

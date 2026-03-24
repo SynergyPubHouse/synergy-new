@@ -85,6 +85,7 @@ app.use((req, res, next) => {
 });
 app.use('/scholar', scholarRoutes);
 app.use('/', sitemapRoutes);
+app.use("/", require("./routes/publicPdfRoutes"));
 
 app.get('/robots.txt', (req, res) => {
     res.setHeader('Content-Type', 'text/plain');
