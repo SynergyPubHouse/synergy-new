@@ -29,6 +29,30 @@ const ArticleDetail = () => {
   const [viewCount, setViewCount] = useState(0);
   const viewCountedRef = useRef(false);
 
+  const getDirectPdfSourceUrl = useCallback((pdfUrl) => {
+    if (!pdfUrl) return "";
+
+    try {
+      const parsedUrl = new URL(pdfUrl, window.location.origin);
+      const isPublishedPdfProxyPath = /^\/pdf\/.+\.pdf$/i.test(parsedUrl.pathname);
+
+      if (!isPublishedPdfProxyPath) {
+        return parsedUrl.toString();
+      }
+
+      const backendBaseUrl = import.meta.env.VITE_BACKEND_URL?.trim();
+
+      if (!backendBaseUrl) {
+        return parsedUrl.toString();
+      }
+
+      return `${backendBaseUrl.replace(/\/+$/, "")}${parsedUrl.pathname}${parsedUrl.search}`;
+    } catch (error) {
+      console.error("Error resolving direct PDF source URL:", error);
+      return pdfUrl;
+    }
+  }, []);
+
   // =====================================================
   // GOOGLE SCHOLAR META TAGS COMPONENT
   // =====================================================
@@ -273,7 +297,8 @@ const ArticleDetail = () => {
       if (!url) return null;
       try {
         setIsPdfLoading(true);
-        const res = await axios.get(url, {
+        const directPdfUrl = getDirectPdfSourceUrl(url);
+        const res = await axios.get(directPdfUrl, {
           responseType: "blob",
           headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
         });
@@ -285,7 +310,7 @@ const ArticleDetail = () => {
         setIsPdfLoading(false);
       }
     },
-    [user],
+    [getDirectPdfSourceUrl, user],
   );
 
   // ✅ NEW: Open PDF in new tab - Direct URL (no blob, no about:blank)
