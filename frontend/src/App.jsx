@@ -47,6 +47,7 @@ import FinalEvaluationAndAcceptance from "./pages/peer-review/FinalEvaluationAnd
 import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationIntegrityAndTimeline";
 
 import PageNotAvailable from "./pages/pagenotavailable";
+import PublicPdfProxy from "./pages/PublicPdfProxy";
 // import BookPublication from "./pages/BookPublication";
 import BookPublication from "./pages/BookPublication";
 import WebSeriesCast from "./pages/WebSeriesCast";
@@ -75,7 +76,9 @@ function ScrollToTop() {
 function AppContent() {
   const location = useLocation();
   const hideNavFooter =
-    location.pathname === "/login" || location.pathname === "/register";
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
+    location.pathname.startsWith("/pdf/");
   const [user, setUser] = React.useState(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -183,6 +186,7 @@ function AppContent() {
         <Route path="/conference-publication" element={<ConferencePublication />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route path="/verification-pending" element={<VerificationPending />} />
+        <Route path="/pdf/:filename" element={<PublicPdfProxy />} />
         {/* Journal Management Routes */}
         {/* <Route path={BASE_URL} element={<HomePage />} /> */}
         <Route path={`/publish`} element={<Publish />} />
