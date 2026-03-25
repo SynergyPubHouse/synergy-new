@@ -17,9 +17,7 @@ const Manuscript = require("../models/Manuscript");
 const streamPipeline = promisify(pipeline);
 
 const CLOUDINARY_URL_PATTERN = /res\.cloudinary\.com/i;
-const NEW_PUBLIC_URL_PATTERN = /synergyworldpress\.com\/pdf\//i;
 const PUBLISHED_MANUSCRIPTS_PREFIX = "published_manuscripts";
-const DEFAULT_PUBLIC_SITE_URL = "https://synergyworldpress.com";
 
 const BATCH_SIZE = parsePositiveInt(process.env.MIGRATION_BATCH_SIZE, 10);
 const REQUEST_DELAY_MS = parsePositiveInt(process.env.MIGRATION_DELAY_MS, 250);
@@ -69,25 +67,8 @@ function getS3Client() {
   return s3Client;
 }
 
-function getPublicSiteBaseUrl() {
-  const configuredBaseUrl = (
-    process.env.PUBLIC_SITE_URL || DEFAULT_PUBLIC_SITE_URL
-  ).trim();
-
-  return (
-    configuredBaseUrl.startsWith("http://") ||
-    configuredBaseUrl.startsWith("https://")
-      ? configuredBaseUrl
-      : `https://${configuredBaseUrl}`
-  ).replace(/\/+$/, "");
-}
-
 function buildS3Key(filename) {
   return `${PUBLISHED_MANUSCRIPTS_PREFIX}/${filename}`;
-}
-
-function buildPublicUrl(filename) {
-  return `${getPublicSiteBaseUrl()}/pdf/${filename}`;
 }
 
 function buildMigrationQuery() {
@@ -345,43 +326,11 @@ async function uploadToS3(localFilePath, filename) {
   };
 }
 
-async function updateManuscriptUrl(manuscriptId, currentUrl, newUrl) {
-  const result = await Manuscript.updateOne(
-    {
-      _id: manuscriptId,
-      publishedFileUrl: currentUrl,
-    },
-    {
-      $set: { publishedFileUrl: newUrl },
-    },
-  );
-
-  if (result.matchedCount === 0) {
-    const latest = await Manuscript.findById(manuscriptId)
-      .select("publishedFileUrl")
-      .lean();
-
-    if (latest?.publishedFileUrl === newUrl) {
-      return { success: true, concurrentUpdate: true };
-    }
-
-    throw new Error(
-      "Manuscript record changed during migration; database was not updated",
-    );
-  }
-
-  return {
-    success: true,
-    concurrentUpdate: false,
-  };
-}
-
 async function processManuscript(manuscript) {
   const manuscriptId = manuscript._id.toString();
   const oldUrl = manuscript.publishedFileUrl || "";
   let filename = null;
   let newS3Key = null;
-  let newUrl = null;
   let s3UploadStatus = null;
   let downloadContentType = null;
   let fileSignature = null;
@@ -392,15 +341,6 @@ async function processManuscript(manuscript) {
       oldUrl,
       status: "skipped",
       reason: "missing_published_file_url",
-    };
-  }
-
-  if (NEW_PUBLIC_URL_PATTERN.test(oldUrl)) {
-    return {
-      manuscriptId,
-      oldUrl,
-      status: "skipped",
-      reason: "already_migrated",
     };
   }
 
@@ -419,7 +359,6 @@ async function processManuscript(manuscript) {
   try {
     filename = extractFilename(oldUrl);
     newS3Key = buildS3Key(filename);
-    newUrl = buildPublicUrl(filename);
 
     const collisions = await findFilenameCollisions(manuscript._id, filename);
 
@@ -429,7 +368,6 @@ async function processManuscript(manuscript) {
         oldUrl,
         filename,
         newS3Key,
-        newUrl,
         status: "failed",
         reason: "filename_collision",
         nonRetryable: true,
@@ -452,7 +390,6 @@ async function processManuscript(manuscript) {
         oldUrl,
         filename,
         newS3Key,
-        newUrl,
         s3UploadStatus: s3UploadStatus || "would_upload",
         status: "skipped",
         reason: "dry_run",
@@ -475,14 +412,11 @@ async function processManuscript(manuscript) {
       s3UploadStatus = "uploaded";
     }
 
-    await updateManuscriptUrl(manuscript._id, oldUrl, newUrl);
-
     return {
       manuscriptId,
       oldUrl,
       filename,
       newS3Key,
-      newUrl,
       fileSize: downloadedFileSize,
       downloadContentType,
       fileSignature,
@@ -497,7 +431,6 @@ async function processManuscript(manuscript) {
       oldUrl,
       filename,
       newS3Key,
-      newUrl,
       fileSize: downloadedFileSize,
       downloadContentType,
       fileSignature,
@@ -542,7 +475,6 @@ async function processWithRetry(manuscript) {
       oldUrl: result.oldUrl,
       filename: result.filename,
       newS3Key: result.newS3Key,
-      newUrl: result.newUrl,
       s3UploadStatus: result.s3UploadStatus || null,
       status: result.status,
       reason: result.reason || null,
@@ -617,7 +549,6 @@ async function run() {
     requestDelayMs: REQUEST_DELAY_MS,
     retryDelayMs: RETRY_DELAY_MS,
     dryRun: DRY_RUN,
-    publicSiteUrl: getPublicSiteBaseUrl(),
   });
 
   while (summary.processed < summary.totalToProcess) {
@@ -663,7 +594,6 @@ async function run() {
           oldUrl: result.oldUrl,
           filename: result.filename,
           newS3Key: result.newS3Key,
-          newUrl: result.newUrl,
           s3UploadStatus: result.s3UploadStatus || null,
           status: result.status,
           reason: result.reason || null,
