@@ -24,10 +24,6 @@ export default function PublicPdfProxy() {
 
       const nextPdfUrl = buildBackendPdfUrl(filename);
       setPdfUrl(nextPdfUrl);
-
-      // Use top-level navigation so the browser handles the real PDF response
-      // directly instead of trying to render a blob URL inside the SPA.
-      window.location.replace(nextPdfUrl);
     } catch (loadError) {
       setError(loadError?.message || "Failed to open PDF");
     }
@@ -44,22 +40,19 @@ export default function PublicPdfProxy() {
     );
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6 text-center">
-      <div>
-        <h1 className="text-3xl font-bold text-[#00796B]">Opening PDF...</h1>
-        <p className="mt-4 text-lg text-gray-700">
-          If the PDF does not open automatically, use the button below.
-        </p>
-        {pdfUrl ? (
-          <a
-            href={pdfUrl}
-            className="mt-6 inline-flex rounded bg-[#00796B] px-6 py-3 font-semibold text-white"
-          >
-            Open PDF
-          </a>
-        ) : null}
+  if (!pdfUrl) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 text-lg text-gray-700">
+        Loading PDF...
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <iframe
+      src={pdfUrl}
+      title={filename}
+      className="h-screen w-full border-0"
+    />
   );
 }
