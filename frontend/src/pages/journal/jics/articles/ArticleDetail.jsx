@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "../../../../App";
@@ -454,7 +454,7 @@ const ArticleDetail = () => {
     }
     return article.issueYear || '';
   };
-
+  const navigate = useNavigate()
   // Parse classification
   const parseClassification = (classification) => {
     if (!classification) return [];
@@ -473,12 +473,21 @@ const ArticleDetail = () => {
     article.issueVolume && article.issueNumber && article.issueYear;
 
   return (
-    <div className="min-h-screen bg-[#f9f9f9] text-[#212121] py-12">
+    <div className="min-h-screen bg-[#f9f9f9] pt-28 pb-12 text-[#212121] md:pt-32">
       {/* Google Scholar Meta Tags */}
       <ScholarMetaTags />
 
       <div className="container mx-auto px-6 md:px-20">
-        <div className="bg-white rounded-xl shadow-md p-6 border border-[#e0e0e0] mt-[50px]">
+         <button
+          onClick={() => navigate('/journal/jics/articles/current')}
+          className="mb-6 inline-flex items-center gap-2 text-[#00796b] transition-colors hover:text-[#00acc1]"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Published articles
+        </button>
+        <div className="bg-white rounded-xl border border-[#e0e0e0] p-6 shadow-md">
           {/* Bibliographic Details Banner */}
           {hasIssueInfo && (
             <p className="text-sm font-semibold text-[#00796b] uppercase tracking-wider mb-3 flex items-center flex-wrap gap-2">
