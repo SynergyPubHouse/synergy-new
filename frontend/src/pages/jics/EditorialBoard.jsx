@@ -344,7 +344,7 @@ const genderData = [
 
 // Role order for display
 const roleOrder = [
-  "Editorial Team Member",
+  "Editorial Board Members",
   "Associate Editors",
   "Area Editors",
   "Managing Editor",
