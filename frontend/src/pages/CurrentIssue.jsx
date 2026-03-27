@@ -103,7 +103,7 @@ const CurrentIssue = () => {
             Published Articles ({articles.length})
           </h1>
           <p className="mt-3 inline-flex items-center rounded-full bg-[#e0f2f1] px-4 py-1.5 text-sm font-semibold tracking-[0.12em] text-[#00695c] shadow-sm ring-1 ring-[#00796b]/10">
-            Vol. 1, Issue 1 • Jan - Apr 2026
+            Vol. 1, Issue 1 • Jan-Apr 2026
           </p>
         </div>
 
