@@ -278,7 +278,7 @@ const editorialMembers = [
     designation: "Sr. IT Solutions Architect",
     affiliation: "Valley Health System, Winchester, Virginia, USA",
     email: "monu.sharma@ieee.org",
-    role: "Editorial Team Member",
+    role: "Editorial Board Member",
   },
   {
     name: "Dr. Ahmed Hussein Ali",
@@ -286,7 +286,7 @@ const editorialMembers = [
     department: "Computer Science",
     affiliation: "Al-Iraqia University, Baghdad, Iraq",
     email: "ahmed.ali@aliraqia.edu.iq",
-    role: "Editorial Team Member",
+    role: "Editorial Board Member",
   },
   {
     name: "Dr. Shakeel Ahmed",
@@ -295,7 +295,7 @@ const editorialMembers = [
       "School of Computer Science, Faculty of Innovation and Technology",
     affiliation: "Taylor's University, Subang Jaya 47500, Selangor, Malaysia",
     email: "Shakeel.ahmed@taylors.edu.my",
-    role: "Editorial Team Member",
+    role: "Editorial Board Member",
   },
   {
     name: "Prof. (Dr.) Anand Nayyar",
@@ -304,7 +304,7 @@ const editorialMembers = [
     department: "School of Computer Science and Artificial Intelligence (SCA)",
     affiliation: "Duy Tan University, Da Nang 550000, Viet Nam",
     email: "anandnayyar@duytan.edu.vn",
-    role: "Editorial Team Member",
+    role: "Editorial Board Member",
   },
   {
     name: "Dr. Parvathaneni Naga Srinivasu",
@@ -313,7 +313,7 @@ const editorialMembers = [
     affiliation:
       "Amrita Vishwa Vidyapeetham, Amaravati Campus, Amaravati 522503, Andhra Pradesh.",
     email: "p_nagasrinivasu@av.amrita.edu",
-    role: "Editorial Team Member",
+    role: "Editorial Board Member",
   },
   {
     name: "Dr. Hemanth.K.S",
@@ -322,7 +322,7 @@ const editorialMembers = [
     affiliation:
       "Christ University Yeshwanthpur Campus, Nalagadderanahalli, Peenya, Bengaluru, Karnataka 560073.",
     email: "hemanth.ks@christuniversity.in",
-    role: "Editorial Team Member",
+    role: "Editorial Board Member",
   },
   {
     name: "Dr. Nassreddine, Ghalia",
@@ -330,7 +330,7 @@ const editorialMembers = [
     department: "Information Technology and Systems",
     affiliation: "Rafik Hariri University, Lebanon",
     email: "nassreddinega@rhu.edu.lb",
-    role: "Editorial Team Member",
+    role: "Editorial Board Member",
   },
 ];
 
@@ -344,7 +344,7 @@ const genderData = [
 
 // Role order for display
 const roleOrder = [
-  "Editorial Team Member",
+  "Editorial Board Member",
   "Associate Editors",
   "Area Editors",
   "Managing Editor",
