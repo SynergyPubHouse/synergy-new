@@ -40,7 +40,7 @@ const Overview = () => (
             </tr>
             <tr className="border-b border-gray-100">
               <td className="px-6 py-4 text-sm text-gray-700 bg-gray-50">Starting Year</td>
-              <td className="px-6 py-4 text-sm text-gray-700">2025</td>
+              <td className="px-6 py-4 text-sm text-gray-700">2026</td>
             </tr>
             <tr className="border-b border-gray-100">
               <td className="px-6 py-4 text-sm text-gray-700 bg-gray-50">Frequency</td>
