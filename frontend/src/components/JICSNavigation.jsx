@@ -31,7 +31,7 @@ const JICSNavigation = () => {
           path: "/journal/jics/articles/archives",
         },
         {
-          label: "Article Download",
+          label: "Special Issue",
           path: "#",
           icon: (
             <svg
