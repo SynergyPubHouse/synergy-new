@@ -25,6 +25,7 @@ const formatScholarDate = (dateString) => {
   if (isNaN(d.getTime())) return "";
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 };
+
 function getApiBaseUrl() {
   const configuredBaseUrl = (
     process.env.API_BASE_URL ||
@@ -39,6 +40,25 @@ function getApiBaseUrl() {
   ).replace(/\/+$/, "");
 }
 
+function getPublicBaseUrl() {
+  const configuredBaseUrl = (
+    process.env.PUBLIC_SITE_URL ||
+    process.env.CLIENT_URL ||
+    "https://synergyworldpress.com"
+  ).trim();
+
+  return (
+    configuredBaseUrl.startsWith("http://") ||
+    configuredBaseUrl.startsWith("https://")
+      ? configuredBaseUrl
+      : `https://${configuredBaseUrl}`
+  ).replace(/\/+$/, "");
+}
+
+/**
+ * Google Scholar needs a PDF URL that returns the actual PDF file.
+ * For this project, that is the API PDF route.
+ */
 function normalizePdfUrl(pdfUrl) {
   if (!pdfUrl || typeof pdfUrl !== "string") {
     return "";
@@ -52,6 +72,30 @@ function normalizePdfUrl(pdfUrl) {
     .replace("https://www.synergyworldpress.com/pdf/", `${apiBaseUrl}/pdf/`)
     .replace("http://www.synergyworldpress.com/pdf/", `${apiBaseUrl}/pdf/`);
 }
+
+/**
+ * Visible download button URL.
+ * This keeps the user-facing link on the main domain:
+ * https://synergyworldpress.com/pdf/file.pdf
+ */
+function getPublicPdfUrl(pdfUrl) {
+  if (!pdfUrl || typeof pdfUrl !== "string") {
+    return "";
+  }
+
+  const apiBaseUrl = getApiBaseUrl();
+  const publicBaseUrl = getPublicBaseUrl();
+
+  return pdfUrl
+    .replace(`${apiBaseUrl}/pdf/`, `${publicBaseUrl}/pdf/`)
+    .replace("https://api.synergyworldpress.com/pdf/", `${publicBaseUrl}/pdf/`)
+    .replace("http://api.synergyworldpress.com/pdf/", `${publicBaseUrl}/pdf/`)
+    .replace("https://synergyworldpress.com/pdf/", `${publicBaseUrl}/pdf/`)
+    .replace("http://synergyworldpress.com/pdf/", `${publicBaseUrl}/pdf/`)
+    .replace("https://www.synergyworldpress.com/pdf/", `${publicBaseUrl}/pdf/`)
+    .replace("http://www.synergyworldpress.com/pdf/", `${publicBaseUrl}/pdf/`);
+}
+
 router.get("/article/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -153,8 +197,14 @@ router.get("/article/:id", async (req, res) => {
         : new Date().toISOString();
 
     // URLs
-    const baseUrl = "https://synergyworldpress.com";
-const pdfUrl = normalizePdfUrl(article.publishedFileUrl || "");
+    const baseUrl = getPublicBaseUrl();
+
+    // Scholar/PDF metadata should use the API URL because it returns application/pdf.
+    const pdfUrl = normalizePdfUrl(article.publishedFileUrl || "");
+
+    // Visible button should keep the main-domain URL.
+    const publicPdfUrl = getPublicPdfUrl(pdfUrl || article.publishedFileUrl || "");
+
     const articleUrl = `${baseUrl}/journal/jics/articles/${article._id}`;
 
     // Generate HTML
@@ -165,6 +215,7 @@ const pdfUrl = normalizePdfUrl(article.publishedFileUrl || "");
       publishedDate,
       isoDate,
       pdfUrl,
+      publicPdfUrl,
       articleUrl,
       baseUrl,
     });
@@ -178,73 +229,120 @@ const pdfUrl = normalizePdfUrl(article.publishedFileUrl || "");
   }
 });
 
+router.get("/articles-listing", async (req, res) => {
+  try {
+    const manuscripts = await Manuscript.find({ status: "Published" })
+      .select("_id title pdfAuthors authors issueVolume issueNumber pageStart pageEnd publishedAt")
+      .populate("authors", "firstName middleName lastName")
+      .sort({ publishedAt: -1 })
+      .lean();
 
+    const articles = (manuscripts || []).map((doc) => {
+      const article = doc || {};
 
-router.get('/articles-listing', async (req, res) => {
-    try {
-        const manuscripts = await Manuscript.find({ status: 'Published' })
-            .select('_id title pdfAuthors authors issueVolume issueNumber pageStart pageEnd publishedAt')
-            .populate('authors', 'firstName middleName lastName')
-            .sort({ publishedAt: -1 })
-            .lean();
+      let authorsDisplay = "";
+      if (Array.isArray(article.pdfAuthors) && article.pdfAuthors.length > 0) {
+        authorsDisplay = article.pdfAuthors
+          .filter((a) => a && String(a).trim())
+          .join(", ");
+      } else if (Array.isArray(article.authors) && article.authors.length > 0) {
+        authorsDisplay = article.authors
+          .map((author) => {
+            if (!author) return null;
+            if (typeof author === "string") return author;
+            const parts = [
+              author.firstName,
+              author.middleName,
+              author.lastName,
+            ].filter((p) => p && String(p).trim());
+            if (parts.length === 0) return null;
+            return parts.join(" ");
+          })
+          .filter((name) => name && String(name).trim())
+          .join(", ");
+      }
 
-        const articles = (manuscripts || []).map(doc => {
-            const article = doc || {};
+      let publishedDisplay = "";
+      if (article.publishedAt) {
+        try {
+          publishedDisplay = new Date(article.publishedAt).toLocaleDateString(
+            "en-US",
+            {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            },
+          );
+        } catch (e) {
+          publishedDisplay = "";
+        }
+      }
 
-            let authorsDisplay = '';
-            if (Array.isArray(article.pdfAuthors) && article.pdfAuthors.length > 0) {
-                authorsDisplay = article.pdfAuthors
-                    .filter(a => a && String(a).trim())
-                    .join(', ');
-            } else if (Array.isArray(article.authors) && article.authors.length > 0) {
-                authorsDisplay = article.authors
-                    .map(author => {
-                        if (!author) return null;
-                        if (typeof author === 'string') return author;
-                        const parts = [
-                            author.firstName,
-                            author.middleName,
-                            author.lastName
-                        ].filter(p => p && String(p).trim());
-                        if (parts.length === 0) return null;
-                        return parts.join(' ');
-                    })
-                    .filter(name => name && String(name).trim())
-                    .join(', ');
-            }
+      return {
+        id: article._id,
+        title: article.title || "",
+        authorsDisplay,
+        issueVolume: article.issueVolume,
+        issueNumber: article.issueNumber,
+        pageStart: article.pageStart,
+        pageEnd: article.pageEnd,
+        publishedDisplay,
+      };
+    });
 
-            const hasVolume = typeof article.issueVolume === 'number' || (article.issueVolume && String(article.issueVolume).trim());
-            const hasIssue = typeof article.issueNumber === 'number' || (article.issueNumber && String(article.issueNumber).trim());
-            const hasPages = article.pageStart && article.pageEnd;
+    const canonicalUrl = `${getPublicBaseUrl()}/journal/jics/articles/current`;
 
-            let publishedDisplay = '';
-            if (article.publishedAt) {
-                try {
-                    publishedDisplay = new Date(article.publishedAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
-                } catch (e) {
-                    publishedDisplay = '';
-                }
-            }
+    const articlesHtml =
+      articles.length === 0
+        ? '<p class="empty">No published articles are available at this time.</p>'
+        : '<ul class="article-list">' +
+          articles
+            .map((a) => {
+              const articleUrl = a.id
+                ? `${getPublicBaseUrl()}/journal/jics/articles/${a.id}`
+                : "#";
+              const parts = [];
 
-            return {
-                id: article._id,
-                title: article.title || '',
-                authorsDisplay,
-                issueVolume: article.issueVolume,
-                issueNumber: article.issueNumber,
-                pageStart: article.pageStart,
-                pageEnd: article.pageEnd,
-                publishedDisplay
-            };
-        });
+              if (a.issueVolume != null || a.issueNumber != null) {
+                const v = a.issueVolume != null ? a.issueVolume : "-";
+                const i = a.issueNumber != null ? a.issueNumber : "-";
+                parts.push(`Volume ${v}, Issue ${i}`);
+              }
 
-        const canonicalUrl = 'https://synergyworldpress.com/journal/jics/articles/current';
+              if (a.pageStart && a.pageEnd) {
+                parts.push(`Pages ${a.pageStart}-${a.pageEnd}`);
+              }
 
-        const html = `<!DOCTYPE html>
+              if (a.publishedDisplay) {
+                parts.push(`Published ${a.publishedDisplay}`);
+              }
+
+              const metaLine = parts.join(" | ");
+
+              return (
+                '<li class="article-item">' +
+                '<h3 class="article-title">' +
+                '<a href="' +
+                articleUrl +
+                '">' +
+                escapeHtml(a.title) +
+                "</a>" +
+                "</h3>" +
+                (a.authorsDisplay
+                  ? '<p class="article-authors">' +
+                    escapeHtml(a.authorsDisplay) +
+                    "</p>"
+                  : "") +
+                (metaLine
+                  ? '<p class="article-meta">' + escapeHtml(metaLine) + "</p>"
+                  : "") +
+                "</li>"
+              );
+            })
+            .join("") +
+          "</ul>";
+
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -275,46 +373,17 @@ router.get('/articles-listing', async (req, res) => {
         <h2>Published Articles</h2>
     </header>
     <main>
-        ${articles.length === 0 ? `
-        <p class="empty">No published articles are available at this time.</p>
-        ` : `
-        <ul class="article-list">
-            ${articles.map(a => {
-                const articleUrl = a.id ? `https://synergyworldpress.com/journal/jics/articles/${a.id}` : '#';
-                const parts = [];
-                if (a.issueVolume != null || a.issueNumber != null) {
-                    const v = a.issueVolume != null ? a.issueVolume : '-';
-                    const i = a.issueNumber != null ? a.issueNumber : '-';
-                    parts.push(\`Volume \${v}, Issue \${i}\`);
-                }
-                if (a.pageStart && a.pageEnd) {
-                    parts.push(\`Pages \${a.pageStart}-\${a.pageEnd}\`);
-                }
-                if (a.publishedDisplay) {
-                    parts.push(\`Published \${a.publishedDisplay}\`);
-                }
-                const metaLine = parts.join(' | ');
-                return \`
-            <li class="article-item">
-                <h3 class="article-title">
-                    <a href="\${articleUrl}">\${escapeHtml(a.title)}</a>
-                </h3>
-                \${a.authorsDisplay ? \`<p class="article-authors">\${escapeHtml(a.authorsDisplay)}</p>\` : ''}
-                \${metaLine ? \`<p class="article-meta">\${escapeHtml(metaLine)}</p>\` : ''}
-            </li>\`;
-            }).join('')}
-        </ul>
-        `}
+        ${articlesHtml}
     </main>
 </body>
 </html>`;
 
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        res.send(html);
-    } catch (error) {
-        console.error('[Scholar Route] Articles Listing Error:', error);
-        res.status(500).send(`<!DOCTYPE html>
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(html);
+  } catch (error) {
+    console.error("[Scholar Route] Articles Listing Error:", error);
+    res.status(500).send(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -326,7 +395,7 @@ router.get('/articles-listing', async (req, res) => {
     <p>Failed to load published articles.</p>
 </body>
 </html>`);
-    }
+  }
 });
 
 // HTML Generator Function
@@ -337,6 +406,7 @@ function generateScholarHtml({
   publishedDate,
   isoDate,
   pdfUrl,
+  publicPdfUrl,
   articleUrl,
   baseUrl,
 }) {
@@ -504,7 +574,7 @@ ${JSON.stringify(schemaData, null, 2)}
             : ""
         }
         
-        ${pdfUrl ? `<a href="${pdfUrl}" class="pdf-btn" target="_blank">📄 Download Full Text (PDF)</a>` : ""}
+        ${publicPdfUrl ? `<a href="${publicPdfUrl}" class="pdf-btn" target="_blank">📄 Download Full Text (PDF)</a>` : ""}
     </article>
     
     <footer class="footer">
@@ -523,7 +593,7 @@ function generateErrorHtml(title, message) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title>${title} | JICS</title>
+    <title>${escapeHtml(title)} | JICS</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center; }
         h1 { color: #d32f2f; }
@@ -531,8 +601,8 @@ function generateErrorHtml(title, message) {
     </style>
 </head>
 <body>
-    <h1>${title}</h1>
-    <p>${message}</p>
+    <h1>${escapeHtml(title)}</h1>
+    <p>${escapeHtml(message)}</p>
     <p><a href="https://synergyworldpress.com">← Go to Homepage</a></p>
     <p><a href="https://synergyworldpress.com/journal/jics/articles/current">View All Articles</a></p>
 </body>
