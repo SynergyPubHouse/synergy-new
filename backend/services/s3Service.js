@@ -49,6 +49,20 @@ function getPublicSiteBaseUrl() {
   ).replace(/\/+$/, "");
 }
 
+function getApiBaseUrl() {
+  const configuredBaseUrl = (
+    process.env.API_BASE_URL ||
+    "https://api.synergyworldpress.com"
+  ).trim();
+
+  return (
+    configuredBaseUrl.startsWith("http://") ||
+    configuredBaseUrl.startsWith("https://")
+      ? configuredBaseUrl
+      : `https://${configuredBaseUrl}`
+  ).replace(/\/+$/, "");
+}
+
 function ensurePdfFilename(filename) {
   if (!filename || typeof filename !== "string") {
     throw new Error("A valid filename is required for S3 upload");
@@ -72,7 +86,7 @@ function buildPublishedManuscriptKey(filename) {
 
 function getPublishedManuscriptPublicUrl(filename) {
   const pdfFilename = ensurePdfFilename(filename);
-  return `${getPublicSiteBaseUrl()}/pdf/${pdfFilename}`;
+  return `${getApiBaseUrl()}/pdf/${pdfFilename}`;
 }
 
 async function uploadPublishedManuscriptToS3(fileBody, filename) {
@@ -101,6 +115,7 @@ async function uploadPublishedManuscriptToS3(fileBody, filename) {
 async function getPublishedManuscriptFromS3(objectKey, options = {}) {
   const bucket = getRequiredEnv("AWS_S3_BUCKET");
   const normalizedKey = objectKey.replace(/^\/+/, "");
+
   const response = await getS3Client().send(
     new GetObjectCommand({
       Bucket: bucket,
@@ -145,12 +160,14 @@ function getCloudFrontUrl(objectKey) {
   }
 
   const configuredDomain = getRequiredEnv("CLOUD_FRONT_DOMAIN").trim();
+
   const cloudFrontDomain = (
     configuredDomain.startsWith("http://") ||
     configuredDomain.startsWith("https://")
       ? configuredDomain
       : `https://${configuredDomain}`
   ).replace(/\/+$/, "");
+
   const normalizedKey = objectKey.replace(/^\/+/, "");
 
   return `${cloudFrontDomain}/${normalizedKey}`;
@@ -158,6 +175,7 @@ function getCloudFrontUrl(objectKey) {
 
 function getPublishedManuscriptCloudFrontUrl(objectKey) {
   const normalizedKey = objectKey.replace(/^\/+/, "");
+
   const publicFilename = normalizedKey.startsWith(
     `${PUBLISHED_MANUSCRIPTS_PREFIX}/`,
   )
