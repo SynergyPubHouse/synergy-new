@@ -279,6 +279,10 @@ const manuscriptSchema = new mongoose.Schema(
 			type: Date,
 			default: null,
 		},
+		separateIssue: {
+			type: Boolean,
+			default: false,
+		},
 
 		issueVolume: {
 			type: Number,

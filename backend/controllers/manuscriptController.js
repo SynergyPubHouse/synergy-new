@@ -1772,7 +1772,10 @@ exports.getManuscriptById = async (req, res) => {
       });
     }
 
-    const doc = manuscript.toObject();
+    const doc = {
+      ...manuscript.toObject(),
+      separateIssue: manuscript.separateIssue || false,
+    };
 
     // ✅ Extract PDF authors if mergedFileUrl exists
 
@@ -2811,7 +2814,10 @@ exports.uploadPublishedPdf = async (req, res) => {
       section,
       pdfAuthors,
       pdfCorrespondingAuthor,
+      separateIssue: requestedSeparateIssue,
     } = req.body;
+    const separateIssue =
+      requestedSeparateIssue === "true" || requestedSeparateIssue === true;
 
     let authorsArray = [];
     if (pdfAuthors) {
@@ -2877,6 +2883,7 @@ exports.uploadPublishedPdf = async (req, res) => {
     manuscript.publishedDriveViewUrl = driveResult.webViewLink || "";
     manuscript.status = "Published";
     manuscript.publishedAt = publishedDate;
+    manuscript.separateIssue = separateIssue;
 
     // Issue info
     if (issueVolume) manuscript.issueVolume = parseInt(issueVolume);
@@ -2911,6 +2918,7 @@ exports.uploadPublishedPdf = async (req, res) => {
         pageEnd: manuscript.pageEnd,
         pdfAuthors: manuscript.pdfAuthors,
         pdfCorrespondingAuthor: manuscript.pdfCorrespondingAuthor,
+        separateIssue: manuscript.separateIssue || false,
       },
     });
   } catch (error) {
@@ -3070,9 +3078,14 @@ exports.getPublishedManuscripts = async (req, res) => {
     });
 
     // ✅ Extract PDF authors for each manuscript
-    const manuscriptsWithPdfAuthors = sortedManuscripts.map((manuscript) =>
-      manuscript.toObject(),
-    );
+    const manuscriptsWithPdfAuthors = sortedManuscripts.map((manuscript) => {
+      const article = manuscript.toObject();
+
+      return {
+        ...article,
+        separateIssue: article.separateIssue || false,
+      };
+    });
 
     res.json({
       success: true,
