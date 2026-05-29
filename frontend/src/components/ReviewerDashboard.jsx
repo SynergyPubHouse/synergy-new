@@ -5,6 +5,7 @@ import { useAuth } from "../App";
 import { getUserFullName } from "../utils/roleUtils";
 
 // Helper function to format recommendation text
+// Working
 const formatRecommendation = (rec) => {
   const recMap = {
     accept: "Accept",
@@ -45,7 +46,7 @@ function ReviewerDashboard() {
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/assigned-manuscripts`,
         {
           headers: { Authorization: `Bearer ${user.token}` },
-        }
+        },
       );
 
       const userManuscripts = {};
@@ -65,7 +66,11 @@ function ReviewerDashboard() {
           }
         });
 
-        if (manuscript.author && manuscript.author._id && !seen.has(String(manuscript.author._id))) {
+        if (
+          manuscript.author &&
+          manuscript.author._id &&
+          !seen.has(String(manuscript.author._id))
+        ) {
           seen.add(String(manuscript.author._id));
           candidateAuthors.push(manuscript.author);
         }
@@ -89,7 +94,8 @@ function ReviewerDashboard() {
         candidateAuthors.forEach((au) => {
           const firstName = au.firstName || "";
           const lastName = au.lastName || "";
-          const fullName = `${firstName} ${lastName}`.trim() || "Unknown Author";
+          const fullName =
+            `${firstName} ${lastName}`.trim() || "Unknown Author";
           const authorId = au._id || manuscript._id;
           const groupKey = authorId;
           if (!userManuscripts[groupKey]) {
@@ -107,8 +113,12 @@ function ReviewerDashboard() {
 
       Object.values(userManuscripts).forEach((u) => {
         u.manuscripts.sort((a, b) => {
-          const dateB = new Date(b.submissionDate || b.createdAt || b.updatedAt || 0).getTime();
-          const dateA = new Date(a.submissionDate || a.createdAt || a.updatedAt || 0).getTime();
+          const dateB = new Date(
+            b.submissionDate || b.createdAt || b.updatedAt || 0,
+          ).getTime();
+          const dateA = new Date(
+            a.submissionDate || a.createdAt || a.updatedAt || 0,
+          ).getTime();
           return dateB - dateA;
         });
       });
@@ -140,7 +150,7 @@ function ReviewerDashboard() {
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/pending-invitations`,
         {
           headers: { Authorization: `Bearer ${user.token}` },
-        }
+        },
       );
       setPendingInvitations(response.data);
     } catch (error) {
@@ -156,14 +166,13 @@ function ReviewerDashboard() {
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/completed-reviews`,
         {
           headers: { Authorization: `Bearer ${user.token}` },
-        }
+        },
       );
       setCompletedReviews(response.data);
     } catch (error) {
       console.error("Error fetching completed reviews:", error);
     }
   }, [user]);
-
 
   useEffect(() => {
     if (user && user.token) {
@@ -182,7 +191,7 @@ function ReviewerDashboard() {
     setManuscripts(user.manuscripts || []);
 
     // Force re-render
-    setForceRender(prev => !prev);
+    setForceRender((prev) => !prev);
 
     console.log("Selected user manuscripts:", user.manuscripts?.length || 0);
     console.log("=== End Debug ===");
@@ -224,7 +233,8 @@ function ReviewerDashboard() {
       };
 
       const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL
+        `${
+          import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/review`,
         {
           comments: currentReviewText,
@@ -235,7 +245,7 @@ function ReviewerDashboard() {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        }
+        },
       );
 
       // const statusResponse = await axios.put(
@@ -273,7 +283,8 @@ function ReviewerDashboard() {
         return;
       }
       await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL
+        `${
+          import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/reject-invitation`,
         {
           rejectionReason: rejectionReason.trim(),
@@ -282,10 +293,10 @@ function ReviewerDashboard() {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        }
+        },
       );
       setPendingInvitations((prev) =>
-        prev.filter((inv) => inv._id !== manuscriptId)
+        prev.filter((inv) => inv._id !== manuscriptId),
       );
       setShowRejectForm(null);
       setRejectionReason("");
@@ -307,19 +318,20 @@ function ReviewerDashboard() {
       console.log("Accepting invitation for manuscript:", manuscriptId);
 
       await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL
+        `${
+          import.meta.env.VITE_BACKEND_URL
         }/api/auth/reviewer/manuscripts/${manuscriptId}/accept-invitation`,
         {},
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        }
+        },
       );
 
       // Remove from pending invitations
       setPendingInvitations((prev) =>
-        prev.filter((inv) => inv._id !== manuscriptId)
+        prev.filter((inv) => inv._id !== manuscriptId),
       );
 
       alert("Invitation accepted successfully!");
@@ -327,18 +339,17 @@ function ReviewerDashboard() {
       console.log("Fetching fresh manuscripts after acceptance...");
       const refreshedUsers = await fetchManuscripts();
       await fetchInvitations();
-      setForceRender(prev => !prev);
+      setForceRender((prev) => !prev);
 
       if (Array.isArray(refreshedUsers) && refreshedUsers.length > 0) {
         const targetUser = refreshedUsers.find((u) =>
-          (u.manuscripts || []).some((m) => m._id === manuscriptId)
+          (u.manuscripts || []).some((m) => m._id === manuscriptId),
         );
         if (targetUser) {
           setSelectedUser(targetUser);
           setManuscripts(targetUser.manuscripts || []);
         }
       }
-
     } catch (error) {
       console.error("Error accepting invitation:", error);
       alert("Failed to accept invitation");
@@ -350,20 +361,18 @@ function ReviewerDashboard() {
       return false;
     }
 
-
     return manuscript.reviewerNotes.some(
       (note) =>
         note.addedBy?.email?.toLowerCase() === user?.email?.toLowerCase() ||
         note.addedBy?.id === user?.id ||
-        note.addedBy?.id === user?._id
+        note.addedBy?.id === user?._id,
     );
   };
-
 
   const isManuscriptStatusFinal = (status) => {
     const finalStatuses = ["Accepted", "Reject", "Rejected", "Published"];
     return finalStatuses.some(
-      (finalStatus) => status?.toLowerCase() === finalStatus.toLowerCase()
+      (finalStatus) => status?.toLowerCase() === finalStatus.toLowerCase(),
     );
   };
   const handleDownloadCertificate = async (month, year) => {
@@ -378,21 +387,34 @@ function ReviewerDashboard() {
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/reviewer/certificates/download?month=${month}&year=${year}`,
         {
           headers: { Authorization: `Bearer ${user.token}` },
-          responseType: 'blob', // Important for file downloads
-        }
+          responseType: "blob", // Important for file downloads
+        },
       );
 
       const monthNames = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
       ];
       const monthName = monthNames[month];
 
       // Create a URL for the blob
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.setAttribute('download', `Certificate_of_Reviewing_${monthName}_${year}.pdf`);
+      link.setAttribute(
+        "download",
+        `Certificate_of_Reviewing_${monthName}_${year}.pdf`,
+      );
       document.body.appendChild(link);
       link.click();
 
@@ -401,7 +423,10 @@ function ReviewerDashboard() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading certificate:", error);
-      alert(error.response?.data?.message || "Failed to download certificate. It may not be available yet.");
+      alert(
+        error.response?.data?.message ||
+          "Failed to download certificate. It may not be available yet.",
+      );
     }
   };
 
@@ -418,7 +443,11 @@ function ReviewerDashboard() {
 
     if (certificateFilter === "past3Months") {
       const reviewDate = new Date(review.year, review.month, 1);
-      const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, 1); // -2 because current month is inclusive
+      const threeMonthsAgo = new Date(
+        today.getFullYear(),
+        today.getMonth() - 2,
+        1,
+      ); // -2 because current month is inclusive
       return reviewDate >= threeMonthsAgo;
     }
 
@@ -567,52 +596,79 @@ function ReviewerDashboard() {
 
             {filteredCertificates.length === 0 ? (
               <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-gray-500 text-lg">No certificates found for this time period.</p>
+                <p className="text-gray-500 text-lg">
+                  No certificates found for this time period.
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredCertificates.map((review) => {
-                const unlockDate = new Date(review.unlockDate);
-                const monthNames = [
-                  "January", "February", "March", "April", "May", "June",
-                  "July", "August", "September", "October", "November", "December",
-                ];
-                const monthName = monthNames[review.month];
-                
-                return (
-                  <div
-                    key={`${review.year}-${review.month}`}
-                    className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0] flex flex-col justify-between"
-                  >
-                    <div>
-                      <h3 className="text-xl font-semibold text-[#1a365d] mb-1">
-                        {monthName} {review.year}
-                      </h3>
-                      <p className="text-[#496580] font-medium text-sm mb-1">
-                        Manuscripts Reviewed: <span className="text-[#10b981] font-bold text-lg">{review.reviewCount}</span>
-                      </p>
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t border-[#e2e8f0]">
-                      {review.isUnlocked ? (
-                        <button
-                          onClick={() => handleDownloadCertificate(review.month, review.year)}
-                          className="w-full px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] transition duration-200 flex items-center justify-center space-x-2"
-                        >
-                          <span>⬇️ Download Certificate</span>
-                        </button>
-                      ) : (
-                        <div className="w-full px-4 py-2 bg-gray-100 text-gray-500 rounded text-center border border-gray-200 cursor-not-allowed text-sm">
-                          <span className="block font-medium mb-1">🔒 Locked</span>
-                          <span className="text-xs">
-                            Available after {unlockDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric', day: 'numeric' })}
+                  const unlockDate = new Date(review.unlockDate);
+                  const monthNames = [
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December",
+                  ];
+                  const monthName = monthNames[review.month];
+
+                  return (
+                    <div
+                      key={`${review.year}-${review.month}`}
+                      className="bg-[#f8fafc] p-4 rounded-lg border border-[#e2e8f0] flex flex-col justify-between"
+                    >
+                      <div>
+                        <h3 className="text-xl font-semibold text-[#1a365d] mb-1">
+                          {monthName} {review.year}
+                        </h3>
+                        <p className="text-[#496580] font-medium text-sm mb-1">
+                          Manuscripts Reviewed:{" "}
+                          <span className="text-[#10b981] font-bold text-lg">
+                            {review.reviewCount}
                           </span>
-                        </div>
-                      )}
+                        </p>
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t border-[#e2e8f0]">
+                        {review.isUnlocked ? (
+                          <button
+                            onClick={() =>
+                              handleDownloadCertificate(
+                                review.month,
+                                review.year,
+                              )
+                            }
+                            className="w-full px-4 py-2 bg-[#10b981] text-white rounded hover:bg-[#059669] transition duration-200 flex items-center justify-center space-x-2"
+                          >
+                            <span>⬇️ Download Certificate</span>
+                          </button>
+                        ) : (
+                          <div className="w-full px-4 py-2 bg-gray-100 text-gray-500 rounded text-center border border-gray-200 cursor-not-allowed text-sm">
+                            <span className="block font-medium mb-1">
+                              🔒 Locked
+                            </span>
+                            <span className="text-xs">
+                              Available after{" "}
+                              {unlockDate.toLocaleDateString("en-US", {
+                                month: "long",
+                                year: "numeric",
+                                day: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -629,10 +685,11 @@ function ReviewerDashboard() {
                 <button
                   key={user._id}
                   onClick={() => handleUserClick(user)}
-                  className={`w-full text-left p-3 rounded-lg transition-all ${selectedUser === user
-                    ? "bg-[#496580] text-white"
-                    : "bg-[#f8fafc] text-[#1a365d] hover:bg-[#e2e8f0]"
-                    }`}
+                  className={`w-full text-left p-3 rounded-lg transition-all ${
+                    selectedUser === user
+                      ? "bg-[#496580] text-white"
+                      : "bg-[#f8fafc] text-[#1a365d] hover:bg-[#e2e8f0]"
+                  }`}
                 >
                   {user.fullName}
                 </button>
@@ -647,39 +704,44 @@ function ReviewerDashboard() {
                 ? `Manuscripts Under Review by ${selectedUser.firstName} ${selectedUser.lastName}`
                 : "Select an Author"}
             </h2>
-            <div className="space-y-4" key={`${selectedUser?._id || 'all'}-${forceRender}`}>
-
-
-
-
+            <div
+              className="space-y-4"
+              key={`${selectedUser?._id || "all"}-${forceRender}`}
+            >
               {manuscripts.map((manuscript) => {
                 // Get ALL invitations for this reviewer
-                const allReviewerInvitations = manuscript.invitations?.filter(
-                  (inv) => inv.email?.toLowerCase() === user?.email?.toLowerCase()
-                ) || [];
+                const allReviewerInvitations =
+                  manuscript.invitations?.filter(
+                    (inv) =>
+                      inv.email?.toLowerCase() === user?.email?.toLowerCase(),
+                  ) || [];
 
+                const alreadySubmittedReview =
+                  hasReviewerAlreadySubmittedReview(manuscript);
 
-                const alreadySubmittedReview = hasReviewerAlreadySubmittedReview(manuscript);
-
-
-                const isFinalStatus = isManuscriptStatusFinal(manuscript.status);
-                console.log(`📧 All invitations for ${user?.email} in manuscript ${manuscript._id}:`,
-                  allReviewerInvitations.map(inv => ({
+                const isFinalStatus = isManuscriptStatusFinal(
+                  manuscript.status,
+                );
+                console.log(
+                  `📧 All invitations for ${user?.email} in manuscript ${manuscript._id}:`,
+                  allReviewerInvitations.map((inv) => ({
                     status: inv.status,
                     revisionRound: inv.revisionRound,
                     reviewRound: inv.reviewRound,
                     invitedAt: inv.invitedAt,
                     acceptedAt: inv.acceptedAt,
-                    isRevisionReview: inv.isRevisionReview
-                  }))
+                    isRevisionReview: inv.isRevisionReview,
+                  })),
                 );
 
                 // Sort by invitedAt date (newest first) and get latest
-                const sortedInvitations = [...allReviewerInvitations].sort((a, b) => {
-                  const dateA = new Date(a.invitedAt || a.createdAt || 0);
-                  const dateB = new Date(b.invitedAt || b.createdAt || 0);
-                  return dateB - dateA; // Newest first
-                });
+                const sortedInvitations = [...allReviewerInvitations].sort(
+                  (a, b) => {
+                    const dateA = new Date(a.invitedAt || a.createdAt || 0);
+                    const dateB = new Date(b.invitedAt || b.createdAt || 0);
+                    return dateB - dateA; // Newest first
+                  },
+                );
 
                 // Latest invitation (most recent)
                 const reviewerInvitation = sortedInvitations[0] || null;
@@ -689,26 +751,30 @@ function ReviewerDashboard() {
                   revisionRound: reviewerInvitation?.revisionRound,
                   reviewRound: reviewerInvitation?.reviewRound,
                   invitedAt: reviewerInvitation?.invitedAt,
-                  acceptedAt: reviewerInvitation?.acceptedAt
+                  acceptedAt: reviewerInvitation?.acceptedAt,
                 });
 
                 // Check blocked (review deadline expired - distinguished by isReviewBlocked flag)
                 const isBlocked =
                   reviewerInvitation?.isReviewBlocked === true ||
                   allReviewerInvitations.some(
-                    (inv) => inv.isReviewBlocked === true
+                    (inv) => inv.isReviewBlocked === true,
                   );
 
                 // Check accepted
                 const isAccepted = reviewerInvitation?.status === "accepted";
 
-                const canSubmitReview = isAccepted && !isBlocked && !alreadySubmittedReview && !isFinalStatus;
-
+                const canSubmitReview =
+                  isAccepted &&
+                  !isBlocked &&
+                  !alreadySubmittedReview &&
+                  !isFinalStatus;
 
                 // ═══════════════════════════════════════════════════════════════════
                 // 🔥 KEY FIX: Show author response files based on invitation revision round
                 // ═══════════════════════════════════════════════════════════════════
-                const currentInvitationRevisionRound = reviewerInvitation?.revisionRound || 0;
+                const currentInvitationRevisionRound =
+                  reviewerInvitation?.revisionRound || 0;
 
                 // Check if this invitation was sent during a revision round
                 // If revisionRound > 0, it means author has submitted revision
@@ -717,7 +783,8 @@ function ReviewerDashboard() {
                 // Show author response files ONLY if:
                 // 1. Invitation was sent during revision round (revisionRound > 0)
                 // 2. Reviewer has accepted the invitation
-                const shouldShowAuthorResponseFiles = isRevisionReview && isAccepted;
+                const shouldShowAuthorResponseFiles =
+                  isRevisionReview && isAccepted;
 
                 console.log(`Manuscript ${manuscript._id}:`, {
                   reviewerEmail: user?.email,
@@ -725,17 +792,19 @@ function ReviewerDashboard() {
                   isAccepted,
                   shouldShowAuthorResponseFiles,
                   revisionRound: currentInvitationRevisionRound,
-                  reviewRound: reviewerInvitation?.reviewRound
+                  reviewRound: reviewerInvitation?.reviewRound,
                 });
 
                 // Extra info for display
                 const currentRound = allReviewerInvitations.length;
-                const previousReviewsCount = manuscript.reviewerNotes?.filter(
-                  (note) =>
-                    note.addedBy?.email?.toLowerCase() === user?.email?.toLowerCase() ||
-                    note.addedBy?.id === user?.id ||
-                    note.addedBy?.id === user?._id
-                )?.length || 0;
+                const previousReviewsCount =
+                  manuscript.reviewerNotes?.filter(
+                    (note) =>
+                      note.addedBy?.email?.toLowerCase() ===
+                        user?.email?.toLowerCase() ||
+                      note.addedBy?.id === user?.id ||
+                      note.addedBy?.id === user?._id,
+                  )?.length || 0;
 
                 return (
                   <div
@@ -752,81 +821,114 @@ function ReviewerDashboard() {
                         </p>
                         <p className="text-[#64748b] text-sm">
                           Submitted:{" "}
-                          {new Date(manuscript.submissionDate).toLocaleDateString()}
+                          {new Date(
+                            manuscript.submissionDate,
+                          ).toLocaleDateString()}
                         </p>
-
                       </div>
                       <div className="flex flex-col space-y-2">
                         {/* ALWAYS show original PDF */}
                         {manuscript.mergedFileUrl && (
                           <button
-                            onClick={() => handleViewPDF(manuscript.mergedFileUrl)}
+                            onClick={() =>
+                              handleViewPDF(manuscript.mergedFileUrl)
+                            }
                             className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors mb-1 flex items-center justify-center space-x-2"
                           >
                             📄 Original PDF
                           </button>
                         )}
 
+                        {shouldShowAuthorResponseFiles &&
+                          manuscript.authorResponse?.responseSheet?.docxUrl && (
+                            <button
+                              onClick={() =>
+                                window.open(
+                                  manuscript.authorResponse.responseSheet
+                                    .docxUrl,
+                                  "_blank",
+                                )
+                              }
+                              className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-1 flex items-center justify-center space-x-2"
+                            >
+                              📋 Response Sheet
+                            </button>
+                          )}
 
-                        {shouldShowAuthorResponseFiles && manuscript.authorResponse?.responseSheet?.docxUrl && (
-                          <button
-                            onClick={() => window.open(manuscript.authorResponse.responseSheet.docxUrl, "_blank")}
-                            className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-1 flex items-center justify-center space-x-2"
-                          >
-                            📋 Response Sheet
-                          </button>
-                        )}
+                        {shouldShowAuthorResponseFiles &&
+                          manuscript.authorResponse?.highlightedDocument
+                            ?.url && (
+                            <button
+                              onClick={() =>
+                                window.open(
+                                  manuscript.authorResponse.highlightedDocument
+                                    .url,
+                                  "_blank",
+                                )
+                              }
+                              className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors mb-1 flex items-center justify-center space-x-2"
+                            >
+                              📝 Highlighted Doc
+                            </button>
+                          )}
 
-                        {shouldShowAuthorResponseFiles && manuscript.authorResponse?.highlightedDocument?.url && (
-                          <button
-                            onClick={() => window.open(manuscript.authorResponse.highlightedDocument.url, "_blank")}
-                            className="w-full px-3 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors mb-1 flex items-center justify-center space-x-2"
-                          >
-                            📝  Highlighted Doc
-                          </button>
-                        )}
+                        {shouldShowAuthorResponseFiles &&
+                          manuscript.authorResponse?.cleanDocument?.url && (
+                            <button
+                              onClick={() => {
+                                const url =
+                                  manuscript.authorResponse.cleanDocument.url;
+                                if (!url) return;
 
-                        {shouldShowAuthorResponseFiles && manuscript.authorResponse?.cleanDocument?.url && (
-                          <button
-                            onClick={() => {
-                              const url = manuscript.authorResponse.cleanDocument.url;
-                              if (!url) return;
-
-                              if (url.includes('drive.google.com')) {
-                                const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-                                const fileId = match?.[1];
-                                if (fileId) {
-                                  const isZip = url.toLowerCase().includes('.zip');
+                                if (url.includes("drive.google.com")) {
+                                  const match = url.match(
+                                    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+                                  );
+                                  const fileId = match?.[1];
+                                  if (fileId) {
+                                    const isZip = url
+                                      .toLowerCase()
+                                      .includes(".zip");
+                                    if (isZip) {
+                                      window.open(
+                                        `https://drive.google.com/uc?export=download&id=${fileId}`,
+                                        "_blank",
+                                      );
+                                    } else {
+                                      window.open(
+                                        `https://drive.google.com/file/d/${fileId}/preview`,
+                                        "_blank",
+                                      );
+                                    }
+                                  }
+                                } else {
+                                  const isZip = url
+                                    .toLowerCase()
+                                    .includes(".zip");
+                                  const isPdf = url
+                                    .toLowerCase()
+                                    .includes(".pdf");
                                   if (isZip) {
-                                    window.open(`https://drive.google.com/uc?export=download&id=${fileId}`, '_blank');
+                                    const link = document.createElement("a");
+                                    link.href = url;
+                                    link.download = "clean-document.zip";
+                                    link.target = "_blank";
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  } else if (isPdf) {
+                                    window.open(url, "_blank");
                                   } else {
-                                    window.open(`https://drive.google.com/file/d/${fileId}/preview`, '_blank');
+                                    const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+                                    window.open(viewerUrl, "_blank");
                                   }
                                 }
-                              } else {
-                                const isZip = url.toLowerCase().includes('.zip');
-                                const isPdf = url.toLowerCase().includes('.pdf');
-                                if (isZip) {
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.download = 'clean-document.zip';
-                                  link.target = '_blank';
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                } else if (isPdf) {
-                                  window.open(url, "_blank");
-                                } else {
-                                  const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-                                  window.open(viewerUrl, "_blank");
-                                }
-                              }
-                            }}
-                            className="w-full px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors mb-1 flex items-center justify-center space-x-2"
-                          >
-                            📝 Clean Document
-                          </button>
-                        )}
+                              }}
+                              className="w-full px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600 transition-colors mb-1 flex items-center justify-center space-x-2"
+                            >
+                              📝 Clean Document
+                            </button>
+                          )}
 
                         {/* Show message if this is NOT a revision review */}
                         {/* {!isRevisionReview && (
@@ -874,7 +976,10 @@ function ReviewerDashboard() {
                         </h4>
                         <div className="space-y-2">
                           {manuscript.reviewerNotes.map((note, index) => (
-                            <div key={index} className="bg-white p-3 rounded border border-[#e2e8f0]">
+                            <div
+                              key={index}
+                              className="bg-white p-3 rounded border border-[#e2e8f0]"
+                            >
                               <p className="text-[#1a365d]">{note.text}</p>
                               {note.action && (
                                 <span className="inline-block mt-2 px-2 py-1 text-xs rounded bg-[#10b981] text-white">
@@ -882,7 +987,8 @@ function ReviewerDashboard() {
                                 </span>
                               )}
                               <p className="text-[#64748b] text-xs mt-2">
-                                Added on: {new Date(note.addedAt).toLocaleString()}
+                                Added on:{" "}
+                                {new Date(note.addedAt).toLocaleString()}
                               </p>
                             </div>
                           ))}
@@ -898,7 +1004,8 @@ function ReviewerDashboard() {
                             🚫 Review Access Revoked
                           </div>
                           <p className="text-red-700">
-                            Your invitation to review this manuscript has been <strong>blocked</strong> by the editor.
+                            Your invitation to review this manuscript has been{" "}
+                            <strong>blocked</strong> by the editor.
                           </p>
                           <p className="text-red-600 text-sm mt-2">
                             You can no longer submit a review.
@@ -907,58 +1014,68 @@ function ReviewerDashboard() {
                           {previousReviewsCount > 0 && (
                             <div className="mt-3 p-2 bg-gray-100 rounded">
                               <p className="text-gray-600 text-sm">
-                                📝 You previously submitted <strong>{previousReviewsCount}</strong> review(s) for this manuscript.
+                                📝 You previously submitted{" "}
+                                <strong>{previousReviewsCount}</strong>{" "}
+                                review(s) for this manuscript.
                               </p>
                             </div>
                           )}
 
                           {currentRound > 1 && (
                             <p className="text-red-500 text-xs mt-3">
-                              ⚠️ You were invited for Round {currentRound} but did not submit review.
+                              ⚠️ You were invited for Round {currentRound} but
+                              did not submit review.
                             </p>
                           )}
 
                           {reviewerInvitation?.reviewBlockedAt && (
                             <p className="text-red-500 text-xs mt-3">
-                              Blocked on: {new Date(reviewerInvitation.reviewBlockedAt).toLocaleString()}
+                              Blocked on:{" "}
+                              {new Date(
+                                reviewerInvitation.reviewBlockedAt,
+                              ).toLocaleString()}
                             </p>
                           )}
                         </div>
                       ) : isFinalStatus ? (
-
-                        < div className="bg-gray-50 border border-gray-300 rounded-lg p-6 text-center">
+                        <div className="bg-gray-50 border border-gray-300 rounded-lg p-6 text-center">
                           <div className="text-gray-800 text-lg font-semibold mb-2">
                             🔒 Manuscript Finalized
                           </div>
                           <p className="text-gray-700">
-                            This manuscript has been <strong>{manuscript.status}</strong>.
+                            This manuscript has been{" "}
+                            <strong>{manuscript.status}</strong>.
                           </p>
                           <p className="text-gray-600 text-sm mt-2">
-                            Reviews can no longer be submitted for finalized manuscripts (Accepted, Rejected, or Published).
+                            Reviews can no longer be submitted for finalized
+                            manuscripts (Accepted, Rejected, or Published).
                           </p>
                           {previousReviewsCount > 0 && (
                             <div className="mt-3 p-2 bg-blue-100 rounded">
                               <p className="text-blue-800 text-sm">
-                                📝 You submitted <strong>{previousReviewsCount}</strong> review(s) before finalization.
+                                📝 You submitted{" "}
+                                <strong>{previousReviewsCount}</strong>{" "}
+                                review(s) before finalization.
                               </p>
                             </div>
                           )}
                         </div>
                       ) : alreadySubmittedReview ? (
-
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
                           <div className="text-blue-800 text-lg font-semibold mb-2">
                             ✅ Review Already Submitted
                           </div>
                           <p className="text-blue-700">
-                            You have already submitted your review for this manuscript.
+                            You have already submitted your review for this
+                            manuscript.
                           </p>
                           <p className="text-blue-600 text-sm mt-2">
                             You can only submit one review per manuscript.
                           </p>
                           <div className="mt-3 p-2 bg-blue-100 rounded">
                             <p className="text-blue-800 text-sm">
-                              📝 Total reviews submitted: <strong>{previousReviewsCount}</strong>
+                              📝 Total reviews submitted:{" "}
+                              <strong>{previousReviewsCount}</strong>
                             </p>
                           </div>
                         </div>
@@ -998,10 +1115,16 @@ function ReviewerDashboard() {
                                 }
                                 className="w-full bg-white text-[#1a365d] rounded p-2 border border-[#e2e8f0]"
                               >
-                                <option value="">Select a recommendation</option>
+                                <option value="">
+                                  Select a recommendation
+                                </option>
                                 <option value="Accept">Accept</option>
-                                <option value="Minor Revision">Minor Revision</option>
-                                <option value="Major Revision">Major Revision</option>
+                                <option value="Minor Revision">
+                                  Minor Revision
+                                </option>
+                                <option value="Major Revision">
+                                  Major Revision
+                                </option>
                                 <option value="Reject">Reject</option>
                               </select>
                             </div>
@@ -1042,7 +1165,7 @@ function ReviewerDashboard() {
           </div>
         </div>
       </div>
-    </div >
+    </div>
   );
 }
 
