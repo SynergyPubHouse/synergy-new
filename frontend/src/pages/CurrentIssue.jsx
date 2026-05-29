@@ -3,37 +3,54 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../App";
 
-const CurrentIssue = () => {
+const CurrentIssue = ({ separateIssue = false }) => {
   const { user, loading: authLoading } = useAuth();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const pageTitle = separateIssue ? "Special Issue" : "Published Articles";
+  const emptyMessage = separateIssue
+    ? "No special issue articles available."
+    : "No current issues available.";
 
   useEffect(() => {
-    const fetchCurrentIssue = async () => {
+    const fetchIssueArticles = async () => {
       try {
         setLoading(true);
+        const endpoint = separateIssue
+          ? "/api/manuscripts/special-issue"
+          : "/api/manuscripts/published";
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/published`
+          `${import.meta.env.VITE_BACKEND_URL}${endpoint}`
         );
 
         if (res.data && res.data.data) {
           const data = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
           setArticles(data);
         } else {
-          setError('No current issues available.');
+          setError(emptyMessage);
         }
       } catch (err) {
-        console.error('Error fetching current issue:', err);
-        setError('Failed to load current issue. Please try again later.');
+        console.error('Error fetching issue articles:', err);
+        if (err.response?.status === 404) {
+          setArticles([]);
+          setError("");
+          return;
+        }
+
+        setError(
+          separateIssue
+            ? 'Failed to load special issue articles. Please try again later.'
+            : 'Failed to load current issue. Please try again later.'
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCurrentIssue();
-  }, [user]);
+    fetchIssueArticles();
+  }, [user, separateIssue, emptyMessage]);
 
   // ✅ Same function as ArticleDetail - PDF authors first, then API fallback
   const getAuthors = (article) => {
@@ -61,14 +78,28 @@ const CurrentIssue = () => {
     return `pp. ${article.pageStart}-${article.pageEnd}`;
   };
 
+  const formatIssueDate = (article) => {
+    if (article.issueTitle) return `${article.issueTitle} ${article.issueYear || ''}`.trim();
+
+    if (article.publishedAt) {
+      return new Date(article.publishedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+
+    return article.issueYear ? article.issueYear.toString() : '';
+  };
+
   if (authLoading || loading) {
     return <div className="text-center mt-20 text-lg">Loading...</div>;
   }
 
   if (error) return <div className="text-center mt-20 text-red-500">{error}</div>;
-  
+
   if (!articles || articles.length === 0) {
-    return <div className="text-center mt-20 text-gray-500">No current issues available.</div>;
+    return <div className="text-center mt-20 text-gray-500">{emptyMessage}</div>;
   }
 
   return (
@@ -84,9 +115,14 @@ const CurrentIssue = () => {
           Back to Overview
         </button>
 
-        <h1 className="text-2xl font-extrabold text-[#00796b] mb-8">
-          Published Articles ({articles.length})
-        </h1>
+        <div className="mb-8">
+          <h1 className="text-2xl font-extrabold text-[#00796b]">
+            {pageTitle} ({articles.length})
+          </h1>
+          <p className="mt-3 inline-flex items-center rounded-full bg-[#e0f2f1] px-4 py-1.5 text-sm font-semibold tracking-[0.12em] text-[#00695c] shadow-sm ring-1 ring-[#00796b]/10">
+            Vol. 1, Issue 1 • Jan-Apr 2026
+          </p>
+        </div>
 
         {/* Article List */}
         <div className="space-y-4">
@@ -109,23 +145,30 @@ const CurrentIssue = () => {
 
               {/* Badges */}
               <div className="flex flex-wrap gap-2 mb-3">
+                {/* Journal Name Badge */}
+                <span className="px-2 py-1 bg-[#e0f2f1] text-[#00796b] text-xs font-medium rounded-md border border-[#00796b]/20">
+                  📚 JICS
+                </span>
+
+                {/* Volume & Issue Badge */}
                 {item.section && (
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-md border border-blue-200">
                     📂 {item.section}
                   </span>
                 )}
+                {(item.issueVolume || item.issueNumber) && (
+                  <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-md border border-purple-200">
+                    🏷️ Vol. {item.issueVolume || '-'}, Issue {item.issueNumber || '-'}
+                  </span>
+                )}
                 {formatPageInfo(item) && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-md border border-green-200">
                     📄 {formatPageInfo(item)}
                   </span>
                 )}
                 {item.publishedAt && (
-                  <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                    📅 {new Date(item.publishedAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
+                  <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md border border-gray-200">
+                    📅 {formatIssueDate(item)}
                   </span>
                 )}
               </div>
@@ -137,17 +180,17 @@ const CurrentIssue = () => {
 
               {/* Actions */}
               <div className="flex justify-between items-center">
-              <a
-  href={`/journal/jics/articles/${item._id}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="inline-flex items-center gap-2 text-[#00acc1] font-semibold hover:text-[#00796b] transition-all hover:gap-3"
->
-  Read Full Article
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-  </svg>
-</a>
+                <a
+                  href={`/journal/jics/articles/${item._id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-[#00acc1] font-semibold hover:text-[#00796b] transition-all hover:gap-3"
+                >
+                  Read Full Article
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
                 {item.publishedFileUrl ? (
                   <a
                     href={item.publishedFileUrl}

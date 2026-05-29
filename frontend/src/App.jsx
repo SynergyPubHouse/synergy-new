@@ -47,6 +47,7 @@ import FinalEvaluationAndAcceptance from "./pages/peer-review/FinalEvaluationAnd
 import PublicationIntegrityAndTimeline from "./pages/peer-review/PublicationIntegrityAndTimeline";
 
 import PageNotAvailable from "./pages/pagenotavailable";
+import PublicPdfProxy from "./pages/PublicPdfProxy";
 // import BookPublication from "./pages/BookPublication";
 import BookPublication from "./pages/BookPublication";
 import WebSeriesCast from "./pages/WebSeriesCast";
@@ -75,7 +76,9 @@ function ScrollToTop() {
 function AppContent() {
   const location = useLocation();
   const hideNavFooter =
-    location.pathname === "/login" || location.pathname === "/register";
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
+    location.pathname.startsWith("/pdf/");
   const [user, setUser] = React.useState(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -183,6 +186,7 @@ function AppContent() {
         <Route path="/conference-publication" element={<ConferencePublication />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route path="/verification-pending" element={<VerificationPending />} />
+        <Route path="/pdf/:filename" element={<PublicPdfProxy />} />
         {/* Journal Management Routes */}
         {/* <Route path={BASE_URL} element={<HomePage />} /> */}
         <Route path={`/publish`} element={<Publish />} />
@@ -202,6 +206,7 @@ function AppContent() {
         <Route path={`/settings`} element={<Settings />} />
         <Route path={`/about`} element={<AboutUs />} />
         <Route path={`/journal/jics/articles/current`} element={<CurrentIssue />} />
+        <Route path={`/journal/jics/articles/special-issue`} element={<CurrentIssue separateIssue />} />
         <Route path={`${JICS_URL}/articles/:id`} element={<ArticleDetail />} />
         <Route path={`/journal/jics/articles/:id`} element={<ArticleDetail />} />
 
@@ -217,7 +222,13 @@ function AppContent() {
         <Route
           path={`${JICS_URL}/editor/dashboard`}
           element={
-            user?.accountType === "editor" || user?.availableRoles?.includes("editor") ? (
+            !user ? (
+              <Navigate
+                to="/login"
+                state={{ from: location.pathname }}
+                replace
+              />
+            ) : user?.accountType === "editor" || user?.availableRoles?.includes("editor") ? (
               <EditorDashboard />
             ) : (
               <VerifyEmail />

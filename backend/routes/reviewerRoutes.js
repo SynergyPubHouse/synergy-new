@@ -12,6 +12,8 @@ const {
 	getPendingInvitations,
 	acceptInvitation,
 	rejectInvitation,
+	getCompletedReviews,
+	downloadCertificate,
 } = require("../controllers/reviewerController");
 const auth = require("../middleware/auth");
 
@@ -25,6 +27,8 @@ router.post("/reset-password/:token", resetPassword);
 router.get("/profile", auth, getProfile);
 router.get("/assigned-manuscripts", auth, getAssignedManuscripts);
 router.get("/pending-invitations", auth, getPendingInvitations);
+router.get("/completed-reviews", auth, getCompletedReviews);
+router.get("/certificates/download", auth, downloadCertificate);
 router.post("/manuscripts/:manuscriptId/review", auth, submitReview);
 router.post(
 	"/manuscripts/:manuscriptId/accept-invitation",

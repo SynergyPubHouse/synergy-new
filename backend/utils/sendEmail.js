@@ -19,10 +19,11 @@ function htmlToText(html = "") {
 
 // Create reusable transporter
 const createTransporter = () => {
+    const port = parseInt(process.env.EMAIL_PORT) || 465;
     return nodemailer.createTransport({
         host: process.env.EMAIL_HOST || "smtp.hostinger.com",
-        port: parseInt(process.env.EMAIL_PORT) || 465,
-        secure: true, // true for port 465
+        port,
+        secure: port === 465, // true for port 465 (implicit TLS), false for 587 (STARTTLS)
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
@@ -75,12 +76,13 @@ const sendEmail = async (options) => {
         }
 
         const info = await transporter.sendMail(mailOptions);
-        console.log("Email sent successfully via Hostinger SMTP");
-        console.log("Message ID:", info.messageId);
-        
+        console.log(`✅ Email sent successfully to: ${options.to}`);
+        console.log(`Subject: ${options.subject}`);
+        console.log(`Message ID: ${info.messageId}`);
+
         return info;
     } catch (error) {
-        console.error("Email sending error:", error);
+        console.error(`❌ Email sending error for recipient ${options.to || 'Unknown'}:`, error);
         throw error;
     }
 };

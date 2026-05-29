@@ -9,6 +9,7 @@ const connectDB = require("./config/db");
 const googleAuthRoutes = require('./routes/googleAuthRoutes');
 const scholarRoutes = require('./routes/scholarRoutes');
 const sitemapRoutes = require('./routes/sitemapRoutes');
+const manuscriptController = require("./controllers/manuscriptController");
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, os.tmpdir()),
     filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
@@ -85,6 +86,7 @@ app.use((req, res, next) => {
 });
 app.use('/scholar', scholarRoutes);
 app.use('/', sitemapRoutes);
+app.use("/", require("./routes/publicPdfRoutes"));
 
 app.get('/robots.txt', (req, res) => {
     res.setHeader('Content-Type', 'text/plain');
@@ -419,6 +421,10 @@ app.get('/test-docx-convert', async (req, res) => {
     
     res.json(results);
 });
+app.get(
+  "/api/manuscripts/special-issue",
+  manuscriptController.getSpecialIssueManuscripts,
+);
 app.use("/api", require("./routes/manuscriptRoutes"));
 
 // Error Handling
@@ -428,7 +434,7 @@ app.use(errorHandler);
 // Connect to MongoDB
 connectDB();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const server = app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
 

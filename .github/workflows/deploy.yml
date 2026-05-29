@@ -2,7 +2,7 @@ name: Deploy to Hostinger via FTP
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   deploy:
@@ -16,7 +16,7 @@ jobs:
       - name: Install Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'   # recommended for React Router 7
+          node-version: "20" # recommended for React Router 7
 
       - name: Install dependencies
         run: |
@@ -26,7 +26,9 @@ jobs:
       - name: Build project
         run: |
           cd frontend
+          echo "starting build"
           npm run build
+          echo "build fully finished"
 
       # Upload build folder to Hostinger
       - name: Upload files via FTP
@@ -38,4 +40,4 @@ jobs:
           protocol: ftps
           local-dir: ./frontend/dist/
           server-dir: ${{ secrets.FTP_UPLOAD_PATH }}/
-          dangerous-clean-slate: true
+          dangerous-clean-slate: false

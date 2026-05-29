@@ -15,6 +15,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 // Manuscript routes
 router.get("/manuscripts/published", manuscriptController.getPublishedManuscripts);
+router.get("/manuscripts/special-issue", manuscriptController.getSpecialIssueManuscripts);
 router.get(
 	"/manuscripts/my-submissions",
 	auth,
@@ -23,7 +24,7 @@ router.get(
 	router.get("/manuscripts/most-viewed", manuscriptController.getMostViewedManuscripts);
 	router.post("/manuscripts/:manuscriptId/view", manuscriptController.incrementViewCount);
 router.get(
-	"/manuscripts/:manuscriptId",
+	"/manuscripts/:manuscriptId([0-9a-fA-F]{24})",
 	
 	manuscriptController.getManuscriptById
 );
@@ -110,7 +111,11 @@ router.get("/jobs/:jobId", auth, manuscriptController.getJobStatus);
 
 router.post('/draft', auth, manuscriptController.saveDraft);
 router.put("/manuscripts/:manuscriptId/draft", auth, manuscriptController.updateDraft);
-router.get("/manuscripts/:manuscriptId", auth, manuscriptController.getManuscriptById);
+router.get(
+    "/manuscripts/:manuscriptId([0-9a-fA-F]{24})",
+    auth,
+    manuscriptController.getManuscriptById
+);
 router.delete("/:id", manuscriptController.deleteManuscript);
 
 router.put(
