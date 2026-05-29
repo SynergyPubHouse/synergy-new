@@ -206,6 +206,7 @@ function AppContent() {
         <Route path={`/settings`} element={<Settings />} />
         <Route path={`/about`} element={<AboutUs />} />
         <Route path={`/journal/jics/articles/current`} element={<CurrentIssue />} />
+        <Route path={`/journal/jics/articles/archives`} element={<CurrentIssue archive />} />
         <Route path={`/journal/jics/articles/special-issue`} element={<CurrentIssue separateIssue />} />
         <Route path={`${JICS_URL}/articles/:id`} element={<ArticleDetail />} />
         <Route path={`/journal/jics/articles/:id`} element={<ArticleDetail />} />

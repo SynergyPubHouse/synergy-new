@@ -3,21 +3,106 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../App";
 
-const CurrentIssue = ({ separateIssue = false }) => {
+const MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+const ISSUE_START_YEAR = 2026;
+
+const getIssueWindow = (date = new Date()) => {
+  const year = date.getFullYear();
+  const startMonth = Math.floor(date.getMonth() / 4) * 4;
+  const endMonth = startMonth + 3;
+  const issueNumber = Math.floor(startMonth / 4) + 1;
+  const volume = Math.max(1, year - ISSUE_START_YEAR + 1);
+  const rangeLabel = `${MONTH_NAMES[startMonth]}-${MONTH_NAMES[endMonth]} ${year}`;
+
+  return {
+    startDate: new Date(year, startMonth, 1),
+    endDate: new Date(year, startMonth + 4, 1),
+    label: `Vol. ${volume}, Issue ${issueNumber} • ${rangeLabel}`,
+    rangeLabel,
+  };
+};
+
+const getArticleIssueDate = (article) => {
+  const rawDate = article?.publishedAt || article?.submissionDate || article?.updatedAt;
+  if (!rawDate) return null;
+
+  const date = new Date(rawDate);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const sortArticles = (articles, archive) => {
+  return [...articles].sort((a, b) => {
+    if (archive) {
+      return (getArticleIssueDate(b)?.getTime() || 0) - (getArticleIssueDate(a)?.getTime() || 0);
+    }
+
+    const aPage = a.pageStart;
+    const bPage = b.pageStart;
+
+    if (aPage != null && bPage != null) return aPage - bPage;
+    if (aPage != null && bPage == null) return -1;
+    if (aPage == null && bPage != null) return 1;
+    return (getArticleIssueDate(b)?.getTime() || 0) - (getArticleIssueDate(a)?.getTime() || 0);
+  });
+};
+
+const filterArticlesByIssueWindow = (articles, archive) => {
+  const issueWindow = getIssueWindow();
+
+  return sortArticles(
+    articles.filter((article) => {
+      const issueDate = getArticleIssueDate(article);
+      if (!issueDate) return archive;
+
+      return archive
+        ? issueDate < issueWindow.startDate
+        : issueDate >= issueWindow.startDate && issueDate < issueWindow.endDate;
+    }),
+    archive,
+  );
+};
+
+const CurrentIssue = ({ separateIssue = false, archive = false }) => {
   const { user, loading: authLoading } = useAuth();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const pageTitle = separateIssue ? "Special Issue" : "Published Articles";
+  const issueWindow = getIssueWindow();
+  const pageTitle = separateIssue
+    ? "Special Issue"
+    : archive
+      ? "Past Issues / Archives"
+      : "Current Issue";
   const emptyMessage = separateIssue
     ? "No special issue articles available."
+    : archive
+      ? "No past issue articles available."
     : "No current issues available.";
+  const issueLabel = separateIssue
+    ? "Special Issue"
+    : archive
+      ? `Before ${issueWindow.rangeLabel}`
+      : issueWindow.label;
 
   useEffect(() => {
     const fetchIssueArticles = async () => {
       try {
         setLoading(true);
+        setError("");
         const endpoint = separateIssue
           ? "/api/manuscripts/special-issue"
           : "/api/manuscripts/published";
@@ -27,7 +112,7 @@ const CurrentIssue = ({ separateIssue = false }) => {
 
         if (res.data && res.data.data) {
           const data = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
-          setArticles(data);
+          setArticles(separateIssue ? data : filterArticlesByIssueWindow(data, archive));
         } else {
           setError(emptyMessage);
         }
@@ -50,7 +135,7 @@ const CurrentIssue = ({ separateIssue = false }) => {
     };
 
     fetchIssueArticles();
-  }, [user, separateIssue, emptyMessage]);
+  }, [user, separateIssue, archive, emptyMessage]);
 
   // ✅ Same function as ArticleDetail - PDF authors first, then API fallback
   const getAuthors = (article) => {
@@ -120,7 +205,7 @@ const CurrentIssue = ({ separateIssue = false }) => {
             {pageTitle} ({articles.length})
           </h1>
           <p className="mt-3 inline-flex items-center rounded-full bg-[#e0f2f1] px-4 py-1.5 text-sm font-semibold tracking-[0.12em] text-[#00695c] shadow-sm ring-1 ring-[#00796b]/10">
-            Vol. 1, Issue 1 • Jan-Apr 2026
+            {issueLabel}
           </p>
         </div>
 

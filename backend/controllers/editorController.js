@@ -551,42 +551,32 @@ exports.getUsersWithManuscripts = async (req, res) => {
 			console.log(`Processing manuscript: ${manuscript.customId}`);
 			console.log(`Authors: ${manuscript.authors?.map(a => a._id).join(', ')}`);
 			console.log(`Corresponding Author: ${manuscript.correspondingAuthor?._id}`);
-			
-			// Add manuscript to all authors
-			const allAuthors = [
-				...manuscript.authors,
-				manuscript.correspondingAuthor
-			].filter(author => author); // Remove null/undefined
 
-			// Remove duplicate authors from this manuscript
-			const uniqueAuthors = allAuthors.filter((author, index, self) =>
-				index === self.findIndex((a) => a._id.toString() === author._id.toString())
-			);
+			const author = manuscript.correspondingAuthor || manuscript.authors?.[0];
+			if (!author?._id) {
+				console.log(`Skipping manuscript ${manuscript.customId} because no author is available`);
+				return;
+			}
 
-			console.log(`Unique authors for this manuscript: ${uniqueAuthors.length}`);
+			const authorId = author._id.toString();
 
-			uniqueAuthors.forEach((author) => {
-				const authorId = author._id.toString();
-				
-				if (!userManuscriptMap.has(authorId)) {
-					userManuscriptMap.set(authorId, {
-						...author,
-						manuscripts: []
-					});
-				}
+			if (!userManuscriptMap.has(authorId)) {
+				userManuscriptMap.set(authorId, {
+					...author,
+					manuscripts: []
+				});
+			}
 
-				// Check if manuscript already exists for this author (avoid duplicates)
-				const existingManuscriptIds = userManuscriptMap.get(authorId).manuscripts.map(m => m._id.toString());
-				if (!existingManuscriptIds.includes(manuscript._id.toString())) {
-					userManuscriptMap.get(authorId).manuscripts.push({
-						...manuscript,
-						authorName: formatFullName(author)
-					});
-					console.log(`Added manuscript ${manuscript.customId} to author ${author.firstName} ${author.lastName}`);
-				} else {
-					console.log(`Skipping duplicate manuscript ${manuscript.customId} for author ${author.firstName} ${author.lastName}`);
-				}
-			});
+			const existingManuscriptIds = userManuscriptMap.get(authorId).manuscripts.map(m => m._id.toString());
+			if (!existingManuscriptIds.includes(manuscript._id.toString())) {
+				userManuscriptMap.get(authorId).manuscripts.push({
+					...manuscript,
+					authorName: formatFullName(author)
+				});
+				console.log(`Added manuscript ${manuscript.customId} to author ${author.firstName} ${author.lastName}`);
+			} else {
+				console.log(`Skipping duplicate manuscript ${manuscript.customId} for author ${author.firstName} ${author.lastName}`);
+			}
 		});
 
 		// Convert map to array and filter users with manuscripts
