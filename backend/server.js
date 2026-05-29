@@ -9,6 +9,7 @@ const connectDB = require("./config/db");
 const googleAuthRoutes = require('./routes/googleAuthRoutes');
 const scholarRoutes = require('./routes/scholarRoutes');
 const sitemapRoutes = require('./routes/sitemapRoutes');
+const manuscriptController = require("./controllers/manuscriptController");
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, os.tmpdir()),
     filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
@@ -420,6 +421,10 @@ app.get('/test-docx-convert', async (req, res) => {
     
     res.json(results);
 });
+app.get(
+  "/api/manuscripts/special-issue",
+  manuscriptController.getSpecialIssueManuscripts,
+);
 app.use("/api", require("./routes/manuscriptRoutes"));
 
 // Error Handling

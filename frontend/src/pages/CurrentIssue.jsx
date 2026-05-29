@@ -3,37 +3,54 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../App";
 
-const CurrentIssue = () => {
+const CurrentIssue = ({ separateIssue = false }) => {
   const { user, loading: authLoading } = useAuth();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const pageTitle = separateIssue ? "Special Issue" : "Published Articles";
+  const emptyMessage = separateIssue
+    ? "No special issue articles available."
+    : "No current issues available.";
 
   useEffect(() => {
-    const fetchCurrentIssue = async () => {
+    const fetchIssueArticles = async () => {
       try {
         setLoading(true);
+        const endpoint = separateIssue
+          ? "/api/manuscripts/special-issue"
+          : "/api/manuscripts/published";
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/published`
+          `${import.meta.env.VITE_BACKEND_URL}${endpoint}`
         );
 
         if (res.data && res.data.data) {
           const data = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
           setArticles(data);
         } else {
-          setError('No current issues available.');
+          setError(emptyMessage);
         }
       } catch (err) {
-        console.error('Error fetching current issue:', err);
-        setError('Failed to load current issue. Please try again later.');
+        console.error('Error fetching issue articles:', err);
+        if (err.response?.status === 404) {
+          setArticles([]);
+          setError("");
+          return;
+        }
+
+        setError(
+          separateIssue
+            ? 'Failed to load special issue articles. Please try again later.'
+            : 'Failed to load current issue. Please try again later.'
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCurrentIssue();
-  }, [user]);
+    fetchIssueArticles();
+  }, [user, separateIssue, emptyMessage]);
 
   // ✅ Same function as ArticleDetail - PDF authors first, then API fallback
   const getAuthors = (article) => {
@@ -82,7 +99,7 @@ const CurrentIssue = () => {
   if (error) return <div className="text-center mt-20 text-red-500">{error}</div>;
 
   if (!articles || articles.length === 0) {
-    return <div className="text-center mt-20 text-gray-500">No current issues available.</div>;
+    return <div className="text-center mt-20 text-gray-500">{emptyMessage}</div>;
   }
 
   return (
@@ -100,7 +117,7 @@ const CurrentIssue = () => {
 
         <div className="mb-8">
           <h1 className="text-2xl font-extrabold text-[#00796b]">
-            Published Articles ({articles.length})
+            {pageTitle} ({articles.length})
           </h1>
           <p className="mt-3 inline-flex items-center rounded-full bg-[#e0f2f1] px-4 py-1.5 text-sm font-semibold tracking-[0.12em] text-[#00695c] shadow-sm ring-1 ring-[#00796b]/10">
             Vol. 1, Issue 1 • Jan-Apr 2026

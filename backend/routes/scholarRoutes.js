@@ -231,7 +231,10 @@ router.get("/article/:id", async (req, res) => {
 
 router.get("/articles-listing", async (req, res) => {
   try {
-    const manuscripts = await Manuscript.find({ status: "Published" })
+    const manuscripts = await Manuscript.find({
+      status: "Published",
+      $or: [{ separateIssue: false }, { separateIssue: { $exists: false } }],
+    })
       .select("_id title pdfAuthors authors issueVolume issueNumber pageStart pageEnd publishedAt")
       .populate("authors", "firstName middleName lastName")
       .sort({ publishedAt: -1 })

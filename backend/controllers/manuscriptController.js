@@ -1759,7 +1759,16 @@ const extractAuthorsFromPdfUrl = async (pdfUrl) => {
 // Get a single manuscript by ID
 exports.getManuscriptById = async (req, res) => {
   try {
-    const manuscript = await Manuscript.findById(req.params.manuscriptId)
+    const { manuscriptId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(manuscriptId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid manuscript id",
+      });
+    }
+
+    const manuscript = await Manuscript.findById(manuscriptId)
       .populate("authors", "firstName middleName lastName email")
       .populate("correspondingAuthor", "firstName middleName lastName email")
       .populate("assignedReviewers", "firstName middleName lastName email")
@@ -3050,19 +3059,30 @@ exports.streamPublishedPdf = async (req, res) => {
   }
 };
 
-// Controller
-exports.getPublishedManuscripts = async (req, res) => {
+const currentIssuePublishedFilter = {
+  status: "Published",
+  $or: [{ separateIssue: false }, { separateIssue: { $exists: false } }],
+};
+
+const specialIssuePublishedFilter = {
+  status: "Published",
+  separateIssue: true,
+};
+
+const sendPublishedManuscriptList = async (res, filter, emptyMessage) => {
   try {
-    const manuscripts = await Manuscript.find({ status: "Published" })
+    const manuscripts = await Manuscript.find(filter)
       .populate("authors", "firstName middleName lastName email")
       .populate("correspondingAuthor", "firstName middleName lastName email")
       .populate("assignedReviewers", "firstName middleName lastName email")
       .select("-reviewerNotes -uniqueViewers");
 
     if (!manuscripts || manuscripts.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No published manuscripts found",
+      return res.json({
+        success: true,
+        count: 0,
+        data: [],
+        message: emptyMessage,
       });
     }
 
@@ -3099,6 +3119,23 @@ exports.getPublishedManuscripts = async (req, res) => {
       message: error.message,
     });
   }
+};
+
+// Controller
+exports.getPublishedManuscripts = async (req, res) => {
+  return sendPublishedManuscriptList(
+    res,
+    currentIssuePublishedFilter,
+    "No current issue manuscripts found",
+  );
+};
+
+exports.getSpecialIssueManuscripts = async (req, res) => {
+  return sendPublishedManuscriptList(
+    res,
+    specialIssuePublishedFilter,
+    "No special issue manuscripts found",
+  );
 };
 // ============================================
 // 🔥 NEW: JOB-BASED MANUSCRIPT CREATION
