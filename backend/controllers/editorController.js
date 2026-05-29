@@ -505,7 +505,7 @@ exports.getManuscriptsByAuthor = async (req, res) => {
     ],
 })
             .select(
-                "customId title type status submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked reviewDocxUrl authorResponse revisedPdfBuiltAt revisionCombinedPdfUrl highlightedRevisionFileUrl authors correspondingAuthor invitations manuscriptFile"
+                "customId title type status separateIssue submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked reviewDocxUrl authorResponse revisedPdfBuiltAt revisionCombinedPdfUrl highlightedRevisionFileUrl authors correspondingAuthor invitations manuscriptFile"
             )
             .populate("authors", "firstName lastName middleName email")
             .populate("correspondingAuthor", "firstName lastName middleName email")
@@ -536,7 +536,7 @@ exports.getUsersWithManuscripts = async (req, res) => {
 		const manuscripts = await Manuscript.find({
 			status: { $nin: ["Saved",  "Pending"] },	
 		})
-			.select("authors correspondingAuthor customId title type status submissionDate mergedFileUrl invitations manuscriptFile updatedAt")
+			.select("authors correspondingAuthor customId title type status separateIssue submissionDate mergedFileUrl invitations manuscriptFile updatedAt")
 			.populate("authors", "firstName lastName middleName email")
 			.populate("correspondingAuthor", "firstName lastName middleName email")
 			.lean();
