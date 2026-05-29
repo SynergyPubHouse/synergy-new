@@ -77,6 +77,15 @@ function EditorDashboard() {
     setShowPdfUploadDialog(true);
   };
 
+  const uniqueManuscriptsById = (items = []) => {
+    const seen = new Set();
+    return items.filter((item) => {
+      if (!item?._id || seen.has(item._id)) return false;
+      seen.add(item._id);
+      return true;
+    });
+  };
+
   const removeToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
@@ -155,8 +164,9 @@ function EditorDashboard() {
 
       setUsers(processedUsers);
       // When showing all manuscripts, also sort newest-first globally
-      const allManuscripts = processedUsers
-        .flatMap((user) => user.manuscripts || [])
+      const allManuscripts = uniqueManuscriptsById(
+        processedUsers.flatMap((user) => user.manuscripts || []),
+      )
         .sort((a, b) => {
           const dateB = new Date(
             b.submissionDate || b.createdAt || b.updatedAt || 0,
@@ -272,7 +282,9 @@ function EditorDashboard() {
   // Handle showing all manuscripts (clear user selection)
   const handleShowAllManuscripts = () => {
     setSelectedUser(null);
-    const allManuscripts = users.flatMap((user) => user.manuscripts || []);
+    const allManuscripts = uniqueManuscriptsById(
+      users.flatMap((user) => user.manuscripts || []),
+    );
     setManuscripts(allManuscripts);
     // Clear any active filters
     setFilterType("all");
@@ -874,7 +886,7 @@ function EditorDashboard() {
     // If no user is selected, show all manuscripts from all users
     const allManuscripts = selectedUser
       ? manuscripts
-      : users.flatMap((user) => user.manuscripts || []);
+      : uniqueManuscriptsById(users.flatMap((user) => user.manuscripts || []));
 
     console.log("=== getFilteredManuscripts Debug ===");
     console.log("selectedUser:", selectedUser?.firstName || "None");
@@ -942,10 +954,11 @@ function EditorDashboard() {
     setFilterType("all");
     setFilterValue("");
   };
-
   // Calculate Statistics based on date range
   const calculateStatistics = useCallback(() => {
-    const allManuscripts = users.flatMap((user) => user.manuscripts || []);
+    const allManuscripts = uniqueManuscriptsById(
+      users.flatMap((user) => user.manuscripts || []),
+    );
 
     let filteredManuscripts = allManuscripts;
 
@@ -1146,7 +1159,7 @@ function EditorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-6">
+    <div className="min-h-screen bg-[#f8fafc] px-4 py-6 pt-28 sm:px-6 lg:px-8">
       {/* Toast container */}
       <div className="fixed top-4 right-4 z-50 flex flex-col space-y-2">
         {toasts.map((t) => (
@@ -1165,7 +1178,7 @@ function EditorDashboard() {
           </div>
         ))}
       </div>
-      <div className="max-w-6xl mx-auto">
+      <div className="mx-auto max-w-7xl">
         <h1 className="text-4xl font-bold text-[#496580] mb-8 text-center">
           Editor Dashboard
         </h1>
@@ -1176,9 +1189,9 @@ function EditorDashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
           {/* Status Overview */}
-          <div className="bg-white rounded-lg p-6 shadow-md border border-[#e2e8f0] md:col-span-3 mb-6">
+          <div className="bg-white rounded-lg p-6 shadow-md border border-[#e2e8f0] lg:col-span-2 mb-6">
             <h2 className="text-2xl font-semibold text-[#496580] mb-4">
               📊 Manuscript Status Overview
             </h2>
@@ -1194,9 +1207,9 @@ function EditorDashboard() {
               </button>
 
               {/* Current Issue Button - Only show if any normal article is Published */}
-              {users
-                .flatMap((u) => u.manuscripts || [])
-                .some(
+              {uniqueManuscriptsById(
+                users.flatMap((u) => u.manuscripts || []),
+              ).some(
                   (m) => m.status === "Published" && m.separateIssue !== true,
                 ) && (
                 <a
@@ -1222,8 +1235,8 @@ function EditorDashboard() {
             {(() => {
               // Calculate status counts from all users' manuscripts
               // Note: Rejected manuscripts are not fetched for editors, so they won't appear in counts
-              const allManuscripts = users.flatMap(
-                (user) => user.manuscripts || [],
+              const allManuscripts = uniqueManuscriptsById(
+                users.flatMap((user) => user.manuscripts || []),
               );
               const statusCounts = allManuscripts.reduce((acc, manuscript) => {
                 acc[manuscript.status] = (acc[manuscript.status] || 0) + 1;
@@ -1375,7 +1388,7 @@ function EditorDashboard() {
           </div>
 
           {/* Users List */}
-          <div className="bg-white rounded-lg p-6 shadow-md border border-[#e2e8f0]">
+          <div className="bg-white rounded-lg p-5 shadow-md border border-[#e2e8f0] lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
             <h2 className="text-2xl font-semibold text-[#496580] mb-4">
               Users with Manuscript
             </h2>
@@ -1396,7 +1409,7 @@ function EditorDashboard() {
                 <button
                   key={index}
                   onClick={() => handleUserClick(user)}
-                  className={`w-full text-left p-3 rounded-lg transition-all ${
+                  className={`w-full text-left p-3 rounded-lg transition-all break-words ${
                     selectedUser === user
                       ? "bg-[#496580] text-white"
                       : "bg-[#f8fafc] text-[#1a365d] hover:bg-gray-100"
@@ -1412,13 +1425,13 @@ function EditorDashboard() {
           </div>
 
           {/* Manuscripts List */}
-          <div className="bg-white rounded-lg p-6 shadow-md border border-[#e2e8f0] col-span-2">
+          <div className="min-w-0 bg-white rounded-lg p-6 shadow-md border border-[#e2e8f0]">
             <div className="flex justify-between items-center mb-4">
               <div className="flex flex-col">
                 <h2 className="text-2xl font-semibold text-[#496580]">
                   {selectedUser
                     ? `Manuscripts by ${formatFullName(selectedUser)}`
-                    : "Select a User"}
+                    : "All Manuscripts"}
                 </h2>
                 {filterType !== "all" && selectedUser && (
                   <div className="flex items-center space-x-2 mt-2">
@@ -1692,6 +1705,10 @@ function EditorDashboard() {
                             )}
 
                           {/* Invitations Status */}
+                          {console.log(
+                            manuscript.invitations,
+                            "manuscript.invitations",
+                          )}
                           {manuscript.invitations &&
                             manuscript.invitations.length > 0 && (
                               <div className="mt-3 border-t border-gray-200 pt-3">
