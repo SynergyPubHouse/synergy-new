@@ -52,6 +52,7 @@ import PublicPdfProxy from "./pages/PublicPdfProxy";
 import BookPublication from "./pages/BookPublication";
 import WebSeriesCast from "./pages/WebSeriesCast";
 import ConferencePublication from "./pages/ConferencePublication";
+import ConferenceSiteFrame from "./pages/ConferenceSiteFrame";
 import CurrentIssue from "./pages/CurrentIssue";
 import ArticleDetail from "./pages/journal/jics/articles/ArticleDetail";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -78,7 +79,8 @@ function AppContent() {
   const hideNavFooter =
     location.pathname === "/login" ||
     location.pathname === "/register" ||
-    location.pathname.startsWith("/pdf/");
+    location.pathname.startsWith("/pdf/") ||
+    location.pathname.startsWith("/conference/wc2ir-2026");
   const [user, setUser] = React.useState(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -184,6 +186,7 @@ function AppContent() {
         <Route path="/books" element={<BookPublication />} />
         <Route path="/web-series-cast" element={<WebSeriesCast />} />
         <Route path="/conference-publication" element={<ConferencePublication />} />
+        <Route path="/conference/wc2ir-2026/*" element={<ConferenceSiteFrame />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route path="/verification-pending" element={<VerificationPending />} />
         <Route path="/pdf/:filename" element={<PublicPdfProxy />} />

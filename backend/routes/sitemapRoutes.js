@@ -45,6 +45,12 @@ router.get('/sitemap.xml', async (req, res) => {
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
     </url>
+    <url>
+        <loc>${baseUrl}/conference/wc2ir-2026</loc>
+        <lastmod>${today}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
 `;
 
         // Add all published articles
