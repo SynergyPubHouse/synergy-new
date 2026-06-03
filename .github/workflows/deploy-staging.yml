@@ -2,8 +2,7 @@ name: Deploy Staging
 
 on:
   push:
-    branches:
-      - staging
+    branches: ["staging"]
 
 jobs:
   deploy-staging:
@@ -13,24 +12,30 @@ jobs:
       - name: Checkout staging branch
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Install Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
 
       - name: Install frontend dependencies
-        working-directory: ./react-app
-        run: npm install
+        run: |
+          cd frontend
+          npm install
 
       - name: Build frontend
-        working-directory: ./react-app
-        run: npm run build
+        run: |
+          cd frontend
+          echo "starting staging build"
+          npm run build
+          echo "staging build fully finished"
 
-      - name: Deploy dist to Hostinger staging folder
+      - name: Upload staging files via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.HOSTINGER_FTP_HOST }}
-          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          local-dir: ./react-app/dist/
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./frontend/dist/
           server-dir: /public_html/staging/
+          dangerous-clean-slate: false
