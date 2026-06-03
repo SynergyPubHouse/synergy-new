@@ -4,11 +4,13 @@ const express = require('express');
 const router = express.Router();
 const Manuscript = require('../models/Manuscript');
 
+const getArticleUrlId = (article) => article.customId || article.custom_id || article._id;
+
 // Main Sitemap
 router.get('/sitemap.xml', async (req, res) => {
     try {
         const articles = await Manuscript.find({ status: 'Published' })
-            .select('_id updatedAt publishedAt')
+            .select('_id customId custom_id updatedAt publishedAt')
             .sort({ publishedAt: -1 })
             .lean();
 
@@ -57,10 +59,11 @@ router.get('/sitemap.xml', async (req, res) => {
         articles.forEach(article => {
             const lastmod = new Date(article.updatedAt || article.publishedAt || Date.now())
                 .toISOString().split('T')[0];
+            const articleUrlId = encodeURIComponent(getArticleUrlId(article));
 
             // Scholar URL (for Google Scholar bot)
             xml += `    <url>
-        <loc>${baseUrl}/scholar/article/${article._id}</loc>
+        <loc>${baseUrl}/scholar/article/${articleUrlId}</loc>
         <lastmod>${lastmod}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.8</priority>
@@ -68,7 +71,7 @@ router.get('/sitemap.xml', async (req, res) => {
 `;
             // React URL (for users)
             xml += `    <url>
-        <loc>${baseUrl}/journal/jics/articles/${article._id}</loc>
+        <loc>${baseUrl}/journal/jics/articles/${articleUrlId}</loc>
         <lastmod>${lastmod}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.8</priority>

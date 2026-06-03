@@ -1,15 +1,78 @@
+import { useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const CONFERENCE_BASE_PATH = "/conference/wc2ir-2026";
 const CONFERENCE_ORIGIN = "https://ic2ins-2026.onrender.com";
+const CONFERENCE_NAVIGATION_MESSAGE = "wc2ir:navigation";
 
-function ConferenceSiteFrame() {
-  const location = useLocation();
+function getRenderPathFromSynergyLocation(location) {
   const nestedPath = location.pathname.startsWith(CONFERENCE_BASE_PATH)
     ? location.pathname.slice(CONFERENCE_BASE_PATH.length) || "/"
     : "/";
-  const iframeSrc = `${CONFERENCE_ORIGIN}${nestedPath}${location.search}${location.hash}`;
+
+  return `${nestedPath}${location.search}${location.hash}`;
+}
+
+function getSynergyPathFromRenderUrl(value) {
+  if (!value || typeof value !== "string") {
+    return null;
+  }
+
+  const renderUrl = new URL(value, CONFERENCE_ORIGIN);
+
+  if (renderUrl.origin !== CONFERENCE_ORIGIN) {
+    return null;
+  }
+
+  const renderPath = `${renderUrl.pathname}${renderUrl.search}${renderUrl.hash}`;
+  return renderPath === "/"
+    ? CONFERENCE_BASE_PATH
+    : `${CONFERENCE_BASE_PATH}${renderPath}`;
+}
+
+function ConferenceSiteFrame() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const iframeSrc = useMemo(
+    () => `${CONFERENCE_ORIGIN}${getRenderPathFromSynergyLocation(location)}`,
+    [location],
+  );
+
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.origin !== CONFERENCE_ORIGIN) {
+        return;
+      }
+
+      const data = event.data;
+
+      if (
+        !data ||
+        typeof data !== "object" ||
+        data.type !== CONFERENCE_NAVIGATION_MESSAGE
+      ) {
+        return;
+      }
+
+      try {
+        const nextPath = getSynergyPathFromRenderUrl(data.href || data.path);
+        const currentPath = `${location.pathname}${location.search}${location.hash}`;
+
+        if (nextPath && nextPath !== currentPath) {
+          navigate(nextPath);
+        }
+      } catch {
+        // Ignore malformed navigation messages from the embedded site.
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   return (
     <>

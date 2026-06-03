@@ -96,14 +96,28 @@ function getPublicPdfUrl(pdfUrl) {
     .replace("http://www.synergyworldpress.com/pdf/", `${publicBaseUrl}/pdf/`);
 }
 
+const getArticleUrlId = (article) => article.customId || article.custom_id || article._id;
+
+const buildManuscriptIdentifierQuery = (identifier) => {
+  const value = String(identifier || "").trim();
+  if (!value) return null;
+
+  const clauses = [{ customId: value }, { custom_id: value }];
+  if (mongoose.Types.ObjectId.isValid(value)) {
+    clauses.unshift({ _id: value });
+  }
+
+  return { $or: clauses };
+};
+
 router.get("/article/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    const identifierQuery = buildManuscriptIdentifierQuery(id);
 
     console.log("[Scholar Route] Requested ID:", id);
 
-    // Validate MongoDB ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!identifierQuery) {
       return res
         .status(400)
         .send(
@@ -114,7 +128,7 @@ router.get("/article/:id", async (req, res) => {
         );
     }
 
-    const manuscript = await Manuscript.findById(id)
+    const manuscript = await Manuscript.findOne(identifierQuery)
       .populate("authors", "firstName middleName lastName email")
       .populate("correspondingAuthor", "firstName middleName lastName email");
 
@@ -205,7 +219,7 @@ router.get("/article/:id", async (req, res) => {
     // Visible button should keep the main-domain URL.
     const publicPdfUrl = getPublicPdfUrl(pdfUrl || article.publishedFileUrl || "");
 
-    const articleUrl = `${baseUrl}/journal/jics/articles/${article._id}`;
+    const articleUrl = `${baseUrl}/journal/jics/articles/${encodeURIComponent(getArticleUrlId(article))}`;
 
     // Generate HTML
     const html = generateScholarHtml({
@@ -235,7 +249,7 @@ router.get("/articles-listing", async (req, res) => {
       status: "Published",
       $or: [{ separateIssue: false }, { separateIssue: { $exists: false } }],
     })
-      .select("_id title pdfAuthors authors issueVolume issueNumber pageStart pageEnd publishedAt")
+      .select("_id customId custom_id title pdfAuthors authors issueVolume issueNumber pageStart pageEnd publishedAt")
       .populate("authors", "firstName middleName lastName")
       .sort({ publishedAt: -1 })
       .lean();
@@ -282,7 +296,7 @@ router.get("/articles-listing", async (req, res) => {
       }
 
       return {
-        id: article._id,
+        id: getArticleUrlId(article),
         title: article.title || "",
         authorsDisplay,
         issueVolume: article.issueVolume,
@@ -302,7 +316,7 @@ router.get("/articles-listing", async (req, res) => {
           articles
             .map((a) => {
               const articleUrl = a.id
-                ? `${getPublicBaseUrl()}/journal/jics/articles/${a.id}`
+                ? `${getPublicBaseUrl()}/journal/jics/articles/${encodeURIComponent(a.id)}`
                 : "#";
               const parts = [];
 
