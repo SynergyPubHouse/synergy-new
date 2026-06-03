@@ -37,5 +37,5 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           local-dir: ./frontend/dist/
-          server-dir: /public_html/staging/
+          server-dir: ${{ secrets.FTP_UPLOAD_PATH }}/staging/
           dangerous-clean-slate: false
