@@ -19,8 +19,12 @@ const getVisitorId = () => {
   return visitorId;
 };
 
+const getArticleUrlId = (article) =>
+  article?.customId || article?.custom_id || article?._id;
+
 const ArticleDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -88,7 +92,10 @@ const ArticleDetail = () => {
     };
 
     const publishedDate = getPublishedDate();
-    const articleUrl = `https://synergyworldpress.com/journal/jics/articles/${article._id}`;
+    const articleUrlId = getArticleUrlId(article);
+    const articleUrl = `https://synergyworldpress.com/journal/jics/articles/${encodeURIComponent(
+      articleUrlId,
+    )}`;
     const pdfUrl = article.publishedFileUrl || "";
 
     // Schema.org JSON-LD structured data
@@ -352,6 +359,13 @@ const ArticleDetail = () => {
         const articleData = res.data.data || res.data;
         setArticle(articleData);
         setViewCount(articleData.viewCount || 0);
+
+        const articleUrlId = getArticleUrlId(articleData);
+        if (articleUrlId && articleUrlId !== id) {
+          navigate(`/journal/jics/articles/${encodeURIComponent(articleUrlId)}`, {
+            replace: true,
+          });
+        }
       } catch (error) {
         console.error("Error fetching article:", error);
         setError("Failed to load article. Please try again later.");
@@ -363,7 +377,7 @@ const ArticleDetail = () => {
     if (id) {
       fetchArticle();
     }
-  }, [id]);
+  }, [id, navigate]);
 
   // Increment view count when article loads
   useEffect(() => {
@@ -454,7 +468,6 @@ const ArticleDetail = () => {
     }
     return article.issueYear || '';
   };
-  const navigate = useNavigate()
   // Parse classification
   const parseClassification = (classification) => {
     if (!classification) return [];

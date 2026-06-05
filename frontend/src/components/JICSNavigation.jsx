@@ -119,7 +119,7 @@ const JICSNavigation = () => {
   return (
     <nav className="bg-white shadow-lg rounded-lg border-b border-[#e0e0e0]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-center h-16">
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
             <button
@@ -165,7 +165,7 @@ const JICSNavigation = () => {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex space-x-1">
+          <div className="hidden md:flex justify-center space-x-1">
             {navigationItems.map((item) => (
               <div
                 key={item.label}

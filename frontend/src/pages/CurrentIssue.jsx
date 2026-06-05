@@ -75,6 +75,15 @@ const filterArticlesByIssueWindow = (articles, archive) => {
   );
 };
 
+const getArticleUrlId = (article) => article?.customId || article?.custom_id || article?._id;
+
+const getArticlePath = (article) => {
+  const articleUrlId = getArticleUrlId(article);
+  return articleUrlId
+    ? `/journal/jics/articles/${encodeURIComponent(articleUrlId)}`
+    : "/journal/jics/articles/current";
+};
+
 const CurrentIssue = ({ separateIssue = false, archive = false }) => {
   const { user, loading: authLoading } = useAuth();
   const [articles, setArticles] = useState([]);
@@ -218,7 +227,7 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
             >
               {/* Article Title */}
               <h3 className="text-lg font-semibold text-[#00796b] mb-1">
-                <Link to={`/journal/jics/articles/${item._id}`} className="hover:underline">
+                <Link to={getArticlePath(item)} className="hover:underline">
                   {item.title}
                 </Link>
               </h3>
@@ -266,7 +275,7 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
               {/* Actions */}
               <div className="flex justify-between items-center">
                 <a
-                  href={`/journal/jics/articles/${item._id}`}
+                  href={getArticlePath(item)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-[#00acc1] font-semibold hover:text-[#00796b] transition-all hover:gap-3"

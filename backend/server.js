@@ -25,6 +25,7 @@ const app = express();
 
 // Enhanced CORS configuration
 const allowedOrigins = [
+  "https://staging.synergyworldpress.com",
   "https://www.synergyworldpress.com",
   "https://synergyworldpress.com",
   "http://localhost:5173",

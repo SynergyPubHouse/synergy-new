@@ -77,6 +77,13 @@ function EditorDashboard() {
     setShowPdfUploadDialog(true);
   };
 
+  const getPublishedArticlePath = (manuscript) => {
+    const articleUrlId = manuscript?.customId || manuscript?.custom_id || manuscript?._id;
+    return articleUrlId
+      ? `/journal/jics/articles/${encodeURIComponent(articleUrlId)}`
+      : "/journal/jics/articles/current";
+  };
+
   const uniqueManuscriptsById = (items = []) => {
     const seen = new Set();
     return items.filter((item) => {
@@ -1811,7 +1818,7 @@ function EditorDashboard() {
                         <button
                           onClick={() =>
                             window.open(
-                              `/journal/jics/articles/${manuscript._id}`,
+                              getPublishedArticlePath(manuscript),
                               "_blank",
                             )
                           }

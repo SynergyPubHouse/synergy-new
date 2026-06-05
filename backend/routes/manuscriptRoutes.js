@@ -24,7 +24,7 @@ router.get(
 	router.get("/manuscripts/most-viewed", manuscriptController.getMostViewedManuscripts);
 	router.post("/manuscripts/:manuscriptId/view", manuscriptController.incrementViewCount);
 router.get(
-	"/manuscripts/:manuscriptId([0-9a-fA-F]{24})",
+	"/manuscripts/:manuscriptId",
 	
 	manuscriptController.getManuscriptById
 );
@@ -111,11 +111,6 @@ router.get("/jobs/:jobId", auth, manuscriptController.getJobStatus);
 
 router.post('/draft', auth, manuscriptController.saveDraft);
 router.put("/manuscripts/:manuscriptId/draft", auth, manuscriptController.updateDraft);
-router.get(
-    "/manuscripts/:manuscriptId([0-9a-fA-F]{24})",
-    auth,
-    manuscriptController.getManuscriptById
-);
 router.delete("/:id", manuscriptController.deleteManuscript);
 
 router.put(

@@ -1,0 +1,41 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: ["staging"]
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout staging branch
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          echo "starting staging build"
+          npm run build
+          echo "staging build fully finished"
+
+      - name: Upload staging files via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./frontend/dist/
+          server-dir: ${{ secrets.FTP_UPLOAD_PATH }}/staging/
+          dangerous-clean-slate: false

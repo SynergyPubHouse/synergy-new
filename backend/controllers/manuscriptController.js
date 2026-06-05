@@ -47,6 +47,18 @@ const {
 
 const streamPipeline = promisify(pipeline);
 
+const buildManuscriptIdentifierQuery = (identifier) => {
+  const value = String(identifier || "").trim();
+  if (!value) return null;
+
+  const clauses = [{ customId: value }, { custom_id: value }];
+  if (mongoose.Types.ObjectId.isValid(value)) {
+    clauses.unshift({ _id: value });
+  }
+
+  return { $or: clauses };
+};
+
 // Configure multer for temporary file upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -215,7 +227,7 @@ async function convertDocxToPdf(docxPath, onProgress) {
           step || "Converting...",
         );
       }
-    } catch (_) { }
+    } catch (_) {}
   };
 
   const outputDir = path.dirname(docxPath);
@@ -308,7 +320,7 @@ async function convertDocxToPdf(docxPath, onProgress) {
         // Cleanup profile
         try {
           fsSync.rmSync(profileDir, { recursive: true, force: true });
-        } catch (e) { }
+        } catch (e) {}
 
         // Check PDF
         if (fsSync.existsSync(expectedPdfPath)) {
@@ -342,7 +354,7 @@ async function convertDocxToPdf(docxPath, onProgress) {
         // Cleanup
         try {
           fsSync.rmSync(profileDir, { recursive: true, force: true });
-        } catch (e) { }
+        } catch (e) {}
       }
     } else {
       errors.push("local: LibreOffice path not set");
@@ -1760,15 +1772,16 @@ const extractAuthorsFromPdfUrl = async (pdfUrl) => {
 exports.getManuscriptById = async (req, res) => {
   try {
     const { manuscriptId } = req.params;
+    const identifierQuery = buildManuscriptIdentifierQuery(manuscriptId);
 
-    if (!mongoose.Types.ObjectId.isValid(manuscriptId)) {
+    if (!identifierQuery) {
       return res.status(400).json({
         success: false,
         message: "Invalid manuscript id",
       });
     }
 
-    const manuscript = await Manuscript.findById(manuscriptId)
+    const manuscript = await Manuscript.findOne(identifierQuery)
       .populate("authors", "firstName middleName lastName email")
       .populate("correspondingAuthor", "firstName middleName lastName email")
       .populate("assignedReviewers", "firstName middleName lastName email")
@@ -1908,7 +1921,7 @@ exports.buildAndDownloadPdf = async (req, res) => {
       } catch (innerError) {
         console.error("[buildAndDownloadPdf] Inner error:", innerError);
         if (tempFiles.length > 0) {
-          await cleanupFiles(tempFiles).catch(() => { });
+          await cleanupFiles(tempFiles).catch(() => {});
         }
         return res.status(500).json({
           success: false,
@@ -1919,7 +1932,7 @@ exports.buildAndDownloadPdf = async (req, res) => {
   } catch (error) {
     console.error("[buildAndDownloadPdf] Outer error:", error);
     if (tempFiles.length > 0) {
-      await cleanupFiles(tempFiles).catch(() => { });
+      await cleanupFiles(tempFiles).catch(() => {});
     }
     res.status(500).json({
       success: false,
@@ -2053,7 +2066,7 @@ exports.uploadResponseDoc = async (req, res) => {
         .populate("correspondingAuthor", "_id");
 
       if (!manuscript) {
-        await fs.unlink(req.file.path).catch(() => { });
+        await fs.unlink(req.file.path).catch(() => {});
         return res.status(404).json({
           success: false,
           message: "Manuscript not found",
@@ -2061,7 +2074,7 @@ exports.uploadResponseDoc = async (req, res) => {
       }
 
       if (manuscript.revisionLocked || manuscript.status === "Rejected") {
-        await fs.unlink(req.file.path).catch(() => { });
+        await fs.unlink(req.file.path).catch(() => {});
         return res.status(403).json({
           success: false,
           message:
@@ -2070,7 +2083,7 @@ exports.uploadResponseDoc = async (req, res) => {
       }
 
       if (!isUserAuthor(manuscript, req.user?._id)) {
-        await fs.unlink(req.file.path).catch(() => { });
+        await fs.unlink(req.file.path).catch(() => {});
         return res.status(403).json({
           success: false,
           message:
@@ -2116,9 +2129,9 @@ exports.uploadResponseDoc = async (req, res) => {
 
       await manuscript.save();
 
-      await fs.unlink(req.file.path).catch(() => { });
+      await fs.unlink(req.file.path).catch(() => {});
       if (tempPdfPath) {
-        await fs.unlink(tempPdfPath).catch(() => { });
+        await fs.unlink(tempPdfPath).catch(() => {});
       }
 
       return res.json({
@@ -2128,9 +2141,9 @@ exports.uploadResponseDoc = async (req, res) => {
       });
     } catch (error) {
       console.error("[uploadResponseDoc]", error);
-      await fs.unlink(req.file.path).catch(() => { });
+      await fs.unlink(req.file.path).catch(() => {});
       if (tempPdfPath) {
-        await fs.unlink(tempPdfPath).catch(() => { });
+        await fs.unlink(tempPdfPath).catch(() => {});
       }
       return res.status(500).json({
         success: false,
@@ -2311,7 +2324,7 @@ exports.uploadNotesWord = async (req, res) => {
       // Attempt cleanup even if upload failed
       try {
         await fs.unlink(req.file.path);
-      } catch (_) { }
+      } catch (_) {}
       res.status(500).json({
         success: false,
         message: "Upload failed",
@@ -2962,7 +2975,7 @@ exports.uploadPublishedPdf = async (req, res) => {
     });
   } finally {
     if (tempFiles.length > 0) {
-      await cleanupFiles(tempFiles).catch(() => { });
+      await cleanupFiles(tempFiles).catch(() => {});
     }
   }
 };
@@ -3209,7 +3222,7 @@ exports.createManuscriptAsync = async (req, res) => {
   } catch (error) {
     console.error("[createManuscriptAsync] Error:", error);
     if (tempFiles.length > 0) {
-      await cleanupFiles(tempFiles).catch(() => { });
+      await cleanupFiles(tempFiles).catch(() => {});
     }
     res.status(500).json({
       success: false,
@@ -3241,7 +3254,7 @@ async function processManuscriptJob(jobId, tempFiles) {
       try {
         const arr = JSON.parse(additionalInfo);
         additionalInfo = arr.join(", ");
-      } catch (e) { }
+      } catch (e) {}
     }
 
     // Parse billingInfo
@@ -3313,12 +3326,12 @@ async function processManuscriptJob(jobId, tempFiles) {
     try {
       const result = await extractTextFromDocx(files.coverLetter);
       coverLetterText = result.full_text || "";
-    } catch (err) { }
+    } catch (err) {}
 
     try {
       const result = await extractTextFromDocx(files.declaration);
       declarationText = result.full_text || "";
-    } catch (err) { }
+    } catch (err) {}
 
     updateJob(jobId, { progress: 20, step: "Converting manuscript to PDF..." });
 
@@ -3506,7 +3519,7 @@ async function processManuscriptJob(jobId, tempFiles) {
     console.error(`[processManuscriptJob] Error:`, error);
 
     // Cleanup on error
-    await cleanupFiles(tempFiles).catch(() => { });
+    await cleanupFiles(tempFiles).catch(() => {});
 
     failJob(jobId, error);
   }
@@ -3570,7 +3583,7 @@ exports.updateDraft = async (req, res) => {
             (a) => a.toString() === req.user._id.toString(),
           ) ||
           existingManuscript.correspondingAuthor?.toString() ===
-          req.user._id.toString();
+            req.user._id.toString();
 
         if (!isAuthor) {
           return res.status(403).json({
@@ -3604,7 +3617,7 @@ exports.updateDraft = async (req, res) => {
               additionalInfo = Array.isArray(parsed)
                 ? parsed.join(", ")
                 : additionalInfo;
-            } catch { }
+            } catch {}
           } else if (Array.isArray(additionalInfo)) {
             additionalInfo = additionalInfo.join(", ");
           }
@@ -3632,7 +3645,7 @@ exports.updateDraft = async (req, res) => {
             try {
               const parsed = JSON.parse(classification);
               if (Array.isArray(parsed)) classification = parsed.join(", ");
-            } catch { }
+            } catch {}
           } else if (Array.isArray(classification)) {
             classification = classification.join(", ");
           }
@@ -3914,7 +3927,7 @@ exports.saveDraft = async (req, res) => {
             if (Array.isArray(additionalInfo)) {
               additionalInfo = additionalInfo.join(", ");
             }
-          } catch (e) { }
+          } catch (e) {}
         }
 
         let billingInfo = req.body.billingInfo;
@@ -4139,7 +4152,7 @@ exports.saveDraft = async (req, res) => {
     });
   } catch (error) {
     console.error("[saveDraft] Error:", error);
-    await cleanupFiles(tempFiles).catch(() => { });
+    await cleanupFiles(tempFiles).catch(() => {});
     res.status(500).json({
       success: false,
       message: error.message,
@@ -4182,7 +4195,7 @@ exports.updateDraftAndBuildPdfAsync = async (req, res) => {
             (author) => author.toString() === req.user._id.toString(),
           ) ||
           existingManuscript.correspondingAuthor?.toString() ===
-          req.user._id.toString();
+            req.user._id.toString();
 
         if (!isAuthor) {
           return res.status(403).json({
@@ -4275,7 +4288,7 @@ exports.updateDraftAndBuildPdfAsync = async (req, res) => {
       } catch (innerError) {
         console.error("[updateDraftAndBuildPdfAsync] Inner error:", innerError);
         if (tempFiles.length > 0) {
-          await cleanupFiles(tempFiles).catch(() => { });
+          await cleanupFiles(tempFiles).catch(() => {});
         }
         return res.status(500).json({
           success: false,
@@ -4286,7 +4299,7 @@ exports.updateDraftAndBuildPdfAsync = async (req, res) => {
   } catch (error) {
     console.error("[updateDraftAndBuildPdfAsync] Error:", error);
     if (tempFiles.length > 0) {
-      await cleanupFiles(tempFiles).catch(() => { });
+      await cleanupFiles(tempFiles).catch(() => {});
     }
     res.status(500).json({
       success: false,
@@ -4581,7 +4594,7 @@ async function processUpdateDraftJob(jobId, tempFiles) {
       try {
         const arr = JSON.parse(additionalInfo);
         additionalInfo = arr.join(", ");
-      } catch (e) { }
+      } catch (e) {}
     }
 
     let billingInfo = body.billingInfo;
@@ -4656,14 +4669,14 @@ async function processUpdateDraftJob(jobId, tempFiles) {
       try {
         const result = await extractTextFromDocx(coverLetterDocxPath);
         coverLetterText = result.full_text || "";
-      } catch (err) { }
+      } catch (err) {}
     }
 
     if (hasNewDeclaration && declarationValidation.isDocx) {
       try {
         const result = await extractTextFromDocx(declarationDocxPath);
         declarationText = result.full_text || "";
-      } catch (err) { }
+      } catch (err) {}
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -4841,7 +4854,7 @@ async function processUpdateDraftJob(jobId, tempFiles) {
       if (existingManuscript.coverLetterDriveFileId) {
         try {
           await deleteFileFromDrive(existingManuscript.coverLetterDriveFileId);
-        } catch (delErr) { }
+        } catch (delErr) {}
       }
 
       const coverLetterResult = await uploadFileToDrive(coverLetterDocxPath, {
@@ -4866,7 +4879,7 @@ async function processUpdateDraftJob(jobId, tempFiles) {
       if (existingManuscript.declarationDriveFileId) {
         try {
           await deleteFileFromDrive(existingManuscript.declarationDriveFileId);
-        } catch (delErr) { }
+        } catch (delErr) {}
       }
 
       const declarationResult = await uploadFileToDrive(declarationDocxPath, {
@@ -4910,7 +4923,7 @@ async function processUpdateDraftJob(jobId, tempFiles) {
       try {
         await deleteFileFromDrive(existingManuscript.mergedDriveFileId);
         console.log("[processUpdateDraftJob] Deleted old merged PDF");
-      } catch (delErr) { }
+      } catch (delErr) {}
     }
 
     const mergedResult = await uploadFileToDrive(mergedPdfResult.localPath, {
@@ -5031,7 +5044,7 @@ async function processUpdateDraftJob(jobId, tempFiles) {
     console.error(`[processUpdateDraftJob] Error:`, error);
 
     // Cleanup on error
-    await cleanupFiles(tempFiles).catch(() => { });
+    await cleanupFiles(tempFiles).catch(() => {});
 
     failJob(jobId, error);
   }
@@ -5068,6 +5081,7 @@ exports.incrementViewCount = async (req, res) => {
   try {
     const { manuscriptId } = req.params;
     const visitorId = req.headers["x-visitor-id"] || req.ip || "anonymous";
+    const identifierQuery = buildManuscriptIdentifierQuery(manuscriptId);
 
     // 🔍 Debug Log 1
     console.log("📊 INCREMENT VIEW REQUEST:", {
@@ -5075,7 +5089,14 @@ exports.incrementViewCount = async (req, res) => {
       visitorId,
     });
 
-    const manuscript = await Manuscript.findById(manuscriptId);
+    if (!identifierQuery) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid manuscript id",
+      });
+    }
+
+    const manuscript = await Manuscript.findOne(identifierQuery);
 
     if (!manuscript) {
       console.log("❌ Manuscript NOT FOUND");
@@ -5114,7 +5135,7 @@ exports.incrementViewCount = async (req, res) => {
       console.log("✅ NEW VIEW - Incrementing...");
 
       const updatedManuscript = await Manuscript.findByIdAndUpdate(
-        manuscriptId,
+        manuscript._id,
         {
           $inc: { viewCount: 1 },
           $push: {
