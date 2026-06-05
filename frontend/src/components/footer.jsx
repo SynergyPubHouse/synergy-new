@@ -8,15 +8,16 @@ function Footer() {
     <footer className="bg-[#00796b] text-[#e0e0e0] py-12 mt-16">
       <div className="max-w-7xl mx-auto px-6">
         {/* Footer Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
           {/* About Section */}
           <div>
             <h3 className="text-xl font-bold text-white mb-4">
               About Synergy World Press
             </h3>
             <p className="leading-relaxed">
-              Advancing interdisciplinary research through accessible publishing solutions.
-              Committed to innovation, integrity, and global collaboration.
+              Advancing interdisciplinary research through accessible publishing
+              solutions. Committed to innovation, integrity, and global
+              collaboration.
             </p>
           </div>
 
@@ -46,6 +47,22 @@ function Footer() {
             </ul>
           </div>
 
+          {/* Indexing */}
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4">Indexing</h3>
+            <ul className="space-y-2">
+              <li>
+                <a
+                  href="https://scholar.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[#00acc1] transition-colors"
+                >
+                  Google Scholar
+                </a>
+              </li>
+            </ul>
+          </div>
           {/* Legal */}
           <div>
             <h3 className="text-xl font-bold text-white mb-4">Legal</h3>
@@ -75,7 +92,10 @@ function Footer() {
                 { icon: <FaTwitter />, link: "https://twitter.com" },
                 { icon: <FaLinkedin />, link: "https://linkedin.com" },
                 { icon: <FaGithub />, link: "https://github.com" },
-                { icon: <FaEnvelope />, link: "mailto:contact@synergyworldpress.com" },
+                {
+                  icon: <FaEnvelope />,
+                  link: "mailto:contact@synergyworldpress.com",
+                },
               ].map((social, index) => (
                 <a
                   key={index}
@@ -90,7 +110,10 @@ function Footer() {
             </div>
             <p className="mt-4">
               Need help? <br />
-              <a href="mailto:support@synergyworldpress.com" className="text-[#00acc1] hover:text-[#0097a7]">
+              <a
+                href="mailto:support@synergyworldpress.com"
+                className="text-[#00acc1] hover:text-[#0097a7]"
+              >
                 support@synergyworldpress.com, synergyworldpress@gmail.com
               </a>
             </p>
@@ -103,15 +126,14 @@ function Footer() {
         {/* Copyright */}
         <div className="text-center text-sm">
           <p>
-            © {new Date().getFullYear()} Synergy World Press. All rights reserved.<br />
+            © {new Date().getFullYear()} Synergy World Press. All rights
+            reserved.
+            <br />
             {/* ISSN: 1234-5678 | DOI Prefix: 10.12345 */}
           </p>
           <p className="mt-2">
             Designed by the{" "}
-            <Link
-              to={`/team`}
-              className="text-[#00acc1] hover:text-[#0097a7]"
-            >
+            <Link to={`/team`} className="text-[#00acc1] hover:text-[#0097a7]">
               Synergy Team
             </Link>
           </p>
