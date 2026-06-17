@@ -129,7 +129,7 @@ function Footer() {
             © {new Date().getFullYear()} Synergy World Press. All rights
             reserved.
             <br />
-            {/* ISSN: 1234-5678 | DOI Prefix: 10.12345 */}
+            ISSN: 3139-3616
           </p>
           <p className="mt-2">
             Designed by the{" "}

@@ -119,7 +119,7 @@ const ArticleDetail = () => {
       isPartOf: {
         "@type": "Periodical",
         name: "Journal of Intelligent Computing System (JICS)",
-        issn: "XXXX-XXXX",
+        issn: "3139-3616",
       },
       description: article.abstract || "",
       keywords: article.keywords || "",
@@ -181,7 +181,7 @@ const ArticleDetail = () => {
         <meta name="citation_publisher" content="Synergy World Press" />
 
         {/* ISSN */}
-        <meta name="citation_issn" content="XXXX-XXXX" />
+        <meta name="citation_issn" content="3139-3616" />
 
         {/* Volume & Issue */}
         {article.issueVolume && (

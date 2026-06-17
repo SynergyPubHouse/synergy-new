@@ -445,7 +445,7 @@ function generateScholarHtml({
     isPartOf: {
       "@type": "Periodical",
       name: "Journal of Intelligent Computing System (JICS)",
-      issn: "XXXX-XXXX",
+      issn: "3139-3616",
     },
     description: article.abstract || "",
     keywords: article.keywords || "",
@@ -485,7 +485,7 @@ function generateScholarHtml({
     <meta name="citation_journal_title" content="Journal of Intelligent Computing System (JICS)">
     <meta name="citation_journal_abbrev" content="JICS">
     <meta name="citation_publisher" content="Synergy World Press">
-    <meta name="citation_issn" content="XXXX-XXXX">
+    <meta name="citation_issn" content="3139-3616">
     ${article.issueVolume ? `<meta name="citation_volume" content="${article.issueVolume}">` : ""}
     ${article.issueNumber ? `<meta name="citation_issue" content="${article.issueNumber}">` : ""}
     ${article.pageStart ? `<meta name="citation_firstpage" content="${article.pageStart}">` : ""}
@@ -596,7 +596,7 @@ ${JSON.stringify(schemaData, null, 2)}
     
     <footer class="footer">
         <p>© ${new Date().getFullYear()} Synergy World Press. All rights reserved.</p>
-        <p>ISSN: XXXX-XXXX | <a href="${baseUrl}">synergyworldpress.com</a></p>
+        <p>ISSN: 3139-3616 | <a href="${baseUrl}">synergyworldpress.com</a></p>
     </footer>
 </body>
 </html>`;
