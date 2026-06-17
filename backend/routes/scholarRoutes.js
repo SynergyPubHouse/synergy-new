@@ -28,8 +28,7 @@ const formatScholarDate = (dateString) => {
 
 function getApiBaseUrl() {
   const configuredBaseUrl = (
-    process.env.API_BASE_URL ||
-    "https://api.synergyworldpress.com"
+    process.env.API_BASE_URL || "https://api.synergyworldpress.com"
   ).trim();
 
   return (
@@ -96,7 +95,8 @@ function getPublicPdfUrl(pdfUrl) {
     .replace("http://www.synergyworldpress.com/pdf/", `${publicBaseUrl}/pdf/`);
 }
 
-const getArticleUrlId = (article) => article.customId || article.custom_id || article._id;
+const getArticleUrlId = (article) =>
+  article.customId || article.custom_id || article._id;
 
 const buildManuscriptIdentifierQuery = (identifier) => {
   const value = String(identifier || "").trim();
@@ -217,7 +217,9 @@ router.get("/article/:id", async (req, res) => {
     const pdfUrl = normalizePdfUrl(article.publishedFileUrl || "");
 
     // Visible button should keep the main-domain URL.
-    const publicPdfUrl = getPublicPdfUrl(pdfUrl || article.publishedFileUrl || "");
+    const publicPdfUrl = getPublicPdfUrl(
+      pdfUrl || article.publishedFileUrl || "",
+    );
 
     const articleUrl = `${baseUrl}/journal/jics/articles/${encodeURIComponent(getArticleUrlId(article))}`;
 
@@ -249,7 +251,9 @@ router.get("/articles-listing", async (req, res) => {
       status: "Published",
       $or: [{ separateIssue: false }, { separateIssue: { $exists: false } }],
     })
-      .select("_id customId custom_id title pdfAuthors authors issueVolume issueNumber pageStart pageEnd publishedAt")
+      .select(
+        "_id customId custom_id title pdfAuthors authors issueVolume issueNumber pageStart pageEnd publishedAt",
+      )
       .populate("authors", "firstName middleName lastName")
       .sort({ publishedAt: -1 })
       .lean();
@@ -445,7 +449,7 @@ function generateScholarHtml({
     isPartOf: {
       "@type": "Periodical",
       name: "Journal of Intelligent Computing System (JICS)",
-      issn: "3139-3616",
+      issn: article.issnNumber || "3139-3616",
     },
     description: article.abstract || "",
     keywords: article.keywords || "",
@@ -485,7 +489,7 @@ function generateScholarHtml({
     <meta name="citation_journal_title" content="Journal of Intelligent Computing System (JICS)">
     <meta name="citation_journal_abbrev" content="JICS">
     <meta name="citation_publisher" content="Synergy World Press">
-    <meta name="citation_issn" content="3139-3616">
+    <meta name="citation_issn" content="${escapeHtml(article.issnNumber || "3139-3616")}">
     ${article.issueVolume ? `<meta name="citation_volume" content="${article.issueVolume}">` : ""}
     ${article.issueNumber ? `<meta name="citation_issue" content="${article.issueNumber}">` : ""}
     ${article.pageStart ? `<meta name="citation_firstpage" content="${article.pageStart}">` : ""}
@@ -596,7 +600,7 @@ ${JSON.stringify(schemaData, null, 2)}
     
     <footer class="footer">
         <p>© ${new Date().getFullYear()} Synergy World Press. All rights reserved.</p>
-        <p>ISSN: 3139-3616 | <a href="${baseUrl}">synergyworldpress.com</a></p>
+        <p>ISSN: ${escapeHtml(article.issnNumber || "3139-3616")} | <a href="${baseUrl}">synergyworldpress.com</a></p>
     </footer>
 </body>
 </html>`;
