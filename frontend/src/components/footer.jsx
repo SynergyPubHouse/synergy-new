@@ -113,7 +113,7 @@ function Footer() {
             © {new Date().getFullYear()} Synergy World Press. All rights
             reserved.
             <br />
-            ISSN: 3139-3616
+            {/* ISSN: 3139-3616 */}
           </p>
           <p className="mt-2">
             Designed by the{" "}
