@@ -110,6 +110,14 @@ const JICSNavigation = () => {
         },
       ],
     },
+    {
+      label: "Indexing and Policies",
+      path: "/journal/jics/indexing",
+      dropdown: [
+        { label: "Indexing", path: "/journal/jics/indexing" },
+        { label: "Policies", path: "/journal/jics/policies" },
+      ],
+    },
   ];
 
   const toggleMobileMenu = () => {

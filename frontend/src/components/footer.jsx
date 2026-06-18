@@ -8,7 +8,7 @@ function Footer() {
     <footer className="bg-[#00796b] text-[#e0e0e0] py-12 mt-16">
       <div className="max-w-7xl mx-auto px-6">
         {/* Footer Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About Section */}
           <div>
             <h3 className="text-xl font-bold text-white mb-4">
@@ -47,22 +47,6 @@ function Footer() {
             </ul>
           </div>
 
-          {/* Indexing */}
-          <div>
-            <h3 className="text-xl font-bold text-white mb-4">Indexing</h3>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="https://scholar.google.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-[#00acc1] transition-colors"
-                >
-                  Google Scholar
-                </a>
-              </li>
-            </ul>
-          </div>
           {/* Legal */}
           <div>
             <h3 className="text-xl font-bold text-white mb-4">Legal</h3>

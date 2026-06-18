@@ -13,6 +13,8 @@ import ReviewTimeline from "./jics/ReviewTimeline";
 import ReviewerEthics from "./jics/ReviewerEthics";
 import DecisionCriteria from "./jics/DecisionCriteria";
 import TransparencyMeasures from "./jics/TransparencyMeasures";
+import Indexing from "./jics/Indexing";
+import Policies from "./jics/Policies";
 
 const JICSJournal = () => (
   <div className="min-h-screen bg-[#f9f9f9] font-sans pb-8">
@@ -112,6 +114,8 @@ const JICSJournal = () => (
             path="/review/transparency"
             element={<TransparencyMeasures />}
           />
+          <Route path="/indexing" element={<Indexing />} />
+          <Route path="/policies" element={<Policies />} />
           {/* Catch-All Route for invalid /journal/jics/* paths */}
           <Route path="*" element={<Navigate to="/journal/jics" replace />} />
         </Routes>
