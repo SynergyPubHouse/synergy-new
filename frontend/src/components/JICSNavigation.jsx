@@ -16,6 +16,7 @@ const JICSNavigation = () => {
       path: "/journal/jics/about/overview",
       dropdown: [
         { label: "Overview", path: "/journal/jics/about/overview" },
+        { label: "Journal Insights", path: "/journal/jics/insights" },
         { label: "Editorial Board", path: "/journal/jics/about/editorial-board" },
         { label: "Aims and Scope", path: "/journal/jics/about/aims-scope" },
         { label: "Academic Integrity", path: "/journal/jics/about/integrity" },

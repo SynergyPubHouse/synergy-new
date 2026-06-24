@@ -15,6 +15,7 @@ import DecisionCriteria from "./jics/DecisionCriteria";
 import TransparencyMeasures from "./jics/TransparencyMeasures";
 import Indexing from "./jics/Indexing";
 import Policies from "./jics/Policies";
+import JournalInsights from "./jics/JournalInsights";
 
 const JICSJournal = () => (
   <div className="min-h-screen bg-[#f9f9f9] font-sans pb-8">
@@ -44,27 +45,41 @@ const JICSJournal = () => (
                 A peer-reviewed, open-access international journal dedicated to the advancement of intelligent computing research and its real-world applications.
               </p>
             </div>
-            {/* Elegant Button */}
-            <Link
-              to="/journal/jics/submit"
-              className="whitespace-nowrap inline-flex items-center justify-center px-6 py-3 bg-[#00796b] text-white font-semibold rounded-xl shadow hover:bg-[#00acc1] hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
-            >
-              Submit your manuscript
-              <svg
-                className="ml-2 w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
+            {/* Meta badges + CTA */}
+            <div className="flex flex-col items-center gap-4 flex-shrink-0">
+              {/* ISSN & ESTD card */}
+              <div className="w-full rounded-xl border border-[#00796b]/20 bg-white shadow-sm divide-x divide-[#00796b]/15 flex overflow-hidden">
+                <div className="flex flex-col items-center px-5 py-3 gap-0.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[#00796b]/60">e-ISSN</span>
+                  <span className="text-sm font-bold text-[#00796b] tracking-wide">3139-3616</span>
+                </div>
+                <div className="flex flex-col items-center px-5 py-3 gap-0.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[#00796b]/60">Established</span>
+                  <span className="text-sm font-bold text-[#00796b] tracking-wide">2026</span>
+                </div>
+              </div>
+              {/* Submit button */}
+              <Link
+                to="/journal/jics/submit"
+                className="w-full whitespace-nowrap inline-flex items-center justify-center px-6 py-3 bg-[#00796b] text-white font-semibold rounded-xl shadow hover:bg-[#00acc1] hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M14 5l7 7m0 0l-7 7m7-7H3"
-                />
-              </svg>
-            </Link>
+                Submit your manuscript
+                <svg
+                  className="ml-2 w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M14 5l7 7m0 0l-7 7m7-7H3"
+                  />
+                </svg>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -116,6 +131,7 @@ const JICSJournal = () => (
           />
           <Route path="/indexing" element={<Indexing />} />
           <Route path="/policies" element={<Policies />} />
+          <Route path="/insights" element={<JournalInsights />} />
           {/* Catch-All Route for invalid /journal/jics/* paths */}
           <Route path="*" element={<Navigate to="/journal/jics" replace />} />
         </Routes>

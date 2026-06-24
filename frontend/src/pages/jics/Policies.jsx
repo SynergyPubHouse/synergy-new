@@ -59,8 +59,8 @@ const Policies = () => (
       </h2>
       <p className="text-[#555] text-lg leading-relaxed max-w-2xl">
         JICS is committed to transparent, fair, and rigorous editorial
-        standards. The following policies govern publication charges and
-        the peer review process.
+        standards. The following policies govern all aspects of publication,
+        from submission to post-publication.
       </p>
     </div>
 
@@ -148,6 +148,176 @@ const Policies = () => (
         </div>
       </div>
     </div>
+    {/* Retraction and Correction Policy */}
+    <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden mb-10">
+      <div className="bg-[#00796b] px-7 py-4 flex items-center gap-3">
+        <svg className="w-6 h-6 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+        <h3 className="text-white font-bold text-lg">Retraction and Correction Policy</h3>
+      </div>
+      <div className="px-7 py-6">
+        <p className="text-[#444] text-base leading-relaxed mb-4">
+          JICS reserves the right to retract, correct, or remove published articles when any of the following are established:
+        </p>
+        <ul className="space-y-2 mb-5">
+          {[
+            "Research misconduct is proven",
+            "Plagiarism is detected after publication",
+            "Fabricated or falsified data is identified",
+            "Serious ethical violations are discovered",
+            "Significant errors that invalidate the findings",
+          ].map((item) => (
+            <li key={item} className="flex items-start gap-3 text-sm text-[#555]">
+              <span className="mt-1.5 w-2 h-2 rounded-full bg-[#00796b] flex-shrink-0" />
+              {item}
+            </li>
+          ))}
+        </ul>
+        <div className="bg-[#e0f2f1] border border-[#b2dfdb] rounded-lg px-5 py-3 text-sm text-[#00796b] font-medium">
+          Retractions and corrections are conducted in accordance with{" "}
+          <a href="https://publicationethics.org" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#004d40]">
+            COPE guidelines
+          </a>.
+        </div>
+      </div>
+    </div>
+
+    {/* Data Availability Policy */}
+    <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden mb-10">
+      <div className="bg-[#00796b] px-7 py-4 flex items-center gap-3">
+        <svg className="w-6 h-6 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+        </svg>
+        <h3 className="text-white font-bold text-lg">Data Availability Policy</h3>
+      </div>
+      <div className="px-7 py-6">
+        <p className="text-[#444] text-base leading-relaxed mb-4">
+          Authors are encouraged to make research data available whenever possible to
+          support reproducibility and transparency. A <strong>Data Availability Statement</strong> must
+          be included in the manuscript indicating:
+        </p>
+        <ul className="space-y-2">
+          {[
+            "Where the data can be accessed (repository link or contact details)",
+            "Any restrictions on access and the reasons for them",
+            "A clear statement if data cannot be shared, with justification",
+          ].map((item) => (
+            <li key={item} className="flex items-start gap-3 text-sm text-[#555]">
+              <svg className="w-4 h-4 text-[#00796b] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+
+    {/* AI-Assisted Writing Policy */}
+    <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden mb-10">
+      <div className="bg-[#00796b] px-7 py-4 flex items-center gap-3">
+        <svg className="w-6 h-6 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <h3 className="text-white font-bold text-lg">AI-Assisted Writing Policy</h3>
+      </div>
+      <div className="px-7 py-6">
+        <p className="text-[#444] text-base leading-relaxed mb-4">
+          Authors may use Artificial Intelligence (AI) tools to improve language,
+          grammar, and readability of their manuscripts. However, the following
+          conditions apply:
+        </p>
+        <ul className="space-y-3 mb-5">
+          {[
+            { text: "AI tools cannot be listed as authors", type: "restrict" },
+            { text: "Authors remain fully responsible for all content, accuracy, and originality", type: "restrict" },
+            { text: "Any substantial use of AI-assisted writing tools must be disclosed in the manuscript", type: "restrict" },
+          ].map(({ text }) => (
+            <li key={text} className="flex items-start gap-3 text-sm text-[#555]">
+              <span className="mt-1.5 w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
+              {text}
+            </li>
+          ))}
+        </ul>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-5 py-4 flex gap-3 items-start">
+          <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <p className="text-sm text-[#555] leading-relaxed">
+            JICS reserves the right to screen submissions for excessive AI-generated
+            content and may reject manuscripts that fail to meet scholarly and
+            originality standards.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Archiving Policy */}
+    <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden mb-10">
+      <div className="bg-[#00796b] px-7 py-4 flex items-center gap-3">
+        <svg className="w-6 h-6 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+        </svg>
+        <h3 className="text-white font-bold text-lg">Archiving Policy</h3>
+      </div>
+      <div className="px-7 py-6">
+        <p className="text-[#444] text-base leading-relaxed mb-4">
+          JICS is committed to ensuring the long-term preservation and accessibility
+          of all published content. Published articles may be archived through:
+        </p>
+        <ul className="space-y-2">
+          {[
+            "Institutional repositories",
+            "Author personal repositories",
+            "National libraries",
+            "Third-party archiving services",
+            "Journal archives maintained by Synergy World Press",
+          ].map((item) => (
+            <li key={item} className="flex items-start gap-3 text-sm text-[#555]">
+              <svg className="w-4 h-4 text-[#00796b] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+
+    {/* Conflict of Interest Policy */}
+    <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden mb-10">
+      <div className="bg-[#00796b] px-7 py-4 flex items-center gap-3">
+        <svg className="w-6 h-6 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+        </svg>
+        <h3 className="text-white font-bold text-lg">Conflict of Interest Policy</h3>
+      </div>
+      <div className="px-7 py-6">
+        <p className="text-[#444] text-base leading-relaxed mb-4">
+          Authors, reviewers, and editors must disclose any financial, professional,
+          institutional, or personal relationships that could influence the
+          publication process.
+        </p>
+        <div className="grid sm:grid-cols-3 gap-4 mb-5">
+          {[
+            { role: "Authors", desc: "Disclose funding sources, affiliations, or competing interests at submission" },
+            { role: "Reviewers", desc: "Declare any relationship with the authors or their institutions before accepting a review" },
+            { role: "Editors", desc: "Recuse themselves from handling manuscripts where a conflict exists" },
+          ].map(({ role, desc }) => (
+            <div key={role} className="bg-[#f9f9f9] rounded-xl border border-gray-100 p-4">
+              <p className="text-xs font-bold text-[#00796b] uppercase tracking-wider mb-1">{role}</p>
+              <p className="text-sm text-[#555] leading-snug">{desc}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-sm text-[#555] leading-relaxed">
+          All disclosed conflicts will be evaluated by the editorial office before
+          a final decision is made.
+        </p>
+      </div>
+    </div>
+
   </section>
 );
 
