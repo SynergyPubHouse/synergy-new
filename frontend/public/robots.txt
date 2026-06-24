@@ -19,4 +19,4 @@ Allow: /
 User-agent: Googlebot-News
 Allow: /
 
-Sitemap: https://synergyworldpress.com/sitemap.xml
+Sitemap: https://api.synergyworldpress.com/sitemap.xml

@@ -423,10 +423,54 @@ function ReviewerDashboard() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading certificate:", error);
-      alert(
-        error.response?.data?.message ||
-          "Failed to download certificate. It may not be available yet.",
-      );
+
+      let userMessage = "Something went wrong while downloading the certificate. Please try again.";
+
+      if (error.response) {
+        const status = error.response.status;
+
+        // responseType:"blob" means error bodies come back as Blobs, not parsed JSON.
+        // Read and parse the blob to get the actual backend message.
+        let backendMessage = null;
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          backendMessage = parsed?.message || null;
+        } catch {
+          // blob parse failed — fall through to status-based messages
+        }
+
+        if (status === 401) {
+          userMessage = "Your session has expired. Please log in again to download your certificate.";
+          navigate("/login");
+          return;
+        } else if (status === 403) {
+          userMessage =
+            "This certificate is not yet available.\n\n" +
+            "Certificates are unlocked on the 1st of the following month once the review period ends. " +
+            "Please check back then.";
+        } else if (status === 404) {
+          userMessage =
+            "No completed reviews were found for this period.\n\n" +
+            "This can happen if your review submission was not recorded correctly. " +
+            "Please contact the editorial team if you believe this is an error.";
+        } else if (status === 400) {
+          userMessage =
+            "Invalid request — the month or year could not be determined. " +
+            "Please refresh the page and try again.";
+        } else if (status >= 500) {
+          userMessage =
+            "The certificate could not be generated due to a server error.\n\n" +
+            (backendMessage ? `Details: ${backendMessage}` : "Please try again in a few minutes or contact support.");
+        } else if (backendMessage) {
+          userMessage = backendMessage;
+        }
+      } else if (error.request) {
+        userMessage =
+          "Could not reach the server. Please check your internet connection and try again.";
+      }
+
+      alert(userMessage);
     }
   };
 

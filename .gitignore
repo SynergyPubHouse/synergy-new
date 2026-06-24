@@ -8,6 +8,8 @@ test-*.pdf
 temp-*.pdf
 preview-*.pdf
 merged-*.pdf
+# Keep the certificate template — required in production for PDF generation
+!backend/templates/Reviewer_Certificate.pdf
 
 # Environment variables
 .env.development.local

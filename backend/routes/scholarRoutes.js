@@ -212,6 +212,7 @@ router.get("/article/:id", async (req, res) => {
 
     // URLs
     const baseUrl = getPublicBaseUrl();
+    const apiBaseUrl = getApiBaseUrl();
 
     // Scholar/PDF metadata should use the API URL because it returns application/pdf.
     const pdfUrl = normalizePdfUrl(article.publishedFileUrl || "");
@@ -221,7 +222,13 @@ router.get("/article/:id", async (req, res) => {
       pdfUrl || article.publishedFileUrl || "",
     );
 
-    const articleUrl = `${baseUrl}/journal/jics/articles/${encodeURIComponent(getArticleUrlId(article))}`;
+    // The canonical URL for this Scholar page must be itself (api domain), NOT the
+    // React SPA URL. Pointing canonical at the SPA means Scholar tries to find
+    // citation_* tags on a client-rendered page that has none, and skips the article.
+    const articleUrl = `${apiBaseUrl}/scholar/article/${encodeURIComponent(getArticleUrlId(article))}`;
+
+    // Link back to the main user-facing article page for the download button / footer.
+    const mainSiteArticleUrl = `${baseUrl}/journal/jics/articles/${encodeURIComponent(getArticleUrlId(article))}`;
 
     // Generate HTML
     const html = generateScholarHtml({
@@ -233,6 +240,7 @@ router.get("/article/:id", async (req, res) => {
       pdfUrl,
       publicPdfUrl,
       articleUrl,
+      mainSiteArticleUrl,
       baseUrl,
     });
 
@@ -429,8 +437,13 @@ function generateScholarHtml({
   pdfUrl,
   publicPdfUrl,
   articleUrl,
+  mainSiteArticleUrl,
   baseUrl,
 }) {
+  // articleUrl is the canonical scholar URL (api domain); mainSiteArticleUrl is the
+  // user-facing React page used only for the visible "View Article" link.
+  const userFacingUrl = mainSiteArticleUrl || articleUrl;
+
   const schemaData = {
     "@context": "https://schema.org",
     "@type": "ScholarlyArticle",
@@ -595,7 +608,10 @@ ${JSON.stringify(schemaData, null, 2)}
             : ""
         }
         
-        ${publicPdfUrl ? `<a href="${publicPdfUrl}" class="pdf-btn" target="_blank">📄 Download Full Text (PDF)</a>` : ""}
+        <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
+          ${publicPdfUrl ? `<a href="${publicPdfUrl}" class="pdf-btn" target="_blank">📄 Download Full Text (PDF)</a>` : ""}
+          <a href="${userFacingUrl}" class="pdf-btn" style="background:#004d40;" target="_blank">🔗 View Article on Journal Website</a>
+        </div>
     </article>
     
     <footer class="footer">

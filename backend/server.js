@@ -94,15 +94,16 @@ app.use("/", sitemapRoutes);
 app.use("/", require("./routes/publicPdfRoutes"));
 
 app.get("/robots.txt", (req, res) => {
+  const apiBase = (process.env.API_BASE_URL || "https://api.synergyworldpress.com").replace(/\/+$/, "");
   res.setHeader("Content-Type", "text/plain");
   res.send(`User-agent: *
 Allow: /
 
 User-agent: Googlebot
 Allow: /scholar/
-Allow: /journal/
+Allow: /sitemap.xml
 
-Sitemap: https://synergyworldpress.com/sitemap.xml
+Sitemap: ${apiBase}/sitemap.xml
 
 Disallow: /api/
 Disallow: /login
