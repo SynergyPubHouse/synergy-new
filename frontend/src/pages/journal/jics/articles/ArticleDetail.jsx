@@ -564,7 +564,7 @@ const ArticleDetail = () => {
                 <span className="mr-2">📖</span> Publication Details
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_minmax(260px,1.4fr)]">
                 {/* Issue */}
                 <div className="bg-white p-3 rounded-lg border border-gray-200">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
@@ -599,6 +599,18 @@ const ArticleDetail = () => {
                     </p>
                   </div>
                 )}
+                
+                 {/* {ISSN NUMBER} */}
+                {article.publishedAt && (
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">
+                      ISSN 
+                    </p>
+                    <p className="text-lg font-semibold text-gray-800">
+                     3139-3616
+                    </p>
+                  </div>
+                )}
 
                 {/* Published Date */}
                 {article.publishedAt && (
@@ -611,7 +623,6 @@ const ArticleDetail = () => {
                     </p>
                   </div>
                 )}
-
                 {/* Views Card */}
                 <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-5 rounded-xl border-2 border-purple-200 shadow-lg">
                   <div className="grid grid-cols-2 gap-6 text-center">
