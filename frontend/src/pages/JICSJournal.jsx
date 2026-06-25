@@ -47,17 +47,7 @@ const JICSJournal = () => (
             </div>
             {/* Meta badges + CTA */}
             <div className="flex flex-col items-center gap-4 flex-shrink-0">
-              {/* ISSN & ESTD card */}
-              <div className="w-full rounded-xl border border-[#00796b]/20 bg-white shadow-sm divide-x divide-[#00796b]/15 flex overflow-hidden">
-                <div className="flex flex-col items-center px-5 py-3 gap-0.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[#00796b]/60">e-ISSN</span>
-                  <span className="text-sm font-bold text-[#00796b] tracking-wide">3139-3616</span>
-                </div>
-                <div className="flex flex-col items-center px-5 py-3 gap-0.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[#00796b]/60">Established</span>
-                  <span className="text-sm font-bold text-[#00796b] tracking-wide">2026</span>
-                </div>
-              </div>
+            
               {/* Submit button */}
               <Link
                 to="/journal/jics/submit"
