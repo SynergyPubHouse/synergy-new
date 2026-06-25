@@ -265,6 +265,11 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
                     📅 {formatIssueDate(item)}
                   </span>
                 )}
+                  {item.publishedAt && (
+                  <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md border border-gray-200">
+                    ISSN : 3139-3616
+                  </span>
+                )}
               </div>
 
               {/* Abstract */}

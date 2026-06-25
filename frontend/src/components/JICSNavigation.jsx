@@ -84,6 +84,13 @@ const JICSNavigation = () => {
           path: "/journal/jics/review/transparency",
         },
       ],
+    },{
+      label: "Indexing and Policies",
+      path: "/journal/jics/indexing",
+      dropdown: [
+        { label: "Indexing", path: "/journal/jics/indexing" },
+        { label: "Policies", path: "/journal/jics/policies" },
+      ],
     },
     {
       label: "Journal Updates",
@@ -109,14 +116,6 @@ const JICSNavigation = () => {
           ),
           external: true,
         },
-      ],
-    },
-    {
-      label: "Indexing and Policies",
-      path: "/journal/jics/indexing",
-      dropdown: [
-        { label: "Indexing", path: "/journal/jics/indexing" },
-        { label: "Policies", path: "/journal/jics/policies" },
       ],
     },
   ];
