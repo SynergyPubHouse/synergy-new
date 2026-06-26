@@ -33,7 +33,7 @@ const subjectAreas = [
 ];
 
 const JournalInsights = () => (
-  <section className="max-w-4xl mx-auto">
+  <section className="w-full max-w-6xl mx-auto my-8 px-6 py-8 lg:px-8">
     {/* Page title */}
     <div className="mb-8">
       <h2 className="text-2xl font-extrabold text-[#212121] tracking-tight">
@@ -239,17 +239,38 @@ const JournalInsights = () => (
 
       {/* Editor-in-Chief callout */}
       <Section title="Editor-in-Chief">
-        <div className="flex items-center gap-4">
-          <img
-            src="/images/b12a986f-b157-4137-93fa-c6d5af52a98a.jfif"
-            alt="Dr. Meenu Gupta"
-            className="w-14 h-14 rounded-full object-cover border-2 border-[#00796b] shadow flex-shrink-0"
-          />
-          <div>
-            <p className="text-sm font-bold text-[#212121]">Dr. Meenu Gupta</p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Chandigarh University, Mohali, Punjab, India
-            </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="flex items-center gap-4">
+            <img
+              src="/images/b12a986f-b157-4137-93fa-c6d5af52a98a.jfif"
+              alt="Dr. Meenu Gupta"
+              className="w-14 h-14 rounded-full object-cover border-2 border-[#00796b] shadow flex-shrink-0"
+            />
+            <div>
+              <p className="text-sm font-bold text-[#212121]">Dr. Meenu Gupta</p>
+              <p className="text-xs text-[#00796b] font-semibold mt-0.5">
+                Professor and Head – Conferences & Research Outreach
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Chandigarh University, Mohali, Punjab, 140413, India
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <img
+              src="/images/coEditorInChief.jfif"
+              alt="Dr. Rakesh Kumar"
+              className="w-14 h-14 rounded-full object-cover border-2 border-[#00796b] shadow flex-shrink-0"
+            />
+            <div>
+              <p className="text-sm font-bold text-[#212121]">Dr. Rakesh Kumar</p>
+              <p className="text-xs text-[#00796b] font-semibold mt-0.5">
+                Associate Director, Department of CSE
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Chandigarh University, Mohali, Punjab, 140413, India
+              </p>
+            </div>
           </div>
         </div>
         <Link

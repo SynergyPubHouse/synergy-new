@@ -978,7 +978,7 @@ const EditorialBoard = () => {
   };
 
   return (
-    <section className="max-w-7xl mx-auto my-8 px-4 md:px-8">
+    <section className="w-full max-w-6xl mx-auto my-8 px-6 py-8 lg:px-8">
       {/* Page Title */}
       <div className="mb-10">
         <h2 className="text-3xl font-extrabold text-[#00796b] tracking-tight">
