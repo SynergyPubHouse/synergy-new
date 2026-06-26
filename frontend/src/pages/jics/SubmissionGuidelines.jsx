@@ -1,6 +1,6 @@
 import React from 'react';
  const SubmissionGuidelines = () => (
-  <section className="max-w-3xl mx-auto my-8 p-8">
+  <section className="w-full max-w-6xl mx-auto my-8 px-6 py-8 lg:px-8">
     <h2 className="text-3xl font-extrabold text-[#00796b] mb-6 tracking-tight">
       Manuscript Submission Guidelines
     </h2>
