@@ -23,16 +23,16 @@ router.get('/google/callback', async (req, res) => {
     console.log("\n" + "=".repeat(60));
     console.log("✅ SUCCESS! TOKEN RECEIVED!");
     console.log("=".repeat(60));
-    console.log("\n📋 Add this to your .env file:\n");
-    console.log(`GOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`);
+    console.log("\nRefresh token value suppressed; store it securely.");
+    console.log("Google refresh token received:", Boolean(tokens.refresh_token));
     console.log("\n" + "=".repeat(60));
     
     res.send(`
       <html>
         <body style="font-family: Arial; padding: 50px; text-align: center;">
           <h1>✅ Authorization Successful!</h1>
-          <p>Check your <strong>terminal</strong> for the REFRESH_TOKEN</p>
-          <p>Add it to your <code>.env</code> file</p>
+          <p>Google returned a refresh token successfully.</p>
+          <p>Store it securely in your environment configuration.</p>
           <p>Then restart your server!</p>
         </body>
       </html>

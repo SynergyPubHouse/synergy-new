@@ -4,9 +4,12 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:public-pdf": "node --test tests/publicPdf.test.js",
     "dev": "node server.js",
     "postinstall": "node node_modules/puppeteer/install.mjs",
     "start": "node server.js",
+    "test:doi": "node scripts/testDoiServices.js",
+    "test:doi:integration": "node scripts/testDoiIntegration.js",
     "build": "npm run install-browser && python3 -m pip install docx2txt",
     "install-browser": "node ./scripts/installBrowser.js"
   },

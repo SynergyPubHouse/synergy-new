@@ -46,6 +46,7 @@ const manuscriptSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true, // Allow null values but ensure uniqueness when present
+      immutable: true,
     },
     type: {
       type: String,
@@ -279,6 +280,66 @@ const manuscriptSchema = new mongoose.Schema(
     publishedFileUrl: {
       type: String,
       default: "",
+    },
+    doi: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+      default: undefined,
+    },
+    doiStatus: {
+      type: String,
+      enum: [
+        "not_assigned",
+        "queued",
+        "validating",
+        "submitting",
+        "submitted",
+        "processing",
+        "registered",
+        "warning",
+        "failed",
+        "retry_scheduled",
+        "cancelled",
+      ],
+      default: "not_assigned",
+      index: true,
+    },
+    doiDepositId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DoiDeposit",
+      default: null,
+      index: true,
+    },
+    canonicalUrl: {
+      type: String,
+      default: "",
+    },
+    crossrefResourceUrl: {
+      type: String,
+      default: "",
+    },
+    articleNumber: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    publishedPdfObjectKey: {
+      type: String,
+      default: "",
+    },
+    crossrefMetadataSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    customIdLocked: {
+      type: Boolean,
+      default: false,
+    },
+    customIdLockedAt: {
+      type: Date,
+      default: null,
     },
     // Google Drive fields for published PDF
     publishedDriveFileId: { type: String, default: "" },

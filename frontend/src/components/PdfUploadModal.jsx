@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
+import PropTypes from "prop-types";
 
 function PdfUploadModal({
   isOpen,
@@ -29,6 +30,7 @@ function PdfUploadModal({
   const [issueTitle, setIssueTitle] = useState("");
   const [pageStart, setPageStart] = useState("");
   const [pageEnd, setPageEnd] = useState("");
+  const [articleNumber, setArticleNumber] = useState("");
   const [section, setSection] = useState("Research Article");
 
   // Authors states (New Beautiful UI)
@@ -50,26 +52,40 @@ function PdfUploadModal({
   useEffect(() => {
     if (!isOpen || !manuscript) return;
 
-    // Pre-populate authors list
-    if (manuscript.authors?.length > 0 && pdfAuthorsList.length === 0) {
-      const names = manuscript.authors
+    setPdfAuthorsList((currentAuthors) => {
+      if (currentAuthors.length > 0 || !manuscript.authors?.length) {
+        return currentAuthors;
+      }
+
+      const initialAuthors = manuscript.authors
         .map((a) =>
           [a.firstName, a.middleName, a.lastName]
             .filter((p) => p && p.trim())
             .join(" "),
         )
         .filter((name) => name.trim());
-      if (names.length > 0) setPdfAuthorsList(names);
-    }
 
-    // Pre-select corresponding author
-    if (manuscript.correspondingAuthor && !pdfCorrespondingAuthor) {
-      const ca = manuscript.correspondingAuthor;
-      const caName = [ca.firstName, ca.middleName, ca.lastName]
+      return initialAuthors.length > 0 ? initialAuthors : currentAuthors;
+    });
+
+    setPdfCorrespondingAuthor((currentCorrespondingAuthor) => {
+      if (currentCorrespondingAuthor || !manuscript.correspondingAuthor) {
+        return currentCorrespondingAuthor;
+      }
+
+      const correspondingAuthor = manuscript.correspondingAuthor;
+      const correspondingAuthorName = [
+        correspondingAuthor.firstName,
+        correspondingAuthor.middleName,
+        correspondingAuthor.lastName,
+      ]
         .filter((p) => p && p.trim())
         .join(" ");
-      if (caName.trim()) setPdfCorrespondingAuthor(caName);
-    }
+
+      return correspondingAuthorName.trim()
+        ? correspondingAuthorName
+        : currentCorrespondingAuthor;
+    });
   }, [isOpen, manuscript]);
 
   // Check if issue info is filled
@@ -86,6 +102,7 @@ function PdfUploadModal({
     setIssueTitle("");
     setPageStart("");
     setPageEnd("");
+    setArticleNumber("");
     setSection("Research Article");
     setPdfAuthorsList([]);
     setCurrentAuthorInput("");
@@ -139,6 +156,30 @@ function PdfUploadModal({
       return;
     }
 
+    // Page sequence validation for normal issue publication
+    if (!separateIssue) {
+      if (!issueYear || !issueVolume || !issueNumber || !pageStart || !pageEnd) {
+        setError("Required issue metadata is missing. Please enter Year, Volume, Issue Number, Page Start, and Page End.");
+        setActiveTab("issue");
+        return;
+      }
+
+      const pStart = parseInt(pageStart, 10);
+      const pEnd = parseInt(pageEnd, 10);
+
+      if (Number.isNaN(pStart) || pStart < 1) {
+        setError("pageStart must be at least 1.");
+        setActiveTab("issue");
+        return;
+      }
+
+      if (Number.isNaN(pEnd) || pEnd < pStart) {
+        setError("pageEnd must be greater than or equal to pageStart.");
+        setActiveTab("issue");
+        return;
+      }
+    }
+
     setUploadingPdf(true);
     setError("");
 
@@ -153,6 +194,7 @@ function PdfUploadModal({
       if (issueTitle) formData.append("issueTitle", issueTitle);
       if (pageStart) formData.append("pageStart", pageStart);
       if (pageEnd) formData.append("pageEnd", pageEnd);
+      if (articleNumber) formData.append("articleNumber", articleNumber);
       if (section) formData.append("section", section);
 
       // Authors - Send as JSON string
@@ -492,6 +534,23 @@ function PdfUploadModal({
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Article Number
+                </label>
+                <input
+                  type="text"
+                  value={articleNumber}
+                  onChange={(e) => setArticleNumber(e.target.value)}
+                  className="w-full p-3 border-2 rounded-lg"
+                  placeholder={manuscript.customId || "JICS-26-003"}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Used when page numbers are unavailable. If left blank, the
+                  manuscript ID is used.
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -555,5 +614,43 @@ function PdfUploadModal({
     </div>
   );
 }
+
+PdfUploadModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  manuscript: PropTypes.shape({
+    _id: PropTypes.string,
+    customId: PropTypes.string,
+    title: PropTypes.string,
+    type: PropTypes.string,
+    status: PropTypes.string,
+    authors: PropTypes.arrayOf(
+      PropTypes.shape({
+        _id: PropTypes.string,
+        firstName: PropTypes.string,
+        middleName: PropTypes.string,
+        lastName: PropTypes.string,
+        email: PropTypes.string,
+        orcidId: PropTypes.string,
+      }),
+    ),
+    correspondingAuthor: PropTypes.shape({
+      _id: PropTypes.string,
+      firstName: PropTypes.string,
+      middleName: PropTypes.string,
+      lastName: PropTypes.string,
+      email: PropTypes.string,
+      orcidId: PropTypes.string,
+    }),
+  }).isRequired,
+  userToken: PropTypes.string.isRequired,
+  separateIssue: PropTypes.bool,
+  onSuccess: PropTypes.func,
+};
+
+PdfUploadModal.defaultProps = {
+  separateIssue: false,
+  onSuccess: undefined,
+};
 
 export default PdfUploadModal;

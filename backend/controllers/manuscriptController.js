@@ -44,6 +44,9 @@ const {
   failJob,
   STATUS,
 } = require("../utils/jobProcessor");
+const {
+  assignDoiAndQueueDeposit,
+} = require("../services/doiService");
 
 const streamPipeline = promisify(pipeline);
 
@@ -127,6 +130,260 @@ async function cleanupFiles(filePaths) {
 
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isS3NotFoundError(error) {
+  return (
+    error?.name === "NoSuchKey" ||
+    error?.name === "NotFound" ||
+    error?.$metadata?.httpStatusCode === 404
+  );
+}
+
+function isS3PermissionError(error) {
+  return (
+    error?.name === "AccessDenied" ||
+    error?.name === "Forbidden" ||
+    error?.$metadata?.httpStatusCode === 403
+  );
+}
+
+function getFilenameFromPdfUrl(pdfUrl) {
+  if (!pdfUrl || typeof pdfUrl !== "string") {
+    return "";
+  }
+
+  try {
+    const parsedUrl = new URL(pdfUrl);
+    const pathname = decodeURIComponent(parsedUrl.pathname || "");
+    const filename = path.posix.basename(pathname).trim();
+    return filename.toLowerCase().endsWith(".pdf") ? filename : "";
+  } catch (_) {
+    const filename = path.posix
+      .basename(pdfUrl.split(/[?#]/)[0] || "")
+      .trim();
+    return filename.toLowerCase().endsWith(".pdf") ? filename : "";
+  }
+}
+
+function normalizeHttpBaseUrl(baseUrl, fallbackProtocol = "https") {
+  const value = String(baseUrl || "").trim();
+  if (!value) return "";
+
+  return (
+    value.startsWith("http://") || value.startsWith("https://")
+      ? value
+      : `${fallbackProtocol}://${value}`
+  ).replace(/\/+$/, "");
+}
+
+function getPublishedPdfUrlCandidates(filename) {
+  const apiBaseUrl = normalizeHttpBaseUrl(
+    process.env.API_BASE_URL || "https://api.synergyworldpress.com",
+  );
+  const publicBaseUrl = normalizeHttpBaseUrl(
+    process.env.PUBLIC_SITE_URL ||
+      process.env.CLIENT_URL ||
+      "https://synergyworldpress.com",
+  );
+  const encodedFilename = encodeURIComponent(filename);
+  const hosts = [
+    apiBaseUrl,
+    publicBaseUrl,
+    "https://api.synergyworldpress.com",
+    "http://api.synergyworldpress.com",
+    "https://synergyworldpress.com",
+    "http://synergyworldpress.com",
+    "https://www.synergyworldpress.com",
+    "http://www.synergyworldpress.com",
+  ].filter(Boolean);
+
+  return [
+    ...new Set(
+      hosts.flatMap((host) => [
+        `${host}/pdf/${filename}`,
+        `${host}/pdf/${encodedFilename}`,
+      ]),
+    ),
+  ];
+}
+
+function getPublishedPdfObjectKey(manuscript) {
+  const storedKey = String(manuscript?.publishedPdfObjectKey || "").trim();
+  if (storedKey) {
+    return storedKey.replace(/^\/+/, "");
+  }
+
+  const storedUrlFilename = getFilenameFromPdfUrl(manuscript?.publishedFileUrl);
+
+  return storedUrlFilename ? buildPublishedManuscriptKey(storedUrlFilename) : "";
+}
+
+function parseOptionalPositiveInteger(value, fieldName) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  const parsedValue = Number(String(value).trim());
+  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error(`${fieldName} must be a positive whole number`);
+  }
+
+  return parsedValue;
+}
+
+function parseOptionalIssueYear(value) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  const parsedYear = Number(String(value).trim());
+  const maxYear = new Date().getFullYear() + 1;
+
+  if (
+    !Number.isInteger(parsedYear) ||
+    parsedYear < 1900 ||
+    parsedYear > maxYear
+  ) {
+    throw new Error(`issueYear must be between 1900 and ${maxYear}`);
+  }
+
+  return parsedYear;
+}
+
+async function buildPublicationMetadata(input, manuscript) {
+  const isSeparateIssue = input.separateIssue === "true" || input.separateIssue === true;
+
+  if (!isSeparateIssue) {
+    // Required issue metadata fields must be provided and valid
+    if (
+      input.issueYear === undefined || input.issueYear === null || String(input.issueYear).trim() === "" ||
+      input.issueVolume === undefined || input.issueVolume === null || String(input.issueVolume).trim() === "" ||
+      input.issueNumber === undefined || input.issueNumber === null || String(input.issueNumber).trim() === "" ||
+      input.pageStart === undefined || input.pageStart === null || String(input.pageStart).trim() === "" ||
+      input.pageEnd === undefined || input.pageEnd === null || String(input.pageEnd).trim() === ""
+    ) {
+      throw new Error("Required issue metadata is missing");
+    }
+
+    const issueYearValue = parseOptionalIssueYear(input.issueYear);
+    const issueVolumeValue = parseOptionalPositiveInteger(input.issueVolume, "issueVolume");
+    const issueNumberValue = parseOptionalPositiveInteger(input.issueNumber, "issueNumber");
+    const pageStartValue = parseOptionalPositiveInteger(input.pageStart, "pageStart");
+    const pageEndValue = parseOptionalPositiveInteger(input.pageEnd, "pageEnd");
+
+    if (
+      issueYearValue === null ||
+      issueVolumeValue === null ||
+      issueNumberValue === null ||
+      pageStartValue === null ||
+      pageEndValue === null
+    ) {
+      throw new Error("Required issue metadata is missing");
+    }
+
+    if (pageStartValue < 1) {
+      throw new Error("pageStart must be at least 1");
+    }
+    if (pageEndValue < pageStartValue) {
+      throw new Error("pageEnd cannot be lower than pageStart");
+    }
+
+    // Check existing published articles in the same issue
+    const existingArticles = await Manuscript.find({
+      _id: { $ne: manuscript._id },
+      status: "Published",
+      issueYear: issueYearValue,
+      issueVolume: issueVolumeValue,
+      issueNumber: issueNumberValue,
+      $or: [{ separateIssue: false }, { separateIssue: { $exists: false } }],
+    }).select("pageStart pageEnd");
+
+    const validEnds = existingArticles
+      .map((a) => a.pageEnd)
+      .filter((val) => val !== null && val !== undefined);
+
+    if (validEnds.length === 0) {
+      if (pageStartValue !== 1) {
+        throw new Error("The first article in this issue must start on page 1");
+      }
+    } else {
+      const highestPageEnd = Math.max(...validEnds);
+      const expectedPageStart = highestPageEnd + 1;
+      if (pageStartValue !== expectedPageStart) {
+        throw new Error(
+          `The next article in Volume ${issueVolumeValue}, Issue ${issueNumberValue} must start on page ${expectedPageStart}.`
+        );
+      }
+    }
+
+    return {
+      issueVolume: issueVolumeValue,
+      issueNumber: issueNumberValue,
+      issueYear: issueYearValue,
+      issueTitle: String(input.issueTitle || "").trim(),
+      pageStart: pageStartValue,
+      pageEnd: pageEndValue,
+      articleNumber: "", // Expected to be empty string for normal pagination
+    };
+  }
+
+  // Fallback logic for Special Issues (separateIssue = true)
+  const pageStartValue = parseOptionalPositiveInteger(
+    input.pageStart,
+    "pageStart",
+  );
+  const pageEndValue = parseOptionalPositiveInteger(input.pageEnd, "pageEnd");
+  const hasPageStart = pageStartValue !== null;
+  const hasPageEnd = pageEndValue !== null;
+
+  if (hasPageStart !== hasPageEnd) {
+    throw new Error("Both pageStart and pageEnd are required when using pages");
+  }
+
+  if (hasPageStart && pageEndValue < pageStartValue) {
+    throw new Error("pageEnd cannot be lower than pageStart");
+  }
+
+  const customId = String(manuscript.customId || manuscript._id || "").trim();
+  const requestedArticleNumber = String(input.articleNumber || "").trim();
+  const articleNumber =
+    hasPageStart && !requestedArticleNumber
+      ? ""
+      : requestedArticleNumber || customId;
+
+  if (!hasPageStart && !articleNumber) {
+    throw new Error(
+      "articleNumber is required when pageStart and pageEnd are unavailable",
+    );
+  }
+
+  if (articleNumber) {
+    const duplicate = await Manuscript.exists({
+      _id: { $ne: manuscript._id },
+      articleNumber,
+    });
+
+    if (duplicate) {
+      throw new Error("articleNumber must be unique");
+    }
+  }
+
+  return {
+    issueVolume: parseOptionalPositiveInteger(
+      input.issueVolume,
+      "issueVolume",
+    ),
+    issueNumber: parseOptionalPositiveInteger(
+      input.issueNumber,
+      "issueNumber",
+    ),
+    issueYear: parseOptionalIssueYear(input.issueYear),
+    issueTitle: String(input.issueTitle || "").trim(),
+    pageStart: pageStartValue,
+    pageEnd: pageEndValue,
+    articleNumber,
+  };
 }
 
 const isUserAuthor = (manuscript, userId) => {
@@ -1568,6 +1825,14 @@ exports.updateManuscriptStatus = async (req, res) => {
     const { manuscriptId } = req.params;
     const { status } = req.body;
 
+    if (status === "Published") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Use the publish PDF workflow to publish articles. Direct Published status changes are not allowed.",
+      });
+    }
+
     // First, get the current manuscript to check its current status
     const currentManuscript = await Manuscript.findById(manuscriptId);
     if (!currentManuscript) {
@@ -2833,6 +3098,7 @@ exports.uploadPublishedPdf = async (req, res) => {
       issueTitle,
       pageStart,
       pageEnd,
+      articleNumber,
       section,
       pdfAuthors,
       pdfCorrespondingAuthor,
@@ -2864,13 +3130,35 @@ exports.uploadPublishedPdf = async (req, res) => {
     tempFiles = [req.file.path];
 
     const manuscript = await Manuscript.findById(manuscriptId)
-      .populate("authors", "firstName lastName email")
-      .populate("correspondingAuthor", "firstName lastName email");
+      .populate("authors", "firstName middleName lastName email orcidId")
+      .populate("correspondingAuthor", "firstName middleName lastName email orcidId");
 
     if (!manuscript) {
       return res.status(404).json({
         success: false,
         message: "Manuscript not found",
+      });
+    }
+
+    let publicationMetadata;
+    try {
+      publicationMetadata = await buildPublicationMetadata(
+        {
+          issueVolume,
+          issueNumber,
+          issueYear,
+          issueTitle,
+          pageStart,
+          pageEnd,
+          articleNumber,
+          separateIssue,
+        },
+        manuscript,
+      );
+    } catch (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError.message,
       });
     }
 
@@ -2901,19 +3189,21 @@ exports.uploadPublishedPdf = async (req, res) => {
 
     // Update manuscript
     manuscript.publishedFileUrl = publishedPdfUrl;
+    manuscript.publishedPdfObjectKey = s3ObjectKey || "";
     manuscript.publishedDriveFileId = driveResult.driveFileId;
     manuscript.publishedDriveViewUrl = driveResult.webViewLink || "";
     manuscript.status = "Published";
     manuscript.publishedAt = publishedDate;
     manuscript.separateIssue = separateIssue;
 
-    // Issue info
-    if (issueVolume) manuscript.issueVolume = parseInt(issueVolume);
-    if (issueNumber) manuscript.issueNumber = parseInt(issueNumber);
-    if (issueYear) manuscript.issueYear = parseInt(issueYear);
-    if (issueTitle) manuscript.issueTitle = issueTitle;
-    if (pageStart) manuscript.pageStart = parseInt(pageStart);
-    if (pageEnd) manuscript.pageEnd = parseInt(pageEnd);
+    // Issue and article metadata
+    manuscript.issueVolume = publicationMetadata.issueVolume;
+    manuscript.issueNumber = publicationMetadata.issueNumber;
+    manuscript.issueYear = publicationMetadata.issueYear;
+    manuscript.issueTitle = publicationMetadata.issueTitle;
+    manuscript.pageStart = publicationMetadata.pageStart;
+    manuscript.pageEnd = publicationMetadata.pageEnd;
+    manuscript.articleNumber = publicationMetadata.articleNumber;
     if (section) manuscript.section = section;
 
     manuscript.pdfAuthors = authorsArray;
@@ -2922,6 +3212,56 @@ exports.uploadPublishedPdf = async (req, res) => {
     await manuscript.save();
     manuscriptSaved = true;
 
+    let doiQueueResult = {
+      queued: false,
+      doi: manuscript.doi || null,
+      depositId: manuscript.doiDepositId || null,
+      status: manuscript.doiStatus || "not_assigned",
+      error: null,
+    };
+
+    try {
+      const result = await assignDoiAndQueueDeposit(manuscript);
+
+      // assignDoiAndQueueDeposit mutates DOI fields but does not save them.
+      await manuscript.save();
+
+      doiQueueResult = {
+        queued: Boolean(result?.queued),
+        doi: manuscript.doi || result?.doi || null,
+        depositId:
+          manuscript.doiDepositId ||
+          result?.deposit?._id ||
+          result?.depositId ||
+          null,
+        status:
+          manuscript.doiStatus ||
+          result?.deposit?.status ||
+          result?.status ||
+          "not_assigned",
+        error: null,
+      };
+
+      console.log("[uploadPublishedPdf] DOI deposit queued", {
+        manuscriptId: String(manuscript._id),
+        customId: manuscript.customId || manuscript.custom_id || null,
+        doi: doiQueueResult.doi,
+        depositId: doiQueueResult.depositId
+          ? String(doiQueueResult.depositId)
+          : null,
+        status: doiQueueResult.status,
+        queued: doiQueueResult.queued,
+      });
+    } catch (doiError) {
+      console.error("[uploadPublishedPdf] DOI queue failed", {
+        manuscriptId: String(manuscript._id),
+        customId: manuscript.customId || manuscript.custom_id || null,
+        message: doiError.message,
+      });
+
+      doiQueueResult.error = doiError.message;
+    }
+
     return res.json({
       success: true,
       message: "Manuscript published successfully",
@@ -2929,6 +3269,7 @@ exports.uploadPublishedPdf = async (req, res) => {
         manuscriptId: manuscript._id,
         customId,
         publishedFileUrl: manuscript.publishedFileUrl,
+        publishedPdfObjectKey: manuscript.publishedPdfObjectKey,
         publishedAt: manuscript.publishedAt,
         status: manuscript.status,
         issueVolume: manuscript.issueVolume,
@@ -2938,9 +3279,21 @@ exports.uploadPublishedPdf = async (req, res) => {
         section: manuscript.section,
         pageStart: manuscript.pageStart,
         pageEnd: manuscript.pageEnd,
+        articleNumber: manuscript.articleNumber,
         pdfAuthors: manuscript.pdfAuthors,
         pdfCorrespondingAuthor: manuscript.pdfCorrespondingAuthor,
         separateIssue: manuscript.separateIssue || false,
+        doi: manuscript.doi || doiQueueResult.doi || null,
+        doiStatus:
+          manuscript.doiStatus ||
+          doiQueueResult.status ||
+          "not_assigned",
+        doiDepositId:
+          manuscript.doiDepositId ||
+          doiQueueResult.depositId ||
+          null,
+        doiQueued: doiQueueResult.queued,
+        doiQueueError: doiQueueResult.error,
       },
     });
   } catch (error) {
@@ -2983,43 +3336,74 @@ exports.uploadPublishedPdf = async (req, res) => {
 exports.streamPublishedPdf = async (req, res) => {
   try {
     const requestedFilename = String(req.params.filename || "").trim();
-    const normalizedFilename = path.basename(requestedFilename);
+    let decodedFilename = "";
+    try {
+      decodedFilename = decodeURIComponent(requestedFilename);
+    } catch (_) {
+      return res.status(404).send("PDF not found");
+    }
+    const normalizedFilename = path.basename(decodedFilename);
 
     if (
       !normalizedFilename ||
-      normalizedFilename !== requestedFilename ||
+      normalizedFilename !== decodedFilename ||
       !normalizedFilename.toLowerCase().endsWith(".pdf")
     ) {
       return res.status(404).send("PDF not found");
     }
 
-    const escapedFilename = escapeRegex(normalizedFilename);
-    const filenamePattern = new RegExp(`${escapedFilename}$`);
+    const candidateObjectKey = buildPublishedManuscriptKey(normalizedFilename);
+    const candidateUrls = getPublishedPdfUrlCandidates(normalizedFilename);
 
     console.log("[streamPublishedPdf] Lookup debug", {
       requestedFilename: normalizedFilename,
-      escapedFilename,
-      regex: filenamePattern.toString(),
+      candidateObjectKey,
+      candidateUrlCount: candidateUrls.length,
       dbName: mongoose.connection?.name || null,
       modelName: Manuscript.modelName,
     });
 
     const manuscript = await Manuscript.findOne({
-      publishedFileUrl: { $regex: filenamePattern },
+      status: "Published",
+      $or: [
+        { publishedPdfObjectKey: candidateObjectKey },
+        { publishedPdfObjectKey: `/${candidateObjectKey}` },
+        { publishedFileUrl: { $in: candidateUrls } },
+      ],
     })
-      .select("_id publishedFileUrl")
+      .select("_id customId status publishedFileUrl publishedPdfObjectKey")
       .lean();
 
-    console.log("[streamPublishedPdf] Matched manuscript", {
-      manuscriptId: manuscript?._id?.toString() || null,
-      publishedFileUrl: manuscript?.publishedFileUrl || null,
-    });
-
     if (!manuscript) {
+      console.warn("[streamPublishedPdf] Manuscript not found", {
+        requestedFilename: normalizedFilename,
+        candidateObjectKey,
+      });
       return res.status(404).send("PDF not found");
     }
 
-    const s3ObjectKey = buildPublishedManuscriptKey(normalizedFilename);
+    const s3ObjectKey = getPublishedPdfObjectKey(manuscript);
+
+    console.log("[streamPublishedPdf] Matched manuscript", {
+      manuscriptId: manuscript?._id?.toString() || null,
+      customId: manuscript?.customId || null,
+      status: manuscript?.status || null,
+      requestedFilename: normalizedFilename,
+      publishedFileUrl: manuscript?.publishedFileUrl || null,
+      publishedPdfObjectKey: manuscript?.publishedPdfObjectKey || null,
+      resolvedS3ObjectKey: s3ObjectKey || null,
+      usedLegacyUrlFallback: !manuscript?.publishedPdfObjectKey,
+    });
+
+    if (!s3ObjectKey) {
+      console.warn("[streamPublishedPdf] PDF key missing", {
+        manuscriptId: manuscript?._id?.toString() || null,
+        requestedFilename: normalizedFilename,
+        publishedFileUrl: manuscript?.publishedFileUrl || null,
+      });
+      return res.status(404).send("PDF not found");
+    }
+
     const pdfObject = await getPublishedManuscriptFromS3(s3ObjectKey, {
       byteRange: req.headers.range,
     });
@@ -3056,15 +3440,28 @@ exports.streamPublishedPdf = async (req, res) => {
 
     await streamPipeline(pdfObject.body, res);
   } catch (error) {
-    console.error("[streamPublishedPdf] Error:", error);
-
-    const isNotFound =
-      error?.name === "NoSuchKey" || error?.$metadata?.httpStatusCode === 404;
+    if (isS3NotFoundError(error)) {
+      console.warn("[streamPublishedPdf] S3 object missing", {
+        message: error.message,
+        name: error.name,
+        statusCode: error?.$metadata?.httpStatusCode || null,
+      });
+    } else if (isS3PermissionError(error)) {
+      console.error("[streamPublishedPdf] S3 permission failure", {
+        message: error.message,
+        name: error.name,
+        statusCode: error?.$metadata?.httpStatusCode || null,
+      });
+    } else {
+      console.error("[streamPublishedPdf] Error:", error);
+    }
 
     if (res.headersSent) {
       res.destroy(error);
       return;
     }
+
+    const isNotFound = isS3NotFoundError(error);
 
     return res
       .status(isNotFound ? 404 : 500)
@@ -5205,3 +5602,4 @@ exports.getMostViewedManuscripts = async (req, res) => {
 
 module.exports.convertDocxToPdf = convertDocxToPdf;
 module.exports.isValidPdf = isValidPdf;
+module.exports.buildPublicationMetadata = buildPublicationMetadata;
