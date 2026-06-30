@@ -17,6 +17,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 const runInvitationExpiryJob = require("./jobs/invitationExpiryJob");
 const runStrictReviewDeadline = require("./jobs/strictReviewDeadlineJob");
+const { startDoiWorker } = require("./workers/doiWorker");
 const cron = require("node-cron");
 
 dotenv.config();
@@ -83,7 +84,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Debug middleware
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`, {
+  console.log(`${req.method} ${req.path}`, {
     origin: req.headers.origin,
     "user-agent": req.headers["user-agent"],
   });
@@ -479,6 +480,7 @@ const server = app.listen(PORT, async () => {
   });
 
   console.log("Cron jobs scheduled: Every hour on the hour (PRODUCTION MODE)");
+  startDoiWorker();
 });
 
 // Handle unhandled promise rejections
