@@ -202,7 +202,7 @@ function EditorDashboard() {
         return;
       }
 
-      console.log("Fetching reviewers with token:", user.token); // Debug log
+      console.log("Fetching reviewers with token:", Boolean(user.token)); // Debug log
       const response = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/reviewers`,
         {
@@ -944,7 +944,7 @@ function EditorDashboard() {
     }
 
     return allManuscripts;
-  }, [selectedUser, manuscripts, users, filterType, filterValue, forceRender]);
+  }, [selectedUser, manuscripts, users, filterType, filterValue]);
 
   // Handle filter clicks
   const handleStatusFilter = (status) => {
@@ -1805,9 +1805,7 @@ function EditorDashboard() {
                       {/* View PDF Button - Always Available */}
                       {manuscript.mergedFileUrl && (
                         <button
-                          onClick={() =>
-                            window.open(manuscript.mergedFileUrl, "_blank")
-                          }
+                          onClick={() => handleManuscriptClick(manuscript)}
                           className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors flex items-center justify-center space-x-2"
                         >
                           <span>📄</span>
@@ -2867,7 +2865,7 @@ function EditorDashboard() {
         manuscript={uploadManuscript}
         userToken={user?.token}
         separateIssue={separateIssue}
-        onSuccess={(data) => {
+        onSuccess={() => {
           addToast(
             separateIssue
               ? "PDF has been published as Special Issue successfully!"

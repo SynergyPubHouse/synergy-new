@@ -3,6 +3,14 @@ const http = require("http");
 const url = require("url");
 
 // ✅ Replace these with your Google Cloud Console credentials
+function requireEnv(name) {
+ const value = process.env[name];
+ if (!value) {
+   throw new Error(`Missing required environment variable: ${name}`);
+ }
+ return value;
+}
+
 const CLIENT_ID =
  "399654942628-vqbjbpspft5ic6rfmt29340itbf4vbu9.apps.googleusercontent.com";
 const CLIENT_SECRET = "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";
@@ -42,12 +50,12 @@ const server = http.createServer(async (req, res) => {
 
      res.end(`
        <h2>✅ Tokens Generated Successfully!</h2>
-       <p>Check your terminal for the tokens.</p>
+       <p>Tokens were returned successfully. Store them securely.</p>
      `);
 
      console.log("\n✅ Tokens generated successfully!\n");
-     console.log("Access Token:  ", tokens.access_token);
-     console.log("Refresh Token: ", tokens.refresh_token);
+     console.log("Access token received:  ", Boolean(tokens.access_token));
+     console.log("Refresh token received: ", Boolean(tokens.refresh_token));
      console.log(
        "Expiry Date:   ",
        new Date(tokens.expiry_date).toISOString(),

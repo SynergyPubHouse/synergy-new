@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const manuscriptController = require("../controllers/manuscriptController");
 const auth = require("../middleware/auth");
+const requireEditor = require("../middleware/requireEditor");
 const multer = require("multer");
 const os = require("os");
 
@@ -100,6 +101,8 @@ router.post(
 
 router.post(
     "/manuscript/publish/:manuscriptId",
+    auth,
+    requireEditor,
     upload.single("pdfFile"), 
     manuscriptController.uploadPublishedPdf
 );

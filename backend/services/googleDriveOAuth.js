@@ -140,9 +140,6 @@ function getOAuth2Client() {
 
   return oauth2Client;
 }
-console.log("process.env.GOOGLE_CLIENT_ID_pdf",process.env.GOOGLE_CLIENT_ID_pdf)
-console.log("process.env.GOOGLE_CLIENT_SECRET",process.env.GOOGLE_CLIENT_SECRET)
-console.log(" process.env.GOOGLE_REDIRECT_URI", process.env.GOOGLE_REDIRECT_URI)
 
 // Auth URL generate karo
 function getAuthUrl() {
