@@ -70,14 +70,6 @@ router.get('/sitemap.xml', async (req, res) => {
         <priority>0.8</priority>
     </url>
 `;
-            // React URL (for users)
-            xml += `    <url>
-        <loc>${baseUrl}/journal/jics/articles/${articleUrlId}</loc>
-        <lastmod>${lastmod}</lastmod>
-        <changefreq>monthly</changefreq>
-        <priority>0.8</priority>
-    </url>
-`;
         });
 
         xml += `</urlset>`;

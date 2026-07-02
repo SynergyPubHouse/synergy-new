@@ -2059,6 +2059,20 @@ exports.getManuscriptById = async (req, res) => {
       });
     }
 
+    const userRoles = Array.isArray(req.user?.roles) ? req.user.roles : [];
+    const canViewUnpublished =
+      !!req.editor ||
+      userRoles.includes("editor") ||
+      userRoles.includes("admin") ||
+      userRoles.includes("administrator");
+
+    if (manuscript.status !== "Published" && !canViewUnpublished) {
+      return res.status(404).json({
+        success: false,
+        message: "Manuscript not found",
+      });
+    }
+
     const doc = {
       ...manuscript.toObject(),
       separateIssue: manuscript.separateIssue || false,
