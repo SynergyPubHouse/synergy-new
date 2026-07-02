@@ -288,6 +288,24 @@ const manuscriptSchema = new mongoose.Schema(
       sparse: true,
       default: undefined,
     },
+    doiSequence: {
+      type: Number,
+      default: null,
+      min: 1,
+      index: true,
+    },
+    doiPatternVersion: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    doiComponents: {
+      prefix: { type: String, trim: true, default: "" },
+      journalCode: { type: String, trim: true, default: "" },
+      volume: { type: Number, default: null },
+      issue: { type: Number, default: null },
+      sequence: { type: Number, default: null },
+    },
     doiStatus: {
       type: String,
       enum: [
