@@ -16,7 +16,7 @@ const DEFAULTS = {
     "https://synergyworldpress.com/journal/jics/articles",
   CROSSREF_MAX_RETRIES: "5",
   CROSSREF_WORKER_INTERVAL_MS: "60000",
-  CROSSREF_JOURNAL_CODE: "jics",
+  CROSSREF_JOURNAL_CODE: "109319",
   CROSSREF_REQUEST_TIMEOUT_MS: "30000",
 };
 
