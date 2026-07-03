@@ -71,11 +71,19 @@ function renderPages(snapshot) {
     ].join("");
   }
 
-  if (snapshot.articleNumber) {
-    return `<publisher_item><item_number item_number_type="article-number">${escapeXml(snapshot.articleNumber)}</item_number></publisher_item>`;
-  }
-
   return "";
+}
+
+function renderPublisherItem(snapshot) {
+  if (!snapshot.articleNumber) return "";
+
+  return `<publisher_item><item_number item_number_type="article-number">${escapeXml(snapshot.articleNumber)}</item_number></publisher_item>`;
+}
+
+function renderAbstract(abstract) {
+  if (!abstract) return "";
+
+  return `<jats:abstract><jats:p>${escapeXml(abstract)}</jats:p></jats:abstract>`;
 }
 
 function renderIssue(snapshot) {
@@ -102,7 +110,7 @@ function generateCrossrefXml(snapshot, { batchId, depositorName, depositorEmail 
     .slice(0, 14);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<doi_batch xmlns="http://www.crossref.org/schema/5.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.4.0" xsi:schemaLocation="http://www.crossref.org/schema/5.4.0 https://www.crossref.org/schemas/crossref5.4.0.xsd">
+<doi_batch xmlns="http://www.crossref.org/schema/5.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1" version="5.4.0" xsi:schemaLocation="http://www.crossref.org/schema/5.4.0 https://www.crossref.org/schemas/crossref5.4.0.xsd">
   <head>
     <doi_batch_id>${escapeXml(batchId)}</doi_batch_id>
     <timestamp>${timestamp}</timestamp>
@@ -129,13 +137,10 @@ function generateCrossrefXml(snapshot, { batchId, depositorName, depositorEmail 
           <title>${escapeXml(snapshot.title)}</title>
         </titles>
         ${renderContributors(snapshot.authors)}
+        ${renderAbstract(snapshot.abstract)}
         ${renderPublicationDate(snapshot.publicationDate)}
-        ${
-          snapshot.abstract
-            ? `<abstract xmlns="http://www.ncbi.nlm.nih.gov/JATS1"><p>${escapeXml(snapshot.abstract)}</p></abstract>`
-            : ""
-        }
         ${renderPages(snapshot)}
+        ${renderPublisherItem(snapshot)}
         <doi_data>
           <doi>${escapeXml(snapshot.doi)}</doi>
           <resource>${escapeXml(snapshot.crossrefResourceUrl)}</resource>
