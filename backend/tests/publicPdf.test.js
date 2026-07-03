@@ -206,6 +206,7 @@ require.cache[require.resolve("../services/doiService")] = {
 };
 
 const {
+  getManuscriptById,
   streamPublishedPdf,
   uploadPublishedPdf,
 } = require("../controllers/manuscriptController");
@@ -665,12 +666,17 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   assert.match(html, /citation_doi" content="10\.0000\/jics\.test"/);
   assert.match(
     html,
-    /citation_pdf_url" content="http:\/\/localhost:5000\/pdf\/published_JICS-26-014\.pdf"/,
+    /citation_pdf_url" content="http:\/\/localhost:5000\/scholar\/article\/JICS-26-014\/fulltext\.pdf"/,
   );
   assert.match(
     html,
     /citation_public_url" content="http:\/\/localhost:3000\/journal\/jics\/articles\/JICS-26-014"/,
   );
+  assert.match(
+    html,
+    /<link rel="canonical" href="http:\/\/localhost:5000\/scholar\/article\/JICS-26-014">/,
+  );
+  assert.doesNotMatch(html, /Unknown Author/);
 
   const articleWithoutOptionalMetadata = {
     ...article,
@@ -698,4 +704,108 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   assert.doesNotMatch(htmlWithoutOptionalMetadata, /citation_firstpage"/);
   assert.doesNotMatch(htmlWithoutOptionalMetadata, /citation_lastpage"/);
   assert.doesNotMatch(htmlWithoutOptionalMetadata, /citation_doi"/);
+});
+
+test("Scholar fulltext PDF route streams the article PDF from S3", async () => {
+  resetMocks();
+
+  const article = {
+    _id: "507f1f77bcf86cd799439099",
+    customId: "JICS-26-014",
+    title: "Scholar Metadata Test",
+    status: "Published",
+    publishedPdfObjectKey: "published_manuscripts/published_JICS-26-014.pdf",
+  };
+  manuscriptResult = article;
+
+  const router = require("../routes/scholarRoutes");
+  const layer = router.stack.find(
+    (item) => item.route?.path === "/article/:id/fulltext.pdf",
+  );
+  const handler = layer.route.stack[0].handle;
+  const res = new MockResponse();
+
+  await handler({ params: { id: "JICS-26-014" }, headers: {} }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(
+    lastS3Key,
+    "published_manuscripts/published_JICS-26-014.pdf",
+  );
+  assert.equal(res.headers["content-type"], "application/pdf");
+  assert.match(
+    res.headers["content-disposition"],
+    /inline; filename="published_JICS-26-014\.pdf"/,
+  );
+  assert.equal(res.bodyText(), "%PDF-1.4\n");
+  assert.equal(lastFindQuery.status, "Published");
+  assert.deepEqual(lastFindQuery.$or, [
+    { customId: "JICS-26-014" },
+    { custom_id: "JICS-26-014" },
+  ]);
+});
+
+test("Scholar page rejects missing required citation metadata", async () => {
+  resetMocks();
+
+  const article = {
+    _id: "507f1f77bcf86cd799439099",
+    customId: "JICS-26-016",
+    title: "No Author Test",
+    status: "Published",
+    publishedAt: new Date("2026-06-01T00:00:00.000Z"),
+    pdfAuthors: [],
+    authors: [],
+  };
+  manuscriptResult = { status: "Published", toObject: () => article };
+
+  const router = require("../routes/scholarRoutes");
+  const layer = router.stack.find((item) => item.route?.path === "/article/:id");
+  const handler = layer.route.stack[0].handle;
+  const res = new MockResponse();
+
+  await handler({ params: { id: "JICS-26-016" } }, res);
+
+  assert.equal(res.statusCode, 422);
+  assert.doesNotMatch(res.bodyText(), /citation_author/);
+});
+
+test("public manuscript lookup hides unpublished articles from anonymous requests", async () => {
+  resetMocks();
+
+  const unpublished = createManuscript({
+    status: "Accepted",
+    title: "Accepted Draft",
+    toObject() {
+      return {
+        _id: this._id,
+        customId: this.customId,
+        status: this.status,
+        title: this.title,
+      };
+    },
+  });
+  manuscriptResult = unpublished;
+  const anonymousRes = new MockResponse();
+
+  await getManuscriptById(
+    { params: { manuscriptId: "JICS-26-003" } },
+    anonymousRes,
+  );
+
+  assert.equal(anonymousRes.statusCode, 404);
+  assert.equal(anonymousRes.jsonBody.success, false);
+
+  const editorRes = new MockResponse();
+  await getManuscriptById(
+    {
+      params: { manuscriptId: "JICS-26-003" },
+      user: { roles: ["editor"] },
+    },
+    editorRes,
+  );
+
+  assert.equal(editorRes.statusCode, 200);
+  assert.equal(editorRes.jsonBody.success, true);
+  assert.equal(editorRes.jsonBody.data.status, "Accepted");
 });

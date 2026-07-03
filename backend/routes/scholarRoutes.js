@@ -3,7 +3,15 @@
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
+const { promisify } = require("util");
+const { pipeline } = require("stream");
 const Manuscript = require("../models/Manuscript");
+const {
+  buildPublishedManuscriptKey,
+  getPublishedManuscriptFromS3,
+} = require("../services/s3Service");
+
+const streamPipeline = promisify(pipeline);
 
 // HTML escape function - XSS protection
 const escapeHtml = (text) => {
@@ -97,16 +105,6 @@ function safeDecodeURIComponent(value) {
   }
 }
 
-/**
- * Google Scholar needs a PDF URL that returns the actual PDF file.
- * For this project, that is the API PDF route.
- */
-function normalizePdfUrl(pdfUrl) {
-  const filename = getPdfFilenameFromUrl(pdfUrl);
-
-  return filename ? joinUrl(getApiBaseUrl(), "pdf", encodeURIComponent(filename)) : "";
-}
-
 const getArticleUrlId = (article) =>
   article.customId || article.custom_id || article._id;
 
@@ -122,10 +120,191 @@ const buildManuscriptIdentifierQuery = (identifier) => {
   return { $or: clauses };
 };
 
+const buildPublishedManuscriptIdentifierQuery = (identifier) => {
+  const identifierQuery = buildManuscriptIdentifierQuery(identifier);
+  return identifierQuery ? { status: "Published", ...identifierQuery } : null;
+};
+
+function getScholarArticleUrl(article, apiBaseUrl = getApiBaseUrl()) {
+  const articleUrlId = getArticleUrlId(article);
+  return articleUrlId
+    ? joinUrl(apiBaseUrl, "scholar/article", encodeURIComponent(articleUrlId))
+    : "";
+}
+
+function getScholarPdfUrl(article, apiBaseUrl = getApiBaseUrl()) {
+  const articleUrl = getScholarArticleUrl(article, apiBaseUrl);
+  return articleUrl ? `${articleUrl}/fulltext.pdf` : "";
+}
+
+function getPublishedPdfObjectKey(article) {
+  const storedKey = String(article?.publishedPdfObjectKey || "").trim();
+  if (storedKey) return storedKey.replace(/^\/+/, "");
+
+  const filename = getPdfFilenameFromUrl(article?.publishedFileUrl || "");
+  return filename ? buildPublishedManuscriptKey(filename) : "";
+}
+
+function getScholarAuthors(article) {
+  if (Array.isArray(article.pdfAuthors) && article.pdfAuthors.length > 0) {
+    return article.pdfAuthors
+      .map((author) => String(author || "").trim())
+      .filter(Boolean);
+  }
+
+  if (!Array.isArray(article.authors) || article.authors.length === 0) {
+    return [];
+  }
+
+  return article.authors
+    .map((author) => {
+      if (typeof author === "string") return author.trim();
+      if (author && (author.firstName || author.lastName)) {
+        return [author.firstName, author.middleName, author.lastName]
+          .filter((part) => part && String(part).trim())
+          .join(" ")
+          .trim();
+      }
+      return "";
+    })
+    .filter(Boolean);
+}
+
+function validateScholarArticleMetadata(article, authors, publishedDate) {
+  const missing = [];
+
+  if (!String(article?.title || "").trim()) {
+    missing.push("title");
+  }
+
+  if (!Array.isArray(authors) || authors.length === 0) {
+    missing.push("authors");
+  }
+
+  if (!article?.publishedAt || !publishedDate) {
+    missing.push("publishedAt");
+  }
+
+  return missing;
+}
+
+function logScholarMetadataError(article, missing) {
+  const identifier = getArticleUrlId(article) || article?._id || "unknown";
+  console.warn("[Scholar Route] Missing required Scholar metadata", {
+    identifier: String(identifier),
+    missing,
+  });
+}
+
+function isS3NotFoundError(error) {
+  return (
+    error?.name === "NoSuchKey" ||
+    error?.Code === "NoSuchKey" ||
+    error?.code === "NoSuchKey" ||
+    error?.$metadata?.httpStatusCode === 404
+  );
+}
+
+router.get("/article/:id/fulltext.pdf", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const identifierQuery = buildPublishedManuscriptIdentifierQuery(id);
+
+    console.log("[Scholar Route] Requested ID:", id);
+
+    if (!identifierQuery) {
+      return res
+        .status(400)
+        .send(
+          generateErrorHtml(
+            "Invalid Article ID",
+            "The article ID format is incorrect.",
+          ),
+        );
+    }
+
+    const manuscript = await Manuscript.findOne(identifierQuery)
+      .select("_id customId custom_id title status publishedPdfObjectKey publishedFileUrl")
+      .lean();
+
+    if (!manuscript) {
+      return res
+        .status(404)
+        .send(
+          generateErrorHtml(
+            "Article Not Found",
+            "The requested article does not exist.",
+          ),
+        );
+    }
+
+    const s3ObjectKey = getPublishedPdfObjectKey(manuscript);
+    if (!s3ObjectKey) {
+      return res
+        .status(404)
+        .send(
+          generateErrorHtml(
+            "PDF Not Found",
+            "The full text PDF is not available for this article.",
+          ),
+        );
+    }
+
+    const pdfObject = await getPublishedManuscriptFromS3(s3ObjectKey, {
+      byteRange: req.headers.range,
+    });
+    const filename = s3ObjectKey.split("/").filter(Boolean).pop() || "fulltext.pdf";
+
+    res.setHeader("Content-Type", pdfObject.contentType || "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${filename.replace(/"/g, "")}"`,
+    );
+    res.setHeader("X-Content-Type-Options", "nosniff");
+
+    if (pdfObject.contentRange) {
+      res.status(206);
+      res.setHeader("Content-Range", pdfObject.contentRange);
+    }
+    if (pdfObject.acceptRanges) {
+      res.setHeader("Accept-Ranges", pdfObject.acceptRanges);
+    }
+    if (pdfObject.contentLength !== undefined) {
+      res.setHeader("Content-Length", pdfObject.contentLength);
+    }
+    if (pdfObject.etag) {
+      res.setHeader("ETag", pdfObject.etag);
+    }
+    if (pdfObject.lastModified) {
+      res.setHeader("Last-Modified", new Date(pdfObject.lastModified).toUTCString());
+    }
+
+    await streamPipeline(pdfObject.body, res);
+  } catch (error) {
+    if (isS3NotFoundError(error)) {
+      return res
+        .status(404)
+        .send(
+          generateErrorHtml(
+            "PDF Not Found",
+            "The full text PDF is not available for this article.",
+          ),
+        );
+    }
+
+    console.error("[Scholar Route] Fulltext PDF Error:", error);
+    if (!res.headersSent) {
+      res.status(500).send(generateErrorHtml("Server Error", error.message));
+    } else {
+      res.destroy(error);
+    }
+  }
+});
+
 router.get("/article/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const identifierQuery = buildManuscriptIdentifierQuery(id);
+    const identifierQuery = buildPublishedManuscriptIdentifierQuery(id);
 
     console.log("[Scholar Route] Requested ID:", id);
 
@@ -155,48 +334,9 @@ router.get("/article/:id", async (req, res) => {
         );
     }
 
-    if (manuscript.status !== "Published") {
-      return res
-        .status(404)
-        .send(
-          generateErrorHtml(
-            "Article Not Available",
-            "This article has not been published yet.",
-          ),
-        );
-    }
-
     const article = manuscript.toObject();
 
-    // Format authors
-    let authors = [];
-    if (
-      article.pdfAuthors &&
-      Array.isArray(article.pdfAuthors) &&
-      article.pdfAuthors.length > 0
-    ) {
-      authors = article.pdfAuthors.filter((a) => a && a.trim());
-    } else if (
-      article.authors &&
-      Array.isArray(article.authors) &&
-      article.authors.length > 0
-    ) {
-      authors = article.authors
-        .map((author) => {
-          if (typeof author === "string") return author;
-          if (author && (author.firstName || author.lastName)) {
-            return [author.firstName, author.middleName, author.lastName]
-              .filter((p) => p && p.trim())
-              .join(" ");
-          }
-          return null;
-        })
-        .filter((name) => name && name.trim());
-    }
-
-    if (authors.length === 0) {
-      authors = ["Unknown Author"];
-    }
+    const authors = getScholarAuthors(article);
 
     // Corresponding author
     let correspondingAuthor = "";
@@ -213,30 +353,34 @@ router.get("/article/:id", async (req, res) => {
     }
 
     // Dates
-    const publishedDate = formatScholarDate(
-      article.publishedAt || article.submissionDate,
+    const publishedDate = formatScholarDate(article.publishedAt);
+    const missingMetadata = validateScholarArticleMetadata(
+      article,
+      authors,
+      publishedDate,
     );
-    const isoDate = article.publishedAt
-      ? new Date(article.publishedAt).toISOString()
-      : article.submissionDate
-        ? new Date(article.submissionDate).toISOString()
-        : new Date().toISOString();
+    if (missingMetadata.length > 0) {
+      logScholarMetadataError(article, missingMetadata);
+      return res
+        .status(422)
+        .send(
+          generateErrorHtml(
+            "Article Metadata Incomplete",
+            "This article is missing required Scholar metadata.",
+          ),
+        );
+    }
+    const isoDate = new Date(article.publishedAt).toISOString();
 
     // URLs
     const baseUrl = getPublicBaseUrl();
     const apiBaseUrl = getApiBaseUrl();
 
-    // Scholar metadata and the visible PDF button use the same API URL because
-    // it returns the actual application/pdf response.
-    const pdfUrl =
-      normalizePdfUrl(article.publishedPdfObjectKey || "") ||
-      normalizePdfUrl(article.publishedFileUrl || "");
+    const pdfUrl = getPublishedPdfObjectKey(article)
+      ? getScholarPdfUrl(article, apiBaseUrl)
+      : "";
     const publicPdfUrl = pdfUrl;
-    const articleUrl = joinUrl(
-      apiBaseUrl,
-      "scholar/article",
-      encodeURIComponent(getArticleUrlId(article)),
-    );
+    const articleUrl = getScholarArticleUrl(article, apiBaseUrl);
 
     // Link back to the main user-facing article page for the download button / footer.
     const mainSiteArticleUrl = joinUrl(
@@ -272,7 +416,6 @@ router.get("/articles-listing", async (req, res) => {
   try {
     const manuscripts = await Manuscript.find({
       status: "Published",
-      $or: [{ separateIssue: false }, { separateIssue: { $exists: false } }],
     })
       .select(
         "_id customId custom_id title pdfAuthors authors issueVolume issueNumber pageStart pageEnd publishedAt",
@@ -334,11 +477,8 @@ router.get("/articles-listing", async (req, res) => {
       };
     });
 
-    const publicBaseUrl = getPublicBaseUrl();
-    const canonicalUrl = joinUrl(
-      publicBaseUrl,
-      "journal/jics/articles/current",
-    );
+    const apiBaseUrl = getApiBaseUrl();
+    const canonicalUrl = joinUrl(apiBaseUrl, "scholar/articles-listing");
 
     const articlesHtml =
       articles.length === 0
@@ -348,8 +488,8 @@ router.get("/articles-listing", async (req, res) => {
           .map((a) => {
             const articleUrl = a.id
               ? joinUrl(
-                publicBaseUrl,
-                "journal/jics/articles",
+                apiBaseUrl,
+                "scholar/article",
                 encodeURIComponent(a.id),
               )
               : "#";
@@ -463,7 +603,8 @@ function generateScholarHtml({
   mainSiteArticleUrl,
   baseUrl,
 }) {
-  const publicArticleUrl = mainSiteArticleUrl || articleUrl;
+  const scholarArticleUrl = articleUrl;
+  const publicArticleUrl = mainSiteArticleUrl || scholarArticleUrl;
 
   const schemaData = {
     "@context": "https://schema.org",
@@ -487,8 +628,8 @@ function generateScholarHtml({
     },
     description: article.abstract || "",
     keywords: article.keywords || "",
-    url: publicArticleUrl,
-    mainEntityOfPage: publicArticleUrl,
+    url: scholarArticleUrl,
+    mainEntityOfPage: scholarArticleUrl,
     inLanguage: "en",
   };
 
@@ -562,7 +703,7 @@ function generateScholarHtml({
     <meta name="twitter:description" content="${escapeHtml((article.abstract || "").substring(0, 200))}">
 
     <!-- Canonical URL -->
-    <link rel="canonical" href="${publicArticleUrl}">
+    <link rel="canonical" href="${scholarArticleUrl}">
 
     <!-- Schema.org JSON-LD -->
     <script type="application/ld+json">

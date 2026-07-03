@@ -15,7 +15,7 @@ RewriteCond %{HTTP_USER_AGENT} (Googlebot|Googlebot-Scholar|Google-InspectionToo
 RewriteRule ^journal/jics/articles/current/?$ https://api.synergyworldpress.com/scholar/articles-listing [R=302,L]
 
 RewriteCond %{HTTP_USER_AGENT} (Googlebot|Google-InspectionTool|Bingbot|Yandex|DuckDuckBot|Baiduspider|facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Discordbot|Applebot) [NC]
-RewriteRule ^journal/jics/articles/([a-f0-9]{24})/?$ https://api.synergyworldpress.com/scholar/article/$1 [R=302,L]
+RewriteRule ^journal/jics/articles/([A-Za-z0-9_-]+)/?$ https://api.synergyworldpress.com/scholar/article/$1 [R=302,L]
 
 # ================================================
 # 3. Serve real files directly (images, PDFs, CSS, JS, etc.)
