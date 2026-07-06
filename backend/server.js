@@ -94,22 +94,30 @@ app.use("/scholar", scholarRoutes);
 app.use("/", sitemapRoutes);
 app.use("/", require("./routes/publicPdfRoutes"));
 
-app.get("/robots.txt", (req, res) => {
-  const apiBase = (process.env.API_BASE_URL || "https://api.synergyworldpress.com").replace(/\/+$/, "");
-  res.setHeader("Content-Type", "text/plain");
-  res.send(`User-agent: *
-Allow: /
-
-User-agent: Googlebot
+function buildRobotsTxt(apiBaseUrl) {
+  return `User-agent: *
 Allow: /scholar/
+Allow: /scholar/article/
+Allow: /scholar/articles-listing
 Allow: /sitemap.xml
 
-Sitemap: ${apiBase}/sitemap.xml
+Sitemap: ${apiBaseUrl}/sitemap.xml
 
 Disallow: /api/
 Disallow: /login
 Disallow: /register
-`);
+`;
+}
+
+app.get("/robots.txt", (req, res) => {
+  const apiBase = (
+    process.env.PUBLIC_API_BASE_URL ||
+    process.env.API_BASE_URL ||
+    process.env.BACKEND_URL ||
+    "https://api.synergyworldpress.com"
+  ).replace(/\/+$/, "");
+  res.setHeader("Content-Type", "text/plain");
+  res.send(buildRobotsTxt(apiBase));
 });
 // ============================================
 // ROUTES

@@ -34,16 +34,56 @@ const formatScholarDate = (dateString) => {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const DEFAULT_PUBLIC_API_BASE_URL="https://api.synergyworldpress.com";
-const DEFAULT_PUBLIC_SITE_BASE_URL="https://synergyworldpress.com";
+const DEFAULT_PUBLIC_API_BASE_URL = "https://api.synergyworldpress.com";
+const DEFAULT_PUBLIC_SITE_BASE_URL = "https://synergyworldpress.com";
 
-function normalizeBaseUrl(configuredBaseUrl,fallbackBaseUrl){
-  const value=String(configuredBaseUrl || fallbackBaseUrl || "").trim();
-  return(
+function normalizeBaseUrl(configuredBaseUrl, fallbackBaseUrl) {
+  const value = String(configuredBaseUrl || fallbackBaseUrl || "").trim();
+  return (
     value.startsWith("http://") || value.startsWith("https://")
       ? value
       : `https://${value}`
   ).replace(/\/+$/, "");
+}
+
+function getRequestHeader(req, headerName) {
+  if (!req || !headerName) return "";
+  if (typeof req.get === "function") {
+    return String(req.get(headerName) || "").trim();
+  }
+
+  const headers = req.headers || {};
+  return String(
+    headers[headerName] ||
+      headers[String(headerName).toLowerCase()] ||
+      headers[String(headerName).toUpperCase()] ||
+      "",
+  ).trim();
+}
+
+function getRequestBaseUrl(req) {
+  const forwardedProto = getRequestHeader(req, "x-forwarded-proto")
+    .split(",")[0]
+    .trim();
+  const forwardedHost = getRequestHeader(req, "x-forwarded-host")
+    .split(",")[0]
+    .trim();
+  const protocol = forwardedProto || req?.protocol || "";
+  const host = forwardedHost || getRequestHeader(req, "host");
+
+  if (!protocol || !host) return "";
+  return normalizeBaseUrl(`${protocol}://${host}`, "");
+}
+
+function isLocalBaseUrl(baseUrl) {
+  if (!baseUrl) return false;
+
+  try {
+    const { hostname } = new URL(normalizeBaseUrl(baseUrl, ""));
+    return /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0)$/i.test(hostname);
+  } catch (_) {
+    return false;
+  }
 }
 
 function joinUrl(baseUrl, ...segments) {
@@ -59,13 +99,34 @@ function joinUrl(baseUrl, ...segments) {
     : normalizedBaseUrl;
 }
 
-function getApiBaseUrl() {
-  return normalizeBaseUrl(
+function getApiBaseUrl(req) {
+  const configuredApiBaseUrl =
     process.env.PUBLIC_API_BASE_URL ||
     process.env.API_BASE_URL ||
-    process.env.BASE_URL,
-    DEFAULT_PUBLIC_API_BASE_URL,
-  );
+    process.env.BACKEND_URL ||
+    process.env.SERVER_URL ||
+    process.env.APP_URL ||
+    process.env.BASE_URL;
+  const requestBaseUrl = getRequestBaseUrl(req);
+
+  if (configuredApiBaseUrl) {
+    const normalizedConfiguredApiBaseUrl = normalizeBaseUrl(
+      configuredApiBaseUrl,
+      "",
+    );
+
+    if (
+      requestBaseUrl &&
+      isLocalBaseUrl(normalizedConfiguredApiBaseUrl) &&
+      !isLocalBaseUrl(requestBaseUrl)
+    ) {
+      return requestBaseUrl;
+    }
+
+    return normalizedConfiguredApiBaseUrl;
+  }
+
+  return requestBaseUrl || DEFAULT_PUBLIC_API_BASE_URL;
 }
 
 function getPublicBaseUrl() {
@@ -374,7 +435,7 @@ router.get("/article/:id", async (req, res) => {
 
     // URLs
     const baseUrl = getPublicBaseUrl();
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl(req);
 
     const pdfUrl = getPublishedPdfObjectKey(article)
       ? getScholarPdfUrl(article, apiBaseUrl)
@@ -477,7 +538,7 @@ router.get("/articles-listing", async (req, res) => {
       };
     });
 
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl(req);
     const canonicalUrl = joinUrl(apiBaseUrl, "scholar/articles-listing");
 
     const articlesHtml =

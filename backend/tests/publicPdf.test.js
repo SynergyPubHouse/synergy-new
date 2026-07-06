@@ -6,6 +6,7 @@ const { Readable, Writable } = require("node:stream");
 const test = require("node:test");
 
 let manuscriptResult = null;
+let manuscriptListResult = [];
 let lastFindQuery = null;
 let lastS3Key = null;
 let s3Error = null;
@@ -47,6 +48,9 @@ function makeQuery(result, leanResult = result) {
     populate() {
       return this;
     },
+    sort() {
+      return this;
+    },
     lean() {
       return Promise.resolve(leanResult);
     },
@@ -70,7 +74,7 @@ const ManuscriptMock = {
   },
   find(query) {
     lastFindQuery = query;
-    return makeQuery([]);
+    return makeQuery(manuscriptListResult);
   },
   exists() {
     return Promise.resolve(duplicateArticleNumber ? { _id: "duplicate" } : null);
@@ -262,6 +266,7 @@ function makeReq(filename) {
 
 function resetMocks() {
   manuscriptResult = null;
+  manuscriptListResult = [];
   lastFindQuery = null;
   lastS3Key = null;
   s3Error = null;
@@ -278,6 +283,16 @@ function resetMocks() {
   doiAssignShouldFail = false;
   doiAssignErrorMessage = "DOI metadata validation failed";
   doiDepositRecords.clear();
+  delete process.env.PUBLIC_API_BASE_URL;
+  delete process.env.API_BASE_URL;
+  delete process.env.BACKEND_URL;
+  delete process.env.SERVER_URL;
+  delete process.env.APP_URL;
+  delete process.env.BASE_URL;
+  delete process.env.PUBLIC_SITE_BASE_URL;
+  delete process.env.PUBLIC_SITE_URL;
+  delete process.env.CLIENT_URL;
+  delete process.env.FRONTEND_URL;
 }
 
 function makeUploadFixture() {
@@ -630,7 +645,7 @@ test("DOI queue failure does not fail publication or roll back uploaded PDF", as
 
 test("server-generated Scholar page outputs metadata only when values exist", async () => {
   resetMocks();
-  process.env.PUBLIC_API_BASE_URL = "http://localhost:5000";
+  process.env.PUBLIC_API_BASE_URL = "https://api.synergyworldpress.com";
   process.env.PUBLIC_SITE_BASE_URL = "http://localhost:3000";
 
   const article = {
@@ -656,7 +671,7 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   const handler = layer.route.stack[0].handle;
   const res = new MockResponse();
 
-  await handler({ params: { id: "JICS-26-014" } }, res);
+  await handler({ params: { id: "JICS-26-014" }, headers: {} }, res);
   const html = res.bodyText();
 
   assert.match(html, /citation_volume" content="7"/);
@@ -666,7 +681,7 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   assert.match(html, /citation_doi" content="10\.0000\/jics\.test"/);
   assert.match(
     html,
-    /citation_pdf_url" content="http:\/\/localhost:5000\/scholar\/article\/JICS-26-014\/fulltext\.pdf"/,
+    /citation_pdf_url" content="https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-014\/fulltext\.pdf"/,
   );
   assert.match(
     html,
@@ -674,7 +689,7 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   );
   assert.match(
     html,
-    /<link rel="canonical" href="http:\/\/localhost:5000\/scholar\/article\/JICS-26-014">/,
+    /<link rel="canonical" href="https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-014">/,
   );
   assert.doesNotMatch(html, /Unknown Author/);
 
@@ -694,7 +709,7 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   const resWithoutOptionalMetadata = new MockResponse();
 
   await handler(
-    { params: { id: "JICS-26-015" } },
+    { params: { id: "JICS-26-015" }, headers: {} },
     resWithoutOptionalMetadata,
   );
   const htmlWithoutOptionalMetadata = resWithoutOptionalMetadata.bodyText();
@@ -704,6 +719,96 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   assert.doesNotMatch(htmlWithoutOptionalMetadata, /citation_firstpage"/);
   assert.doesNotMatch(htmlWithoutOptionalMetadata, /citation_lastpage"/);
   assert.doesNotMatch(htmlWithoutOptionalMetadata, /citation_doi"/);
+});
+
+test("Scholar page uses the forwarded public host instead of a localhost API base", async () => {
+  resetMocks();
+  process.env.API_BASE_URL = "http://localhost:5000";
+  process.env.PUBLIC_SITE_BASE_URL = "https://synergyworldpress.com";
+
+  const article = {
+    _id: "507f1f77bcf86cd799439099",
+    customId: "JICS-26-003",
+    title: "Scholar Proxy Base URL Test",
+    abstract: "Testing reverse proxy Scholar URLs.",
+    status: "Published",
+    publishedAt: new Date("2026-06-01T00:00:00.000Z"),
+    publishedPdfObjectKey: "published_manuscripts/published_JICS-26-003.pdf",
+    pdfAuthors: ["Grace Hopper"],
+  };
+  manuscriptResult = { status: "Published", toObject: () => article };
+
+  const router = require("../routes/scholarRoutes");
+  const layer = router.stack.find((item) => item.route?.path === "/article/:id");
+  const handler = layer.route.stack[0].handle;
+  const res = new MockResponse();
+
+  await handler(
+    {
+      params: { id: "JICS-26-003" },
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "api.synergyworldpress.com",
+        host: "localhost:5000",
+      },
+      protocol: "http",
+    },
+    res,
+  );
+
+  const html = res.bodyText();
+
+  assert.match(
+    html,
+    /citation_pdf_url" content="https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-003\/fulltext\.pdf"/,
+  );
+  assert.match(
+    html,
+    /<link rel="canonical" href="https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-003">/,
+  );
+  assert.doesNotMatch(html, /localhost:5000/);
+});
+
+test("Scholar page falls back to the request host when no public API base env is set", async () => {
+  resetMocks();
+  process.env.PUBLIC_SITE_BASE_URL = "https://synergyworldpress.com";
+
+  const article = {
+    _id: "507f1f77bcf86cd799439099",
+    custom_id: "JICS-26-099",
+    title: "Scholar Request Host Fallback Test",
+    abstract: "Testing request host fallback.",
+    status: "Published",
+    publishedAt: new Date("2026-06-01T00:00:00.000Z"),
+    publishedPdfObjectKey: "published_manuscripts/published_JICS-26-099.pdf",
+    pdfAuthors: ["Katherine Johnson"],
+  };
+  manuscriptResult = { status: "Published", toObject: () => article };
+
+  const router = require("../routes/scholarRoutes");
+  const layer = router.stack.find((item) => item.route?.path === "/article/:id");
+  const handler = layer.route.stack[0].handle;
+  const res = new MockResponse();
+
+  await handler(
+    {
+      params: { id: "JICS-26-099" },
+      headers: { host: "localhost:5000" },
+      protocol: "http",
+    },
+    res,
+  );
+
+  const html = res.bodyText();
+
+  assert.match(
+    html,
+    /citation_pdf_url" content="http:\/\/localhost:5000\/scholar\/article\/JICS-26-099\/fulltext\.pdf"/,
+  );
+  assert.match(
+    html,
+    /<link rel="canonical" href="http:\/\/localhost:5000\/scholar\/article\/JICS-26-099">/,
+  );
 });
 
 test("Scholar fulltext PDF route streams the article PDF from S3", async () => {
@@ -768,6 +873,75 @@ test("Scholar page rejects missing required citation metadata", async () => {
 
   assert.equal(res.statusCode, 422);
   assert.doesNotMatch(res.bodyText(), /citation_author/);
+});
+
+test("sitemap article lastmod uses updatedAt or publishedAt instead of today for every article", async () => {
+  resetMocks();
+  process.env.API_BASE_URL = "https://api.synergyworldpress.com";
+  manuscriptListResult = [
+    {
+      _id: "507f1f77bcf86cd799439091",
+      customId: "JICS-26-003",
+      updatedAt: new Date("2026-06-15T10:00:00.000Z"),
+      publishedAt: new Date("2026-06-01T00:00:00.000Z"),
+    },
+    {
+      _id: "507f1f77bcf86cd799439092",
+      custom_id: "JICS-26-S01",
+      updatedAt: null,
+      publishedAt: new Date("2026-05-20T00:00:00.000Z"),
+    },
+  ];
+
+  delete require.cache[require.resolve("../routes/sitemapRoutes")];
+  const router = require("../routes/sitemapRoutes");
+  const layer = router.stack.find((item) => item.route?.path === "/sitemap.xml");
+  const handler = layer.route.stack[0].handle;
+  const res = new MockResponse();
+
+  await handler({ headers: {} }, res);
+  const xml = res.bodyText();
+
+  assert.equal(res.statusCode, 200);
+  assert.match(
+    xml,
+    /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/,
+  );
+  assert.match(
+    xml,
+    /<loc>https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-003<\/loc>\s*<lastmod>2026-06-15<\/lastmod>/,
+  );
+  assert.match(
+    xml,
+    /<loc>https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-S01<\/loc>\s*<lastmod>2026-05-20<\/lastmod>/,
+  );
+});
+
+test("robots.txt source keeps a single Scholar allow set without duplicate lines", async () => {
+  resetMocks();
+
+  const serverSource = fs.readFileSync(
+    path.join(__dirname, "../server.js"),
+    "utf8",
+  );
+
+  assert.equal(
+    (serverSource.match(/^Allow: \/scholar\/$/gm) || []).length,
+    1,
+  );
+  assert.equal(
+    (serverSource.match(/^Allow: \/scholar\/article\/$/gm) || []).length,
+    1,
+  );
+  assert.equal(
+    (serverSource.match(/^Allow: \/scholar\/articles-listing$/gm) || []).length,
+    1,
+  );
+  assert.equal(
+    (serverSource.match(/^Allow: \/sitemap\.xml$/gm) || []).length,
+    1,
+  );
+  assert.doesNotMatch(serverSource, /User-agent:\s+Googlebot/);
 });
 
 test("public manuscript lookup hides unpublished articles from anonymous requests", async () => {
