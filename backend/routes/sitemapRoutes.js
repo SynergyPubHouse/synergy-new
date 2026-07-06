@@ -21,6 +21,7 @@ router.get('/sitemap.xml', async (req, res) => {
 
         const baseUrl = PUBLIC_SITE_URL;
         const today = new Date().toISOString().split('T')[0];
+        const staticLastmod = today;
 
         let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -33,6 +34,7 @@ router.get('/sitemap.xml', async (req, res) => {
     </url>
     <url>
         <loc>${baseUrl}/journal/jics/about/overview</loc>
+        <lastmod>${staticLastmod}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
     </url>
@@ -44,11 +46,13 @@ router.get('/sitemap.xml', async (req, res) => {
     </url>
     <url>
         <loc>${baseUrl}/journal/jics/submit</loc>
+        <lastmod>${staticLastmod}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.7</priority>
     </url>
     <url>
         <loc>${baseUrl}/contactus</loc>
+        <lastmod>${staticLastmod}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
     </url>
