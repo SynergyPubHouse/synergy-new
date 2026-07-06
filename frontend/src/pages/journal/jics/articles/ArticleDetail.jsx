@@ -22,6 +22,14 @@ const getVisitorId = () => {
 const getArticleUrlId = (article) =>
   article?.customId || article?.custom_id || article?._id;
 
+const getDoiUrl = (doi) => {
+  const value = String(doi || "").trim();
+  if (!value) return "";
+
+  const normalizedDoi = value.replace(/^https?:\/\/doi\.org\//i, "").trim();
+  return normalizedDoi ? `https://doi.org/${normalizedDoi}` : "";
+};
+
 const ArticleDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -402,6 +410,8 @@ const ArticleDetail = () => {
     return count.toString();
   };
 
+  const doiUrl = getDoiUrl(article?.doi);
+
   // Get authors - PDF first, then API fallback
   const getAuthors = () => {
     if (article?.pdfAuthors && article.pdfAuthors.length > 0) {
@@ -467,6 +477,12 @@ const ArticleDetail = () => {
       });
     }
     return article.issueYear || '';
+  };
+
+  const getCitationText = () => {
+    const citation = `${getAuthors()} (${article.issueYear}). ${article.title}. Journal of Intelligent Computing System (JICS), ${article.issueVolume}(${article.issueNumber})${article.pageStart && article.pageEnd ? `, ${article.pageStart}-${article.pageEnd}` : ""}.`;
+
+    return doiUrl ? `${citation} ${doiUrl}` : citation;
   };
   // Parse classification
   const parseClassification = (classification) => {
@@ -669,11 +685,23 @@ const ArticleDetail = () => {
                     ? ` ${article.pageStart}-${article.pageEnd}`
                     : ""}
                   .
+                  {doiUrl && (
+                    <>
+                      {" "}
+                      <a
+                        href={doiUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-all text-blue-700 hover:text-blue-800 hover:underline"
+                      >
+                        {doiUrl}
+                      </a>
+                    </>
+                  )}
                 </p>
                 <button
                   onClick={() => {
-                    const citation = `${getAuthors()} (${article.issueYear}). ${article.title}. Journal of Intelligent Computing System (JICS), ${article.issueVolume}(${article.issueNumber})${article.pageStart && article.pageEnd ? `, ${article.pageStart}-${article.pageEnd}` : ""}.`;
-                    navigator.clipboard.writeText(citation);
+                    navigator.clipboard.writeText(getCitationText());
                     alert("Citation copied to clipboard!");
                   }}
                   className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
