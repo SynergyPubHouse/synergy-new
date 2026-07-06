@@ -27,7 +27,7 @@ const getDoiUrl = (doi) => {
   if (!value) return "";
 
   const normalizedDoi = value.replace(/^https?:\/\/doi\.org\//i, "").trim();
-  return normalizedDoi ? `https://doi.org/${normalizedDoi}` : "";
+  return normalizedDoi ? `doi.org/${normalizedDoi}` : "";
 };
 
 const ArticleDetail = () => {
