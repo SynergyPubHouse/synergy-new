@@ -110,14 +110,9 @@ Disallow: /register
 }
 
 app.get("/robots.txt", (req, res) => {
-  const apiBase = (
-    process.env.PUBLIC_API_BASE_URL ||
-    process.env.API_BASE_URL ||
-    process.env.BACKEND_URL ||
-    "https://api.synergyworldpress.com"
-  ).replace(/\/+$/, "");
+  const { getPublicApiBaseUrl } = require("./config/publicBaseUrls");
   res.setHeader("Content-Type", "text/plain");
-  res.send(buildRobotsTxt(apiBase));
+  res.send(buildRobotsTxt(getPublicApiBaseUrl()));
 });
 // ============================================
 // ROUTES

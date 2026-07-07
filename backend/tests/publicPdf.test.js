@@ -685,11 +685,20 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   );
   assert.match(
     html,
-    /citation_public_url" content="http:\/\/localhost:3000\/journal\/jics\/articles\/JICS-26-014"/,
+    /citation_public_url" content="https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-014"/,
+  );
+  assert.match(
+    html,
+    /og:url" content="https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-014"/,
   );
   assert.match(
     html,
     /<link rel="canonical" href="https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-014">/,
+  );
+  // The main-site article page stays available as a visible link only.
+  assert.match(
+    html,
+    /href="http:\/\/localhost:3000\/journal\/jics\/articles\/JICS-26-014" class="pdf-btn"/,
   );
   assert.doesNotMatch(html, /Unknown Author/);
 
@@ -721,16 +730,18 @@ test("server-generated Scholar page outputs metadata only when values exist", as
   assert.doesNotMatch(htmlWithoutOptionalMetadata, /citation_doi"/);
 });
 
-test("Scholar page uses the forwarded public host instead of a localhost API base", async () => {
+test("Scholar page ignores localhost base URL env vars when NODE_ENV=production", async () => {
   resetMocks();
-  process.env.API_BASE_URL = "http://localhost:5000";
-  process.env.PUBLIC_SITE_BASE_URL = "https://synergyworldpress.com";
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  process.env.PUBLIC_API_BASE_URL = "http://localhost:5000";
+  process.env.PUBLIC_SITE_BASE_URL = "http://127.0.0.1:3000";
 
   const article = {
     _id: "507f1f77bcf86cd799439099",
     customId: "JICS-26-003",
-    title: "Scholar Proxy Base URL Test",
-    abstract: "Testing reverse proxy Scholar URLs.",
+    title: "Scholar Production Guard Test",
+    abstract: "Testing the production base URL guard.",
     status: "Published",
     publishedAt: new Date("2026-06-01T00:00:00.000Z"),
     publishedPdfObjectKey: "published_manuscripts/published_JICS-26-003.pdf",
@@ -743,18 +754,12 @@ test("Scholar page uses the forwarded public host instead of a localhost API bas
   const handler = layer.route.stack[0].handle;
   const res = new MockResponse();
 
-  await handler(
-    {
-      params: { id: "JICS-26-003" },
-      headers: {
-        "x-forwarded-proto": "https",
-        "x-forwarded-host": "api.synergyworldpress.com",
-        host: "localhost:5000",
-      },
-      protocol: "http",
-    },
-    res,
-  );
+  try {
+    await handler({ params: { id: "JICS-26-003" }, headers: {} }, res);
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  }
 
   const html = res.bodyText();
 
@@ -766,18 +771,20 @@ test("Scholar page uses the forwarded public host instead of a localhost API bas
     html,
     /<link rel="canonical" href="https:\/\/api\.synergyworldpress\.com\/scholar\/article\/JICS-26-003">/,
   );
-  assert.doesNotMatch(html, /localhost:5000/);
+  assert.doesNotMatch(html, /localhost/);
+  assert.doesNotMatch(html, /127\.0\.0\.1/);
 });
 
-test("Scholar page falls back to the request host when no public API base env is set", async () => {
+test("Scholar page emits one shared production domain for all SEO URLs when env is missing", async () => {
   resetMocks();
-  process.env.PUBLIC_SITE_BASE_URL = "https://synergyworldpress.com";
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
 
   const article = {
     _id: "507f1f77bcf86cd799439099",
     custom_id: "JICS-26-099",
-    title: "Scholar Request Host Fallback Test",
-    abstract: "Testing request host fallback.",
+    title: "Scholar Production Default Test",
+    abstract: "Testing production default base URLs.",
     status: "Published",
     publishedAt: new Date("2026-06-01T00:00:00.000Z"),
     publishedPdfObjectKey: "published_manuscripts/published_JICS-26-099.pdf",
@@ -790,25 +797,30 @@ test("Scholar page falls back to the request host when no public API base env is
   const handler = layer.route.stack[0].handle;
   const res = new MockResponse();
 
-  await handler(
-    {
-      params: { id: "JICS-26-099" },
-      headers: { host: "localhost:5000" },
-      protocol: "http",
-    },
-    res,
-  );
+  try {
+    // Request headers must not influence SEO URLs.
+    await handler(
+      {
+        params: { id: "JICS-26-099" },
+        headers: { host: "localhost:5000" },
+        protocol: "http",
+      },
+      res,
+    );
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  }
 
   const html = res.bodyText();
+  const articleUrl =
+    "https://api.synergyworldpress.com/scholar/article/JICS-26-099";
 
-  assert.match(
-    html,
-    /citation_pdf_url" content="http:\/\/localhost:5000\/scholar\/article\/JICS-26-099\/fulltext\.pdf"/,
-  );
-  assert.match(
-    html,
-    /<link rel="canonical" href="http:\/\/localhost:5000\/scholar\/article\/JICS-26-099">/,
-  );
+  assert.ok(html.includes(`<link rel="canonical" href="${articleUrl}">`));
+  assert.ok(html.includes(`citation_pdf_url" content="${articleUrl}/fulltext.pdf"`));
+  assert.ok(html.includes(`citation_public_url" content="${articleUrl}"`));
+  assert.ok(html.includes(`og:url" content="${articleUrl}"`));
+  assert.doesNotMatch(html, /localhost/);
 });
 
 test("Scholar fulltext PDF route streams the article PDF from S3", async () => {
@@ -877,7 +889,7 @@ test("Scholar page rejects missing required citation metadata", async () => {
 
 test("sitemap article lastmod uses updatedAt or publishedAt instead of today for every article", async () => {
   resetMocks();
-  process.env.API_BASE_URL = "https://api.synergyworldpress.com";
+  process.env.PUBLIC_API_BASE_URL = "https://api.synergyworldpress.com";
   manuscriptListResult = [
     {
       _id: "507f1f77bcf86cd799439091",
