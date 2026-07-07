@@ -3,13 +3,12 @@
 const express = require('express');
 const router = express.Router();
 const Manuscript = require('../models/Manuscript');
+const {
+    getPublicApiBaseUrl,
+    getPublicSiteBaseUrl,
+} = require('../config/publicBaseUrls');
 
 const getArticleUrlId = (article) => article.customId || article.custom_id || article._id;
-
-const PUBLIC_SITE_URL = 'https://synergyworldpress.com';
-const API_BASE_URL = process.env.API_BASE_URL
-    ? process.env.API_BASE_URL.replace(/\/+$/, '')
-    : 'https://api.synergyworldpress.com';
 
 // Main Sitemap
 router.get('/sitemap.xml', async (req, res) => {
@@ -19,7 +18,8 @@ router.get('/sitemap.xml', async (req, res) => {
             .sort({ publishedAt: -1 })
             .lean();
 
-        const baseUrl = PUBLIC_SITE_URL;
+        const baseUrl = getPublicSiteBaseUrl();
+        const apiBaseUrl = getPublicApiBaseUrl();
         const today = new Date().toISOString().split('T')[0];
         const staticLastmod = today;
 
@@ -68,7 +68,7 @@ router.get('/sitemap.xml', async (req, res) => {
             // /scholar/ Express route lives. Pointing Scholar at the SPA host
             // returns React's index.html (no citation_* tags) and kills indexing.
             xml += `    <url>
-        <loc>${API_BASE_URL}/scholar/article/${articleUrlId}</loc>
+        <loc>${apiBaseUrl}/scholar/article/${articleUrlId}</loc>
         <lastmod>${lastmod}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.8</priority>

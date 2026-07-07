@@ -34,34 +34,7 @@ function getS3Client() {
   return s3Client;
 }
 
-function getPublicSiteBaseUrl() {
-  const configuredBaseUrl = (
-    process.env.PUBLIC_SITE_URL ||
-    process.env.BASE_URL ||
-    "https://synergyworldpress.com"
-  ).trim();
-
-  return (
-    configuredBaseUrl.startsWith("http://") ||
-    configuredBaseUrl.startsWith("https://")
-      ? configuredBaseUrl
-      : `https://${configuredBaseUrl}`
-  ).replace(/\/+$/, "");
-}
-
-function getApiBaseUrl() {
-  const configuredBaseUrl = (
-    process.env.API_BASE_URL ||
-    "https://api.synergyworldpress.com"
-  ).trim();
-
-  return (
-    configuredBaseUrl.startsWith("http://") ||
-    configuredBaseUrl.startsWith("https://")
-      ? configuredBaseUrl
-      : `https://${configuredBaseUrl}`
-  ).replace(/\/+$/, "");
-}
+const { getPublicApiBaseUrl } = require("../config/publicBaseUrls");
 
 function ensurePdfFilename(filename) {
   if (!filename || typeof filename !== "string") {
@@ -86,7 +59,7 @@ function buildPublishedManuscriptKey(filename) {
 
 function getPublishedManuscriptPublicUrl(filename) {
   const pdfFilename = ensurePdfFilename(filename);
-  return `${getApiBaseUrl()}/pdf/${pdfFilename}`;
+  return `${getPublicApiBaseUrl()}/pdf/${pdfFilename}`;
 }
 
 async function uploadPublishedManuscriptToS3(fileBody, filename) {
