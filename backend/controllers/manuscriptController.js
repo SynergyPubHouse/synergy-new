@@ -212,6 +212,11 @@ function getPublishedPdfObjectKey(manuscript) {
     return storedKey.replace(/^\/+/, "");
   }
 
+  const fallbackPdfS3Key = String(manuscript?.pdfS3Key || "").trim();
+  if (fallbackPdfS3Key) {
+    return fallbackPdfS3Key.replace(/^\/+/, "");
+  }
+
   const storedUrlFilename = getFilenameFromPdfUrl(manuscript?.publishedFileUrl);
 
   return storedUrlFilename ? buildPublishedManuscriptKey(storedUrlFilename) : "";
@@ -3380,10 +3385,14 @@ exports.streamPublishedPdf = async (req, res) => {
       $or: [
         { publishedPdfObjectKey: candidateObjectKey },
         { publishedPdfObjectKey: `/${candidateObjectKey}` },
+        { pdfS3Key: candidateObjectKey },
+        { pdfS3Key: `/${candidateObjectKey}` },
         { publishedFileUrl: { $in: candidateUrls } },
       ],
     })
-      .select("_id customId status publishedFileUrl publishedPdfObjectKey")
+      .select(
+        "_id customId status publishedFileUrl publishedPdfObjectKey pdfS3Key",
+      )
       .lean();
 
     if (!manuscript) {
@@ -3403,8 +3412,10 @@ exports.streamPublishedPdf = async (req, res) => {
       requestedFilename: normalizedFilename,
       publishedFileUrl: manuscript?.publishedFileUrl || null,
       publishedPdfObjectKey: manuscript?.publishedPdfObjectKey || null,
+      pdfS3Key: manuscript?.pdfS3Key || null,
       resolvedS3ObjectKey: s3ObjectKey || null,
-      usedLegacyUrlFallback: !manuscript?.publishedPdfObjectKey,
+      usedLegacyUrlFallback:
+        !manuscript?.publishedPdfObjectKey && !manuscript?.pdfS3Key,
     });
 
     if (!s3ObjectKey) {
@@ -3425,10 +3436,19 @@ exports.streamPublishedPdf = async (req, res) => {
       res.setHeader("Content-Range", pdfObject.contentRange);
     }
 
+    const originalFilename = normalizedFilename || "article.pdf";
+    const asciiFallbackFilename =
+      originalFilename
+        .normalize("NFKD")
+        .replace(/[^\x20-\x7E]/g, "")
+        .replace(/["\\]/g, "")
+        .trim() || "article.pdf";
+    const encodedFilename = encodeURIComponent(originalFilename);
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `inline; filename="${normalizedFilename.replace(/"/g, "")}"`,
+      `inline; filename="${asciiFallbackFilename}"; filename*=UTF-8''${encodedFilename}`,
     );
 
     if (pdfObject.acceptRanges) {
