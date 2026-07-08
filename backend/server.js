@@ -17,6 +17,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 const runInvitationExpiryJob = require("./jobs/invitationExpiryJob");
 const runStrictReviewDeadline = require("./jobs/strictReviewDeadlineJob");
+const runRevisionDeadlineReminderJob = require("./jobs/revisionDeadlineReminderJob");
 const { startDoiWorker } = require("./workers/doiWorker");
 const cron = require("node-cron");
 
@@ -488,6 +489,20 @@ const server = app.listen(PORT, async () => {
   });
 
   console.log("Cron jobs scheduled: Every hour on the hour (PRODUCTION MODE)");
+
+  cron.schedule("0 9 * * *", async () => {
+    console.log(
+      `[PRODUCTION] Revision reminder job running - ${new Date().toLocaleString()}`,
+    );
+
+    try {
+      await runRevisionDeadlineReminderJob();
+    } catch (error) {
+      console.error("Revision reminder job failed:", error.message);
+    }
+  });
+
+  console.log("Revision reminder cron scheduled: Daily at 09:00 server time");
   startDoiWorker();
 });
 

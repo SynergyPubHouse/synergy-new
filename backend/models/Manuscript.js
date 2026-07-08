@@ -188,6 +188,37 @@ const manuscriptSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    revisionRequest: {
+      isActive: {
+        type: Boolean,
+        default: false,
+      },
+      requestedAt: {
+        type: Date,
+        default: null,
+      },
+      dueDate: {
+        type: Date,
+        default: null,
+      },
+      daysAllowed: {
+        type: Number,
+        default: null,
+      },
+      requestedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+      reminderSentAt: {
+        type: Date,
+        default: null,
+      },
+      submittedAt: {
+        type: Date,
+        default: null,
+      },
+    },
 
     assignedReviewers: [
       {

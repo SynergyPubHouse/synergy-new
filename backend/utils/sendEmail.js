@@ -37,8 +37,19 @@ const createTransporter = () => {
 
 const sendEmail = async (options) => {
     try {
-        const fromEmail = process.env.EMAIL_USER || process.env.EMAIL_FROM || "noreply@synergyworldpress.com";
-        const fromName = process.env.EMAIL_FROM_NAME || "Synergy World Press";
+        const resolvedFrom =
+            options.from ||
+            options.fromEmail ||
+            process.env.EMAIL_FROM ||
+            process.env.EMAIL_USER;
+        const fromEmail =
+            typeof resolvedFrom === "string"
+                ? resolvedFrom
+                : resolvedFrom?.email;
+        const fromName =
+            (typeof resolvedFrom === "object" && resolvedFrom?.name) ||
+            process.env.EMAIL_FROM_NAME ||
+            "Synergy World Press";
         const replyTo = process.env.EMAIL_REPLY_TO || undefined;
 
         // Backward compatibility: if caller supplied `text` as HTML, treat it as html

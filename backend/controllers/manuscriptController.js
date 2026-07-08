@@ -1872,11 +1872,19 @@ exports.updateManuscriptStatus = async (req, res) => {
       }
     }
 
-    const manuscript = await Manuscript.findByIdAndUpdate(
-      manuscriptId,
-      { status },
-      { new: true },
-    );
+    const update = { status };
+
+    if (
+      currentManuscript.status === "Revision Required" &&
+      ["Under Review", "Pending"].includes(status)
+    ) {
+      update["revisionRequest.isActive"] = false;
+      update["revisionRequest.submittedAt"] = new Date();
+    }
+
+    const manuscript = await Manuscript.findByIdAndUpdate(manuscriptId, update, {
+      new: true,
+    });
 
     res.status(200).json({
       success: true,
@@ -1897,7 +1905,7 @@ exports.getMySubmissions = async (req, res) => {
     const user = await User.findById(req.user._id).populate({
       path: "manuscripts",
       select:
-        "customId title type status createdAt updatedAt mergedFileUrl reviewDocxUrl editorNotesForAuthor authorResponse revisedPdfBuiltAt revisionAttempts maxRevisionAttempts revisionLocked revisionCombinedPdfUrl",
+        "customId title type status createdAt updatedAt mergedFileUrl reviewDocxUrl editorNotesForAuthor authorResponse revisedPdfBuiltAt revisionAttempts maxRevisionAttempts revisionLocked revisionCombinedPdfUrl revisionRequest",
     });
 
     if (!user) {
