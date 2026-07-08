@@ -3,6 +3,7 @@ import axios from "axios";
 import { useAuth } from "../App";
 import { Link, useNavigate } from "react-router-dom";
 import UploadModal from "../components/UploadModal";
+import { getRevisionDeadlineText } from "../utils/revisionDeadline";
 // import { CLOSING } from "ws";
 
 const BASE_URL = "/journal/jics";
@@ -10,6 +11,7 @@ const BASE_URL = "/journal/jics";
 const MySubmissions = () => {
   const { user } = useAuth();
   const [manuscripts, setManuscripts] = useState([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showConfirmation, setShowConfirmation] = useState(null);
@@ -30,6 +32,14 @@ const MySubmissions = () => {
   useEffect(() => {
     fetchManuscripts();
   }, [user?.token]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchManuscripts = async () => {
     try {
@@ -256,6 +266,31 @@ const MySubmissions = () => {
     setShowNotes(manuscriptId);
   };
 
+  const getRevisionDeadlineInfo = (manuscript) => {
+    const dueDate = manuscript?.revisionRequest?.dueDate;
+    if (!dueDate) return null;
+
+    const diffMs = new Date(dueDate).getTime() - currentTime.getTime();
+
+    return {
+      dueDate,
+      isOverdue: diffMs <= 0,
+      label: getRevisionDeadlineText(dueDate, currentTime),
+    };
+  };
+
+  const getLatestAuthorVisibleNote = (manuscript) => {
+    const notes = Array.isArray(manuscript?.editorNotesForAuthor)
+      ? manuscript.editorNotesForAuthor
+      : [];
+
+    if (!notes.length) return null;
+
+    return [...notes].sort(
+      (a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0)
+    )[0];
+  };
+
   const renderNotes = (manuscript) => {
     if (!manuscript) return null;
 
@@ -431,6 +466,12 @@ const MySubmissions = () => {
                     .map((manuscript, index) => {
                       const attemptsUsed = manuscript.revisionAttempts || 0;
                       const maxAttempts = manuscript.maxRevisionAttempts || 3;
+                      const revisionDeadlineInfo =
+                        manuscript.status === "Revision Required"
+                          ? getRevisionDeadlineInfo(manuscript)
+                          : null;
+                      const latestAuthorVisibleNote =
+                        getLatestAuthorVisibleNote(manuscript);
                       const attemptsExhausted =
                         manuscript.revisionLocked ||
                         attemptsUsed >= maxAttempts ||
@@ -540,6 +581,17 @@ const MySubmissions = () => {
                                   {attemptsUsed}/{maxAttempts} attempts
                                 </div>
                               )}
+                              {revisionDeadlineInfo && (
+                                <div
+                                  className={`text-xs font-medium ${
+                                    revisionDeadlineInfo.isOverdue
+                                      ? "text-red-600"
+                                      : "text-orange-600"
+                                  }`}
+                                >
+                                  {revisionDeadlineInfo.label}
+                                </div>
+                              )}
                               {attemptsExhausted && (
                                 <div className="text-xs text-red-600 font-medium">
                                   Attempts exhausted
@@ -632,6 +684,16 @@ const MySubmissions = () => {
                                 >
                                   Send to Editor
                                 </button>
+                              )}
+                              {latestAuthorVisibleNote && (
+                                <div className="bg-orange-50 border border-orange-200 rounded p-2">
+                                  <div className="text-[11px] font-semibold text-orange-700 mb-1">
+                                    Latest editor note
+                                  </div>
+                                  <p className="text-xs text-gray-700 whitespace-pre-wrap break-words">
+                                    {latestAuthorVisibleNote.text}
+                                  </p>
+                                </div>
                               )}
                               {/* <button
                                 onClick={() => handleNotesClick(manuscript._id)}
