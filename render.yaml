@@ -4,9 +4,6 @@ services:
     env: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    dockerfile:
-      context: .
-      dockerfile: ./Dockerfile
     envVars:
       - key: NODE_ENV
         value: production
@@ -16,3 +13,25 @@ services:
         value: /usr/bin/soffice
       - key: PYTHONUNBUFFERED
         value: "1"
+  - type: web
+    name: synergy-world-press-frontend
+    env: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_BASE_URL
+        value: https://api.synergyworldpress.com
+      - key: PUBLIC_SITE_URL
+        value: https://synergyworldpress.com
+      - key: SSR_REQUEST_TIMEOUT_MS
+        value: "8000"
+      - key: VITE_BACKEND_URL
+        value: https://api.synergyworldpress.com
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+      - key: VITE_ORCID_CLIENT_ID
+        sync: false
