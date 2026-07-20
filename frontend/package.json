@@ -14,6 +14,7 @@
     "test:ssr": "node --test ssr/*.test.js",
     "lint": "eslint .",
     "preview": "vite preview",
+    "start": "node server.js",
     "start:ssr": "cross-env NODE_ENV=production node server.js"
   },
   "dependencies": {
