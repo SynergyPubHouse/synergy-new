@@ -29,6 +29,10 @@ const {
   uploadPublishedManuscriptToS3,
 } = require("../services/s3Service");
 const {
+  getPublicApiBaseUrl,
+  getPublicSiteBaseUrl,
+} = require("../config/publicBaseUrls");
+const {
   uploadFileToDrive,
   deleteFileFromDrive,
   downloadDriveFileToTemp,
@@ -178,14 +182,8 @@ function normalizeHttpBaseUrl(baseUrl, fallbackProtocol = "https") {
 }
 
 function getPublishedPdfUrlCandidates(filename) {
-  const apiBaseUrl = normalizeHttpBaseUrl(
-    process.env.API_BASE_URL || "https://api.synergyworldpress.com",
-  );
-  const publicBaseUrl = normalizeHttpBaseUrl(
-    process.env.PUBLIC_SITE_URL ||
-      process.env.CLIENT_URL ||
-      "https://synergyworldpress.com",
-  );
+  const apiBaseUrl = normalizeHttpBaseUrl(getPublicApiBaseUrl());
+  const publicBaseUrl = normalizeHttpBaseUrl(getPublicSiteBaseUrl());
   const encodedFilename = encodeURIComponent(filename);
   const hosts = [
     apiBaseUrl,

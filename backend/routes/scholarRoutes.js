@@ -34,60 +34,14 @@ const formatScholarDate = (dateString) => {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const DEFAULT_PUBLIC_API_BASE_URL = "https://api.synergyworldpress.com";
-const DEFAULT_PUBLIC_SITE_BASE_URL = "https://synergyworldpress.com";
-
-function normalizeBaseUrl(configuredBaseUrl, fallbackBaseUrl) {
-  const value = String(configuredBaseUrl || fallbackBaseUrl || "").trim();
-  return (
-    value.startsWith("http://") || value.startsWith("https://")
-      ? value
-      : `https://${value}`
-  ).replace(/\/+$/, "");
-}
-
-function getRequestHeader(req, headerName) {
-  if (!req || !headerName) return "";
-  if (typeof req.get === "function") {
-    return String(req.get(headerName) || "").trim();
-  }
-
-  const headers = req.headers || {};
-  return String(
-    headers[headerName] ||
-      headers[String(headerName).toLowerCase()] ||
-      headers[String(headerName).toUpperCase()] ||
-      "",
-  ).trim();
-}
-
-function getRequestBaseUrl(req) {
-  const forwardedProto = getRequestHeader(req, "x-forwarded-proto")
-    .split(",")[0]
-    .trim();
-  const forwardedHost = getRequestHeader(req, "x-forwarded-host")
-    .split(",")[0]
-    .trim();
-  const protocol = forwardedProto || req?.protocol || "";
-  const host = forwardedHost || getRequestHeader(req, "host");
-
-  if (!protocol || !host) return "";
-  return normalizeBaseUrl(`${protocol}://${host}`, "");
-}
-
-function isLocalBaseUrl(baseUrl) {
-  if (!baseUrl) return false;
-
-  try {
-    const { hostname } = new URL(normalizeBaseUrl(baseUrl, ""));
-    return /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0)$/i.test(hostname);
-  } catch (_) {
-    return false;
-  }
-}
+const {
+  getPublicApiBaseUrl,
+  getPublicSiteBaseUrl,
+  normalizeBaseUrl,
+} = require("../config/publicBaseUrls");
 
 function joinUrl(baseUrl, ...segments) {
-  const normalizedBaseUrl = normalizeBaseUrl(baseUrl, "");
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
   const normalizedPath = segments
     .filter((segment) => segment !== undefined && segment !== null)
     .map((segment) => String(segment).replace(/^\/+|\/+$/g, ""))
@@ -97,46 +51,6 @@ function joinUrl(baseUrl, ...segments) {
   return normalizedPath
     ? `${normalizedBaseUrl}/${normalizedPath}`
     : normalizedBaseUrl;
-}
-
-function getApiBaseUrl(req) {
-  const configuredApiBaseUrl =
-    process.env.PUBLIC_API_BASE_URL ||
-    process.env.API_BASE_URL ||
-    process.env.BACKEND_URL ||
-    process.env.SERVER_URL ||
-    process.env.APP_URL ||
-    process.env.BASE_URL;
-  const requestBaseUrl = getRequestBaseUrl(req);
-
-  if (configuredApiBaseUrl) {
-    const normalizedConfiguredApiBaseUrl = normalizeBaseUrl(
-      configuredApiBaseUrl,
-      "",
-    );
-
-    if (
-      requestBaseUrl &&
-      isLocalBaseUrl(normalizedConfiguredApiBaseUrl) &&
-      !isLocalBaseUrl(requestBaseUrl)
-    ) {
-      return requestBaseUrl;
-    }
-
-    return normalizedConfiguredApiBaseUrl;
-  }
-
-  return requestBaseUrl || DEFAULT_PUBLIC_API_BASE_URL;
-}
-
-function getPublicBaseUrl() {
-  return normalizeBaseUrl(
-    process.env.PUBLIC_SITE_BASE_URL ||
-    process.env.PUBLIC_SITE_URL ||
-    process.env.CLIENT_URL ||
-    process.env.FRONTEND_URL,
-    DEFAULT_PUBLIC_SITE_BASE_URL,
-  );
 }
 
 function getPdfFilenameFromUrl(pdfUrl) {
@@ -186,14 +100,14 @@ const buildPublishedManuscriptIdentifierQuery = (identifier) => {
   return identifierQuery ? { status: "Published", ...identifierQuery } : null;
 };
 
-function getScholarArticleUrl(article, apiBaseUrl = getApiBaseUrl()) {
+function getScholarArticleUrl(article, apiBaseUrl = getPublicApiBaseUrl()) {
   const articleUrlId = getArticleUrlId(article);
   return articleUrlId
     ? joinUrl(apiBaseUrl, "scholar/article", encodeURIComponent(articleUrlId))
     : "";
 }
 
-function getScholarPdfUrl(article, apiBaseUrl = getApiBaseUrl()) {
+function getScholarPdfUrl(article, apiBaseUrl = getPublicApiBaseUrl()) {
   const articleUrl = getScholarArticleUrl(article, apiBaseUrl);
   return articleUrl ? `${articleUrl}/fulltext.pdf` : "";
 }
@@ -433,9 +347,11 @@ router.get("/article/:id", async (req, res) => {
     }
     const isoDate = new Date(article.publishedAt).toISOString();
 
-    // URLs
-    const baseUrl = getPublicBaseUrl();
-    const apiBaseUrl = getApiBaseUrl(req);
+    // URLs. Every SEO-facing URL (canonical, citation_pdf_url,
+    // citation_public_url, og:url) must live on the domain this page is
+    // actually served from, or Scholar/Google reject the canonicalization.
+    const baseUrl = getPublicSiteBaseUrl();
+    const apiBaseUrl = getPublicApiBaseUrl();
 
     const pdfUrl = getPublishedPdfObjectKey(article)
       ? getScholarPdfUrl(article, apiBaseUrl)
@@ -538,7 +454,7 @@ router.get("/articles-listing", async (req, res) => {
       };
     });
 
-    const apiBaseUrl = getApiBaseUrl(req);
+    const apiBaseUrl = getPublicApiBaseUrl();
     const canonicalUrl = joinUrl(apiBaseUrl, "scholar/articles-listing");
 
     const articlesHtml =
@@ -665,7 +581,10 @@ function generateScholarHtml({
   baseUrl,
 }) {
   const scholarArticleUrl = articleUrl;
-  const publicArticleUrl = mainSiteArticleUrl || scholarArticleUrl;
+  // citation_public_url and og:url must match the canonical URL exactly.
+  // The SPA article page on the main site cannot serve these meta tags, so
+  // it is only linked as a visible button, never as metadata.
+  const journalSiteArticleUrl = mainSiteArticleUrl || scholarArticleUrl;
 
   const schemaData = {
     "@context": "https://schema.org",
@@ -731,7 +650,7 @@ function generateScholarHtml({
     ${article.pageStart ? `<meta name="citation_firstpage" content="${article.pageStart}">` : ""}
     ${article.pageEnd ? `<meta name="citation_lastpage" content="${article.pageEnd}">` : ""}
     ${pdfUrl ? `<meta name="citation_pdf_url" content="${pdfUrl}">` : ""}
-    <meta name="citation_public_url" content="${publicArticleUrl}">
+    <meta name="citation_public_url" content="${scholarArticleUrl}">
     ${article.doi ? `<meta name="citation_doi" content="${article.doi}">` : ""}
     ${article.abstract ? `<meta name="citation_abstract" content="${escapeHtml(article.abstract)}">` : ""}
     ${article.keywords ? `<meta name="citation_keywords" content="${escapeHtml(article.keywords)}">` : ""}
@@ -753,7 +672,7 @@ function generateScholarHtml({
     <meta property="og:title" content="${escapeHtml(article.title)}">
     <meta property="og:description" content="${escapeHtml((article.abstract || "").substring(0, 200))}">
     <meta property="og:type" content="article">
-    <meta property="og:url" content="${publicArticleUrl}">
+    <meta property="og:url" content="${scholarArticleUrl}">
     <meta property="og:site_name" content="Synergy World Press">
     <meta property="article:published_time" content="${isoDate}">
     ${authors[0] ? `<meta property="article:author" content="${escapeHtml(authors[0])}">` : ""}
@@ -832,7 +751,7 @@ ${JSON.stringify(schemaData, null, 2)}
 
         <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
           ${publicPdfUrl ? `<a href="${publicPdfUrl}" class="pdf-btn" target="_blank">📄 Download Full Text (PDF)</a>` : ""}
-          <a href="${publicArticleUrl}" class="pdf-btn" style="background:#004d40;" target="_blank">🔗 View Article on Journal Website</a>
+          <a href="${journalSiteArticleUrl}" class="pdf-btn" style="background:#004d40;" target="_blank">🔗 View Article on Journal Website</a>
         </div>
     </article>
 
@@ -846,7 +765,7 @@ ${JSON.stringify(schemaData, null, 2)}
 
 // Error HTML Generator
 function generateErrorHtml(title, message) {
-  const publicBaseUrl = getPublicBaseUrl();
+  const publicBaseUrl = getPublicSiteBaseUrl();
   const articlesUrl = joinUrl(publicBaseUrl, "journal/jics/articles/current");
 
   return `<!DOCTYPE html>

@@ -80,6 +80,11 @@ app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Google Search Console site verification (single scoped file, not a static folder)
+app.get("/google26ffacd65324f1d8.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "google26ffacd65324f1d8.html"));
+});
+
 // Static file serving
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -111,14 +116,9 @@ Disallow: /register
 }
 
 app.get("/robots.txt", (req, res) => {
-  const apiBase = (
-    process.env.PUBLIC_API_BASE_URL ||
-    process.env.API_BASE_URL ||
-    process.env.BACKEND_URL ||
-    "https://api.synergyworldpress.com"
-  ).replace(/\/+$/, "");
+  const { getPublicApiBaseUrl } = require("./config/publicBaseUrls");
   res.setHeader("Content-Type", "text/plain");
-  res.send(buildRobotsTxt(apiBase));
+  res.send(buildRobotsTxt(getPublicApiBaseUrl()));
 });
 // ============================================
 // ROUTES
