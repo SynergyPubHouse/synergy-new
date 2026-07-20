@@ -15,8 +15,9 @@ function Footer() {
               About Synergy World Press
             </h3>
             <p className="leading-relaxed">
-              Advancing interdisciplinary research through accessible publishing solutions.
-              Committed to innovation, integrity, and global collaboration.
+              Advancing interdisciplinary research through accessible publishing
+              solutions. Committed to innovation, integrity, and global
+              collaboration.
             </p>
           </div>
 
@@ -75,7 +76,10 @@ function Footer() {
                 { icon: <FaTwitter />, link: "https://twitter.com" },
                 { icon: <FaLinkedin />, link: "https://linkedin.com" },
                 { icon: <FaGithub />, link: "https://github.com" },
-                { icon: <FaEnvelope />, link: "mailto:contact@synergyworldpress.com" },
+                {
+                  icon: <FaEnvelope />,
+                  link: "mailto:contact@synergyworldpress.com",
+                },
               ].map((social, index) => (
                 <a
                   key={index}
@@ -90,7 +94,10 @@ function Footer() {
             </div>
             <p className="mt-4">
               Need help? <br />
-              <a href="mailto:support@synergyworldpress.com" className="text-[#00acc1] hover:text-[#0097a7]">
+              <a
+                href="mailto:support@synergyworldpress.com"
+                className="text-[#00acc1] hover:text-[#0097a7]"
+              >
                 support@synergyworldpress.com, synergyworldpress@gmail.com
               </a>
             </p>
@@ -103,15 +110,14 @@ function Footer() {
         {/* Copyright */}
         <div className="text-center text-sm">
           <p>
-            © {new Date().getFullYear()} Synergy World Press. All rights reserved.<br />
-            {/* ISSN: 1234-5678 | DOI Prefix: 10.12345 */}
+            © {new Date().getFullYear()} Synergy World Press. All rights
+            reserved.
+            <br />
+            {/* ISSN: 3139-3616 */}
           </p>
           <p className="mt-2">
             Designed by the{" "}
-            <Link
-              to={`/team`}
-              className="text-[#00acc1] hover:text-[#0097a7]"
-            >
+            <Link to={`/team`} className="text-[#00acc1] hover:text-[#0097a7]">
               Synergy Team
             </Link>
           </p>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../App";
+import PropTypes from "prop-types";
 
 const MONTH_NAMES = [
   "Jan",
@@ -43,12 +44,79 @@ const getArticleIssueDate = (article) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const getPageStart = (article) => {
+  if (article && article.pageStart !== null && article.pageStart !== undefined) {
+    const page = Number(article.pageStart);
+    if (!Number.isNaN(page)) return page;
+  }
+  return null;
+};
+
+const getIssueKey = (article) => {
+  if (
+    article.issueYear != null &&
+    article.issueVolume != null &&
+    article.issueNumber != null
+  ) {
+    return `year-${article.issueYear}-volume-${article.issueVolume}-issue-${article.issueNumber}`;
+  }
+
+  const date = getArticleIssueDate(article);
+  if (date) {
+    return `legacy-${getIssueWindow(date).label}`;
+  }
+
+  return "unassigned-issue";
+};
+
 const sortArticles = (articles, archive) => {
-  return [...articles].sort((a, b) => {
-    if (archive) {
+  if (archive) {
+    // 1. Sort all articles by issue date descending to keep the overall issue order (newest issues first)
+    const initialSorted = [...articles].sort((a, b) => {
       return (getArticleIssueDate(b)?.getTime() || 0) - (getArticleIssueDate(a)?.getTime() || 0);
+    });
+
+    // 2. Group articles by their respective issues
+    const issueGroups = {};
+    const issueOrder = [];
+
+    for (const article of initialSorted) {
+      const key = getIssueKey(article);
+      if (!issueGroups[key]) {
+        issueGroups[key] = [];
+        issueOrder.push(key);
+      }
+      issueGroups[key].push(article);
     }
 
+    // 3. Sort articles inside each issue by starting page ascending (using stable sort)
+    const sortedResult = [];
+    for (const key of issueOrder) {
+      const group = issueGroups[key];
+      const sortedGroup = [...group].map((item, index) => ({ item, index }))
+        .sort((a, b) => {
+          const pageA = getPageStart(a.item);
+          const pageB = getPageStart(b.item);
+
+          if (pageA !== null && pageB !== null) {
+            if (pageA !== pageB) return pageA - pageB;
+          } else if (pageA !== null && pageB === null) {
+            return -1;
+          } else if (pageA === null && pageB !== null) {
+            return 1;
+          }
+          return a.index - b.index; // Stable sort fallback to preserve original order
+        })
+        .map(x => x.item);
+
+      sortedResult.push(...sortedGroup);
+    }
+
+    return sortedResult;
+  }
+
+  // Current Issue page sorting (unaffected)
+  return [...articles].sort((a, b) => {
     const aPage = a.pageStart;
     const bPage = b.pageStart;
 
@@ -265,6 +333,11 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
                     📅 {formatIssueDate(item)}
                   </span>
                 )}
+                  {item.publishedAt && (
+                  <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-md border border-gray-200">
+                    ISSN : 3139-3616
+                  </span>
+                )}
               </div>
 
               {/* Abstract */}
@@ -304,6 +377,16 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
       </div>
     </div>
   );
+};
+
+CurrentIssue.propTypes = {
+  separateIssue: PropTypes.bool,
+  archive: PropTypes.bool,
+};
+
+CurrentIssue.defaultProps = {
+  separateIssue: false,
+  archive: false,
 };
 
 export default CurrentIssue;

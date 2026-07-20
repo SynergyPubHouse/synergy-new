@@ -22,6 +22,14 @@ const getVisitorId = () => {
 const getArticleUrlId = (article) =>
   article?.customId || article?.custom_id || article?._id;
 
+const getDoiUrl = (doi) => {
+  const value = String(doi || "").trim();
+  if (!value) return "";
+
+  const normalizedDoi = value.replace(/^https?:\/\/doi\.org\//i, "").trim();
+  return normalizedDoi ? `doi.org/${normalizedDoi}` : "";
+};
+
 const ArticleDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -119,7 +127,7 @@ const ArticleDetail = () => {
       isPartOf: {
         "@type": "Periodical",
         name: "Journal of Intelligent Computing System (JICS)",
-        issn: "XXXX-XXXX",
+        issn: "3139-3616",
       },
       description: article.abstract || "",
       keywords: article.keywords || "",
@@ -181,7 +189,7 @@ const ArticleDetail = () => {
         <meta name="citation_publisher" content="Synergy World Press" />
 
         {/* ISSN */}
-        <meta name="citation_issn" content="XXXX-XXXX" />
+        <meta name="citation_issn" content="3139-3616" />
 
         {/* Volume & Issue */}
         {article.issueVolume && (
@@ -402,6 +410,8 @@ const ArticleDetail = () => {
     return count.toString();
   };
 
+  const doiUrl = getDoiUrl(article?.doi);
+
   // Get authors - PDF first, then API fallback
   const getAuthors = () => {
     if (article?.pdfAuthors && article.pdfAuthors.length > 0) {
@@ -467,6 +477,12 @@ const ArticleDetail = () => {
       });
     }
     return article.issueYear || '';
+  };
+
+  const getCitationText = () => {
+    const citation = `${getAuthors()} (${article.issueYear}). ${article.title}. Journal of Intelligent Computing System (JICS), ${article.issueVolume}(${article.issueNumber})${article.pageStart && article.pageEnd ? `, ${article.pageStart}-${article.pageEnd}` : ""}.`;
+
+    return doiUrl ? `${citation} ${doiUrl}` : citation;
   };
   // Parse classification
   const parseClassification = (classification) => {
@@ -564,7 +580,7 @@ const ArticleDetail = () => {
                 <span className="mr-2">📖</span> Publication Details
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_minmax(260px,1.4fr)]">
                 {/* Issue */}
                 <div className="bg-white p-3 rounded-lg border border-gray-200">
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
@@ -599,6 +615,18 @@ const ArticleDetail = () => {
                     </p>
                   </div>
                 )}
+                
+                 {/* {ISSN NUMBER} */}
+                {article.publishedAt && (
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">
+                      ISSN 
+                    </p>
+                    <p className="text-lg font-semibold text-gray-800">
+                     3139-3616
+                    </p>
+                  </div>
+                )}
 
                 {/* Published Date */}
                 {article.publishedAt && (
@@ -611,7 +639,6 @@ const ArticleDetail = () => {
                     </p>
                   </div>
                 )}
-
                 {/* Views Card */}
                 <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-5 rounded-xl border-2 border-purple-200 shadow-lg">
                   <div className="grid grid-cols-2 gap-6 text-center">
@@ -658,11 +685,23 @@ const ArticleDetail = () => {
                     ? ` ${article.pageStart}-${article.pageEnd}`
                     : ""}
                   .
+                  {doiUrl && (
+                    <>
+                      {" "}
+                      <a
+                        href={doiUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-all text-blue-700 hover:text-blue-800 hover:underline"
+                      >
+                        {doiUrl}
+                      </a>
+                    </>
+                  )}
                 </p>
                 <button
                   onClick={() => {
-                    const citation = `${getAuthors()} (${article.issueYear}). ${article.title}. Journal of Intelligent Computing System (JICS), ${article.issueVolume}(${article.issueNumber})${article.pageStart && article.pageEnd ? `, ${article.pageStart}-${article.pageEnd}` : ""}.`;
-                    navigator.clipboard.writeText(citation);
+                    navigator.clipboard.writeText(getCitationText());
                     alert("Citation copied to clipboard!");
                   }}
                   className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"

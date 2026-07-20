@@ -6,6 +6,11 @@ const Manuscript = require('../models/Manuscript');
 
 const getArticleUrlId = (article) => article.customId || article.custom_id || article._id;
 
+const PUBLIC_SITE_URL = 'https://synergyworldpress.com';
+const API_BASE_URL = process.env.API_BASE_URL
+    ? process.env.API_BASE_URL.replace(/\/+$/, '')
+    : 'https://api.synergyworldpress.com';
+
 // Main Sitemap
 router.get('/sitemap.xml', async (req, res) => {
     try {
@@ -14,8 +19,9 @@ router.get('/sitemap.xml', async (req, res) => {
             .sort({ publishedAt: -1 })
             .lean();
 
-        const baseUrl = 'https://synergyworldpress.com';
+        const baseUrl = PUBLIC_SITE_URL;
         const today = new Date().toISOString().split('T')[0];
+        const staticLastmod = today;
 
         let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -28,6 +34,7 @@ router.get('/sitemap.xml', async (req, res) => {
     </url>
     <url>
         <loc>${baseUrl}/journal/jics/about/overview</loc>
+        <lastmod>${staticLastmod}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
     </url>
@@ -39,11 +46,13 @@ router.get('/sitemap.xml', async (req, res) => {
     </url>
     <url>
         <loc>${baseUrl}/journal/jics/submit</loc>
+        <lastmod>${staticLastmod}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.7</priority>
     </url>
     <url>
         <loc>${baseUrl}/contactus</loc>
+        <lastmod>${staticLastmod}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
     </url>
@@ -55,17 +64,11 @@ router.get('/sitemap.xml', async (req, res) => {
                 .toISOString().split('T')[0];
             const articleUrlId = encodeURIComponent(getArticleUrlId(article));
 
-            // Scholar URL (for Google Scholar bot)
+            // Scholar URL — must be on the API domain because that's where the
+            // /scholar/ Express route lives. Pointing Scholar at the SPA host
+            // returns React's index.html (no citation_* tags) and kills indexing.
             xml += `    <url>
-        <loc>${baseUrl}/scholar/article/${articleUrlId}</loc>
-        <lastmod>${lastmod}</lastmod>
-        <changefreq>monthly</changefreq>
-        <priority>0.8</priority>
-    </url>
-`;
-            // React URL (for users)
-            xml += `    <url>
-        <loc>${baseUrl}/journal/jics/articles/${articleUrlId}</loc>
+        <loc>${API_BASE_URL}/scholar/article/${articleUrlId}</loc>
         <lastmod>${lastmod}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.8</priority>

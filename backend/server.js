@@ -17,6 +17,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 const runInvitationExpiryJob = require("./jobs/invitationExpiryJob");
 const runStrictReviewDeadline = require("./jobs/strictReviewDeadlineJob");
+const runRevisionDeadlineReminderJob = require("./jobs/revisionDeadlineReminderJob");
+const { startDoiWorker } = require("./workers/doiWorker");
 const cron = require("node-cron");
 
 dotenv.config();
@@ -83,7 +85,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Debug middleware
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`, {
+  console.log(`${req.method} ${req.path}`, {
     origin: req.headers.origin,
     "user-agent": req.headers["user-agent"],
   });
@@ -93,21 +95,30 @@ app.use("/scholar", scholarRoutes);
 app.use("/", sitemapRoutes);
 app.use("/", require("./routes/publicPdfRoutes"));
 
-app.get("/robots.txt", (req, res) => {
-  res.setHeader("Content-Type", "text/plain");
-  res.send(`User-agent: *
-Allow: /
-
-User-agent: Googlebot
+function buildRobotsTxt(apiBaseUrl) {
+  return `User-agent: *
 Allow: /scholar/
-Allow: /journal/
+Allow: /scholar/article/
+Allow: /scholar/articles-listing
+Allow: /sitemap.xml
 
-Sitemap: https://synergyworldpress.com/sitemap.xml
+Sitemap: ${apiBaseUrl}/sitemap.xml
 
 Disallow: /api/
 Disallow: /login
 Disallow: /register
-`);
+`;
+}
+
+app.get("/robots.txt", (req, res) => {
+  const apiBase = (
+    process.env.PUBLIC_API_BASE_URL ||
+    process.env.API_BASE_URL ||
+    process.env.BACKEND_URL ||
+    "https://api.synergyworldpress.com"
+  ).replace(/\/+$/, "");
+  res.setHeader("Content-Type", "text/plain");
+  res.send(buildRobotsTxt(apiBase));
 });
 // ============================================
 // ROUTES
@@ -453,7 +464,7 @@ app.use(errorHandler);
 // Connect to MongoDB
 connectDB();
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
 
@@ -478,6 +489,21 @@ const server = app.listen(PORT, async () => {
   });
 
   console.log("Cron jobs scheduled: Every hour on the hour (PRODUCTION MODE)");
+
+  cron.schedule("0 9 * * *", async () => {
+    console.log(
+      `[PRODUCTION] Revision reminder job running - ${new Date().toLocaleString()}`,
+    );
+
+    try {
+      await runRevisionDeadlineReminderJob();
+    } catch (error) {
+      console.error("Revision reminder job failed:", error.message);
+    }
+  });
+
+  console.log("Revision reminder cron scheduled: Daily at 09:00 server time");
+  startDoiWorker();
 });
 
 // Handle unhandled promise rejections

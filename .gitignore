@@ -8,11 +8,18 @@ test-*.pdf
 temp-*.pdf
 preview-*.pdf
 merged-*.pdf
+# Keep the certificate template — required in production for PDF generation
+!backend/templates/Reviewer_Certificate.pdf
 
-# Environment variables
+# Environment variables and secrets
+.env
+.env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.development
+.env.production
+.env.test
 
 # Logs
 logs
@@ -65,3 +72,12 @@ ssl/*.p12
 config.bat
 temp_auto_push.bat
 temp_interactive_push.bat
+
+# Credentials and Secrets
+google-credentials.json
+
+# Cache and temporary directories
+.cache/
+
+# Repomix output
+repomix-output.txt

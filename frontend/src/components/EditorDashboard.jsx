@@ -4,10 +4,10 @@ import axios from "axios";
 
 import { exportNotesToWord } from "../components/exportNotesToWord.jsx";
 import PdfUploadModal from "../components/PdfUploadModal";
+import { getRevisionDeadlineText } from "../utils/revisionDeadline";
 // import { calcGeneratorDuration } from "framer-motion";
 function EditorDashboard() {
   const { user } = useAuth();
-  console.log("EditorDashboard user:", user);
   // Helper function to format full name including middle name if it exists
   const formatFullName = (user) => {
     if (!user) return "Unknown";
@@ -29,9 +29,10 @@ function EditorDashboard() {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [manuscripts, setManuscripts] = useState([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [forceRender, setForceRender] = useState(false);
   const [noteText, setNoteText] = useState("");
-  const [revisionNoteText, setRevisionNoteText] = useState("");
+  const [revisionForms, setRevisionForms] = useState({});
   const [selectedManuscript, setSelectedManuscript] = useState(null);
   const [showNoteInput, setShowNoteInput] = useState(null); // 'reject' or 'revision' or null
   const [reviewers, setReviewers] = useState([]);
@@ -93,9 +94,53 @@ function EditorDashboard() {
     });
   };
 
+  const getRevisionFormState = (manuscriptId) =>
+    revisionForms[manuscriptId] || {
+      revisionNoteText: "",
+      daysAllowed: "",
+    };
+
+  const updateRevisionForm = (manuscriptId, field, value) => {
+    setRevisionForms((prev) => ({
+      ...prev,
+      [manuscriptId]: {
+        revisionNoteText: "",
+        daysAllowed: "",
+        ...(prev[manuscriptId] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const formatRevisionDeadline = (dueDate) => {
+    if (!dueDate) return "";
+
+    return new Date(dueDate).toLocaleDateString();
+  };
+
+  const clearRevisionForm = (manuscriptId) => {
+    if (!manuscriptId) return;
+
+    setRevisionForms((prev) => {
+      if (!prev[manuscriptId]) return prev;
+
+      const nextForms = { ...prev };
+      delete nextForms[manuscriptId];
+      return nextForms;
+    });
+  };
+
   const removeToast = (id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch users with manuscripts
   const fetchUsers = useCallback(async () => {
@@ -104,7 +149,6 @@ function EditorDashboard() {
         console.error("No user token found");
         return;
       }
-      console.log("Fetching users...");
       const response = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/users-with-manuscripts`,
         {
@@ -113,16 +157,8 @@ function EditorDashboard() {
           },
         },
       );
-      console.log("=== Fetch Users Debug ===");
-      console.log("API Response:", response.data);
-
       const processedUsers = (response.data || []).map((userRecord) => {
         const authorName = formatFullName(userRecord);
-        console.log(`Processing user: ${authorName} (${userRecord._id})`);
-        console.log(
-          `Raw manuscripts count: ${userRecord.manuscripts?.length || 0}`,
-        );
-        console.log(`Raw manuscripts:`, userRecord.manuscripts);
 
         const manuscriptsWithAuthor = (userRecord.manuscripts || []).map(
           (manuscript) => ({
@@ -130,11 +166,6 @@ function EditorDashboard() {
             authorName: manuscript.authorName || authorName,
           }),
         );
-
-        console.log(
-          `Processed manuscripts count: ${manuscriptsWithAuthor.length}`,
-        );
-        console.log(`Processed manuscripts:`, manuscriptsWithAuthor);
 
         // Sort manuscripts for this author: newest submissions first
         manuscriptsWithAuthor.sort((a, b) => {
@@ -153,20 +184,7 @@ function EditorDashboard() {
           manuscripts: manuscriptsWithAuthor,
         };
 
-        console.log(`Final processed user:`, processedUser);
         return processedUser;
-      });
-
-      console.log("=== All Processed Users ===");
-      processedUsers.forEach((user) => {
-        console.log(
-          `User: ${user.authorName} - Manuscripts: ${user.manuscripts.length}`,
-        );
-        user.manuscripts.forEach((manuscript) => {
-          console.log(
-            `  - ${manuscript.customId || manuscript.title} (${manuscript.status})`,
-          );
-        });
       });
 
       setUsers(processedUsers);
@@ -202,7 +220,6 @@ function EditorDashboard() {
         return;
       }
 
-      console.log("Fetching reviewers with token:", user.token); // Debug log
       const response = await axios.get(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/reviewers`,
         {
@@ -211,7 +228,6 @@ function EditorDashboard() {
           },
         },
       );
-      console.log("Reviewers fetched successfully:", response.data);
       setReviewers(response.data);
     } catch (error) {
       console.error(
@@ -233,20 +249,13 @@ function EditorDashboard() {
 
   // Handle user click to fetch manuscripts
   const handleUserClick = async (author) => {
-    console.log("=== Editor Dashboard Debug ===");
-    console.log("Clicked author:", author);
-    console.log("Author manuscripts count:", author.manuscripts?.length || 0);
-    console.log("Author manuscripts:", author.manuscripts);
-
     setSelectedUser(author);
     try {
       if (!user?.token) {
         // If no token, use cached manuscripts
-        console.log("No token found, using cached manuscripts");
         setManuscripts(author.manuscripts || []);
       } else {
         // Fetch fresh data from API
-        console.log("Fetching from API for author ID:", author._id);
         const response = await axios.get(
           `${import.meta.env.VITE_BACKEND_URL}/api/auth/editor/manuscripts/${author._id}`,
           {
@@ -255,15 +264,11 @@ function EditorDashboard() {
         );
         // If API returns data, use it; otherwise fallback to cached data
         const apiManuscripts = response.data || [];
-        console.log("API response manuscripts count:", apiManuscripts.length);
-        console.log("API response manuscripts:", apiManuscripts);
 
         if (apiManuscripts.length > 0) {
           setManuscripts(apiManuscripts);
-          console.log("Using API data");
         } else {
           setManuscripts(author.manuscripts || []);
-          console.log("Using cached data - API returned empty");
         }
       }
     } catch (err) {
@@ -271,7 +276,6 @@ function EditorDashboard() {
       console.error("Error details:", err.response?.data || err.message);
       // Fallback to cached manuscripts
       setManuscripts(author.manuscripts || []);
-      console.log("Using cached data due to error");
     }
 
     // Clear filters and selections
@@ -283,7 +287,6 @@ function EditorDashboard() {
     // Force re-render by updating a dummy state
     setForceRender((prev) => !prev);
 
-    console.log("=== End Debug ===");
   };
 
   // Handle showing all manuscripts (clear user selection)
@@ -303,8 +306,6 @@ function EditorDashboard() {
 
   // Handle manuscript click to open PDF
   const handleManuscriptClick = (manuscript) => {
-    console.log("Manuscript data:", manuscript);
-
     if (!manuscript?.mergedFileUrl) {
       console.error("No mergedFileUrl found in manuscript:", manuscript);
       addToast("PDF URL not available", "error");
@@ -316,7 +317,6 @@ function EditorDashboard() {
       ? manuscript.mergedFileUrl
       : `${import.meta.env.VITE_BACKEND_URL}${manuscript.mergedFileUrl}`;
 
-    console.log("Opening PDF at:", fullUrl);
     window.open(fullUrl, "_blank");
   };
 
@@ -416,8 +416,6 @@ function EditorDashboard() {
 
   const handleActionClick = async (manuscript, action) => {
     try {
-      console.log("1. handleActionClick called:", { manuscript, action });
-
       // Reset states first
       setSelectedManuscript(null);
       setShowNoteInput(null);
@@ -427,15 +425,19 @@ function EditorDashboard() {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Then set new states
-      console.log("2. Setting new states for manuscript:", manuscript._id);
       setSelectedManuscript(manuscript);
       setShowNoteInput(action);
+      if (action === "revision") {
+        setRevisionForms((prev) => ({
+          ...prev,
+          [manuscript._id]: {
+            revisionNoteText: "",
+            daysAllowed: "",
+            ...(prev[manuscript._id] || {}),
+          },
+        }));
+      }
 
-      console.log("3. States being updated:", {
-        manuscriptId: manuscript._id,
-        action,
-        reviewersAvailable: reviewers.length,
-      });
     } catch (error) {
       console.error("Error in handleActionClick:", error);
     }
@@ -444,10 +446,6 @@ function EditorDashboard() {
   // Handle direct status updates without notes or reviewers
   const handleDirectStatusUpdate = async (manuscriptId, newStatus) => {
     try {
-      console.log(
-        `Updating manuscript ${manuscriptId} to status: ${newStatus}`,
-      );
-
       const response = await axios.patch(
         `${
           import.meta.env.VITE_BACKEND_URL
@@ -524,10 +522,6 @@ function EditorDashboard() {
     note = "",
   ) => {
     try {
-      console.log(
-        `Bulk updating ${manuscriptIds.length} manuscripts to status: ${newStatus}`,
-      );
-
       await axios.patch(
         `${
           import.meta.env.VITE_BACKEND_URL
@@ -598,16 +592,19 @@ function EditorDashboard() {
   // Handle revision required
   const handleRevisionRequired = async (manuscriptId) => {
     try {
-      if (!revisionNoteText.trim()) {
-        addToast("Please enter a revision note", "error");
-        return;
-      }
+      const revisionForm = getRevisionFormState(manuscriptId);
+      const revisionNoteText = revisionForm.revisionNoteText || "";
+      const rawDaysAllowed = revisionForm.daysAllowed;
 
       const response = await axios.post(
         `${
           import.meta.env.VITE_BACKEND_URL
         }/api/auth/editor/manuscripts/${manuscriptId}/revision-required`,
-        { text: revisionNoteText },
+        {
+          status: "Revision Required",
+          revisionNoteText,
+          daysAllowed: rawDaysAllowed || "",
+        },
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
@@ -631,13 +628,17 @@ function EditorDashboard() {
                 typeof updatedData?.revisionLocked === "boolean"
                   ? updatedData.revisionLocked
                   : m.revisionLocked,
+              revisionRequest:
+                updatedData?.revisionRequest ?? m.revisionRequest,
+              editorNotesForAuthor:
+                updatedData?.editorNotesForAuthor ?? m.editorNotesForAuthor,
             }
           : m,
       );
       setManuscripts(updatedManuscripts);
 
       // Reset states
-      setRevisionNoteText("");
+      clearRevisionForm(manuscriptId);
       setShowNoteInput(null);
       setSelectedManuscript(null);
 
@@ -666,10 +667,10 @@ function EditorDashboard() {
   };
 
   const handleCancel = () => {
+    clearRevisionForm(selectedManuscript?._id);
     setShowNoteInput(null);
     setSelectedManuscript(null);
     setNoteText("");
-    setRevisionNoteText("");
   };
 
   const handleAcceptClick = (manuscript) => {
@@ -895,15 +896,7 @@ function EditorDashboard() {
       ? manuscripts
       : uniqueManuscriptsById(users.flatMap((user) => user.manuscripts || []));
 
-    console.log("=== getFilteredManuscripts Debug ===");
-    console.log("selectedUser:", selectedUser?.firstName || "None");
-    console.log("manuscripts state length:", manuscripts.length);
-    console.log("allManuscripts length:", allManuscripts.length);
-    console.log("filterType:", filterType);
-    console.log("filterValue:", filterValue);
-
     if (filterType === "all") {
-      console.log("Returning all manuscripts:", allManuscripts.length);
       return allManuscripts;
     }
 
@@ -944,7 +937,7 @@ function EditorDashboard() {
     }
 
     return allManuscripts;
-  }, [selectedUser, manuscripts, users, filterType, filterValue, forceRender]);
+  }, [selectedUser, manuscripts, users, filterType, filterValue]);
 
   // Handle filter clicks
   const handleStatusFilter = (status) => {
@@ -1659,6 +1652,23 @@ function EditorDashboard() {
                             automatically rejected.
                           </p>
                         )}
+                        {manuscript.status === "Revision Required" &&
+                        manuscript.revisionRequest?.dueDate ? (
+                            <div className="mb-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+                            <p className="font-medium">
+                              {getRevisionDeadlineText(
+                                manuscript.revisionRequest.dueDate,
+                                currentTime,
+                              )}
+                            </p>
+                            <p className="mt-1 text-orange-800">
+                              Revision deadline:{" "}
+                              {formatRevisionDeadline(
+                                manuscript.revisionRequest.dueDate,
+                              )}
+                            </p>
+                          </div>
+                        ) : null}
                         {/* Time Information */}
                         <div className="text-xs text-gray-600 space-y-1">
                           {manuscript.submissionDate && (
@@ -1712,10 +1722,6 @@ function EditorDashboard() {
                             )}
 
                           {/* Invitations Status */}
-                          {console.log(
-                            manuscript.invitations,
-                            "manuscript.invitations",
-                          )}
                           {manuscript.invitations &&
                             manuscript.invitations.length > 0 && (
                               <div className="mt-3 border-t border-gray-200 pt-3">
@@ -1805,9 +1811,7 @@ function EditorDashboard() {
                       {/* View PDF Button - Always Available */}
                       {manuscript.mergedFileUrl && (
                         <button
-                          onClick={() =>
-                            window.open(manuscript.mergedFileUrl, "_blank")
-                          }
+                          onClick={() => handleManuscriptClick(manuscript)}
                           className="w-full px-3 py-2 text-sm bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors flex items-center justify-center space-x-2"
                         >
                           <span>📄</span>
@@ -2526,13 +2530,43 @@ function EditorDashboard() {
                                 Add a revision required note:
                               </label>
                               <textarea
-                                value={revisionNoteText}
+                                value={
+                                  getRevisionFormState(manuscript._id)
+                                    .revisionNoteText
+                                }
                                 onChange={(e) =>
-                                  setRevisionNoteText(e.target.value)
+                                  updateRevisionForm(
+                                    manuscript._id,
+                                    "revisionNoteText",
+                                    e.target.value,
+                                  )
                                 }
                                 className="w-full h-32 p-2 rounded bg-white text-[#1a365d] border border-[#e2e8f0]"
                                 placeholder="Enter revision requirements and feedback for the author..."
-                                required
+                              />
+                            </div>
+
+                            <div className="mb-4">
+                              <label className="block text-[#1a365d] mb-2 font-semibold">
+                                Days allowed for revision (default 15 days):
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={
+                                  getRevisionFormState(manuscript._id)
+                                    .daysAllowed
+                                }
+                                onChange={(e) =>
+                                  updateRevisionForm(
+                                    manuscript._id,
+                                    "daysAllowed",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-full p-2 rounded bg-white text-[#1a365d] border border-[#e2e8f0]"
+                                placeholder="Enter number of days"
                               />
                             </div>
 
@@ -2547,7 +2581,6 @@ function EditorDashboard() {
                                 onClick={() =>
                                   handleRevisionRequired(manuscript._id)
                                 }
-                                disabled={!revisionNoteText.trim()}
                                 className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Request Revision
@@ -2867,7 +2900,7 @@ function EditorDashboard() {
         manuscript={uploadManuscript}
         userToken={user?.token}
         separateIssue={separateIssue}
-        onSuccess={(data) => {
+        onSuccess={() => {
           addToast(
             separateIssue
               ? "PDF has been published as Special Issue successfully!"

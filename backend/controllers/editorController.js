@@ -26,7 +26,123 @@ const formatFullName = (user) => {
 const buildRevisionExhaustedMessage = (maxAttempts) =>
 	`All ${maxAttempts} revision attempts have been exhausted. Manuscript automatically rejected.`;
 
-const applyRevisionRequiredUpdate = async ({ manuscript, text, editor }) => {
+const getProjectSenderEmail = () =>
+	process.env.EMAIL_FROM ||
+	process.env.EMAIL_USER;
+
+const getAuthorEmails = (manuscript) => {
+	const emails = new Set();
+
+	if (manuscript?.correspondingAuthor?.email) {
+		emails.add(String(manuscript.correspondingAuthor.email).toLowerCase());
+	}
+
+	if (Array.isArray(manuscript?.authors)) {
+		manuscript.authors.forEach((author) => {
+			if (author?.email) {
+				emails.add(String(author.email).toLowerCase());
+			}
+		});
+	}
+
+	return Array.from(emails);
+};
+
+const formatDateTimeForEmail = (dateValue) =>
+	new Date(dateValue).toLocaleString("en-US", {
+		year: "numeric",
+		month: "long",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+
+const resolveRevisionNote = (payload = {}) => {
+	const candidates = [
+		payload.revisionNoteText,
+		payload.revisionNote,
+		payload.note,
+		payload.comment,
+		payload.text,
+	];
+
+	for (const value of candidates) {
+		const normalized = String(value || "").trim();
+		if (normalized) {
+			return normalized;
+		}
+	}
+
+	return "";
+};
+
+const resolveRevisionDaysAllowed = (payload = {}) => {
+	let daysAllowed = Number(
+		payload.daysAllowed ?? payload.revisionDays ?? payload.days ?? 15
+	);
+
+	if (!Number.isFinite(daysAllowed) || daysAllowed <= 0) {
+		daysAllowed = 15;
+	}
+
+	return daysAllowed;
+};
+
+const sendRevisionRequiredEmail = async ({
+	manuscript,
+	daysAllowed,
+	dueDate,
+}) => {
+	const authorEmails = getAuthorEmails(manuscript);
+	if (!authorEmails.length) {
+		console.warn(
+			`[sendRevisionRequiredEmail] No author emails found for manuscript ${manuscript._id}`
+		);
+		return;
+	}
+
+	const manuscriptId = manuscript.customId || manuscript._id.toString();
+	const frontendUrl =
+		process.env.FRONTEND_URL || "https://synergyworldpress.com";
+	const dashboardUrl = `${frontendUrl.replace(/\/+$/, "")}/journal/jics/my-submissions`;
+	const formattedDueDate = formatDateTimeForEmail(dueDate);
+	const subject = `Revision Required for Manuscript ${manuscriptId}`;
+	const html = `
+		<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
+			<h2 style="color: #b45309;">Revision Required</h2>
+			<p>Dear Author,</p>
+			<p>Your manuscript requires revision.</p>
+			<div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
+				<p style="margin: 0 0 8px 0;"><strong>Manuscript ID:</strong> ${manuscriptId}</p>
+				<p style="margin: 0 0 8px 0;"><strong>Manuscript title:</strong> ${manuscript.title || "Untitled"}</p>
+				<p style="margin: 0 0 8px 0;"><strong>Revision deadline:</strong> ${formattedDueDate}</p>
+				<p style="margin: 0;"><strong>Time allowed:</strong> ${daysAllowed} day(s)</p>
+			</div>
+			<p>Please log in to your dashboard to view editor comments and submit your revised manuscript.</p>
+			<p><a href="${dashboardUrl}" style="display: inline-block; background-color: #00796b; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 6px;">Open Author Dashboard</a></p>
+			<p style="font-size: 12px; color: #6b7280;">This message was sent by the editorial office of Synergy World Press.</p>
+		</div>
+	`;
+
+	for (const email of authorEmails) {
+		await sendEmail({
+			to: email,
+			subject,
+			html,
+			from: {
+				name: "Synergy World Press",
+				email: getProjectSenderEmail(),
+			},
+		});
+	}
+};
+
+const applyRevisionRequiredUpdate = async ({
+	manuscript,
+	text,
+	editor,
+	daysAllowed,
+}) => {
 	if (!manuscript) {
 		throw new Error("MANUSCRIPT_NOT_FOUND");
 	}
@@ -46,33 +162,46 @@ const applyRevisionRequiredUpdate = async ({ manuscript, text, editor }) => {
 		throw error;
 	}
 
-	const trimmedText = text.trim();
+	const trimmedText = String(text || "").trim();
+	const parsedDaysAllowed = resolveRevisionDaysAllowed({ daysAllowed });
+
+	const requestedAt = new Date();
+	const dueDate = new Date(requestedAt);
+	dueDate.setDate(dueDate.getDate() + parsedDaysAllowed);
 	const maxAttempts = manuscript.maxRevisionAttempts || 3;
-	const nextAttempt = (manuscript.revisionAttempts || 0) + 1;
+	const currentAttempt = manuscript.revisionAttempts || 0;
+	const shouldIncrementAttempt = Boolean(trimmedText);
+	const nextAttempt = shouldIncrementAttempt
+		? currentAttempt + 1
+		: currentAttempt;
 	const attemptsExhausted = nextAttempt >= maxAttempts;
 
-	const annotatedNoteText = `${trimmedText} (Revision attempt ${Math.min(
+	const noteAttemptLabel = `(Revision attempt ${Math.min(
 		nextAttempt,
 		maxAttempts
 	)}/${maxAttempts})`;
+	const annotatedNoteText = trimmedText
+		? `${trimmedText} ${noteAttemptLabel}`
+		: "";
+	const noteAddedAt = new Date();
 
-	const baseNote = {
-		text: annotatedNoteText,
-		action: "Revision Required",
-		visibility: ["author", "editor"],
-		addedBy: {
-			_id: editor._id,
-			name: formatFullName(editor),
-			email: editor.email,
-			role: "editor",
-		},
-		addedAt: new Date(),
-	};
-	
-	const notesToAdd = [baseNote];
+	if (trimmedText) {
+		manuscript.editorNotesForAuthor.push({
+			text: annotatedNoteText,
+			action: "Revision Required",
+			visibility: ["author", "editor"],
+			addedBy: {
+				_id: editor._id,
+				name: formatFullName(editor),
+				email: editor.email,
+				role: "editor",
+			},
+			addedAt: noteAddedAt,
+		});
+	}
 
 	if (attemptsExhausted) {
-		notesToAdd.push({
+		manuscript.editorNotesForAuthor.push({
 			text: buildRevisionExhaustedMessage(maxAttempts),
 			action: "Rejected",
 			visibility: ["author", "editor"],
@@ -86,26 +215,29 @@ const applyRevisionRequiredUpdate = async ({ manuscript, text, editor }) => {
 		});
 	}
 
-	const updatedManuscript = await Manuscript.findByIdAndUpdate(
-		manuscript._id,
-		{
-			$push: {
-				editorNotesForAuthor: {
-					$each: notesToAdd,
-				},
-			},
-			revisionAttempts: nextAttempt,
-			revisionLocked: attemptsExhausted,
-			status: attemptsExhausted ? "Rejected" : "Revision Required",
-		},
-		{ new: true }
-	);
+	manuscript.revisionAttempts = nextAttempt;
+	manuscript.revisionLocked = attemptsExhausted;
+	manuscript.status = attemptsExhausted ? "Rejected" : "Revision Required";
+	manuscript.revisionRequest = {
+		isActive: !attemptsExhausted,
+		requestedAt,
+		dueDate,
+		daysAllowed: parsedDaysAllowed,
+		requestedBy: editor._id,
+		reminderSentAt: null,
+		submittedAt: null,
+	};
+
+	const updatedManuscript = await manuscript.save();
 
 	return {
 		updatedManuscript,
 		attemptsExhausted,
 		maxAttempts,
 		noteText: annotatedNoteText,
+		requestedAt,
+		dueDate,
+		daysAllowed: parsedDaysAllowed,
 	};
 };
 
@@ -275,7 +407,7 @@ const sendStatusChangeNotification = async (
 					}
 
 					<div style="text-align: center; margin-top: 30px;">
-						<a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/my-submissions" 
+						<a href="${process.env.FRONTEND_URL || "https://synergyworldpress.com"}/journal/jics/my-submissions" 
 						   style="display: inline-block; background-color: #00796b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
 							View Your Submissions
 						</a>
@@ -494,9 +626,7 @@ exports.getAuthors = async (req, res) => {
 exports.getManuscriptsByAuthor = async (req, res) => {
     try {
         const { author } = req.params;
-        console.log("=== getManuscriptsByAuthor Debug ===");
-        console.log("Author ID:", author);
-        
+
        const manuscripts = await Manuscript.find({
     status: { $nin: ["Saved", "Pending"] },
     $or: [
@@ -505,19 +635,11 @@ exports.getManuscriptsByAuthor = async (req, res) => {
     ],
 })
             .select(
-                "customId title type status separateIssue submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked reviewDocxUrl authorResponse revisedPdfBuiltAt revisionCombinedPdfUrl highlightedRevisionFileUrl authors correspondingAuthor invitations manuscriptFile"
+                "customId title type status separateIssue submissionDate mergedFileUrl authorNotes editorNotes editorNotesForAuthor reviewerNotes createdAt updatedAt revisionAttempts maxRevisionAttempts revisionLocked revisionRequest reviewDocxUrl authorResponse revisedPdfBuiltAt revisionCombinedPdfUrl highlightedRevisionFileUrl authors correspondingAuthor invitations manuscriptFile"
             )
             .populate("authors", "firstName lastName middleName email")
             .populate("correspondingAuthor", "firstName lastName middleName email")
             .sort({ submissionDate: -1 });
-
-        console.log("Found manuscripts count:", manuscripts.length);
-        manuscripts.forEach(manuscript => {
-            console.log(`- ${manuscript.customId || manuscript.title} (${manuscript.status})`);
-            console.log(`  Authors: ${manuscript.authors?.map(a => `${a.firstName} ${a.lastName}`).join(', ') || 'None'}`);
-            console.log(`  Corresponding Author: ${manuscript.correspondingAuthor ? `${manuscript.correspondingAuthor.firstName} ${manuscript.correspondingAuthor.lastName}` : 'None'}`);
-        });
-        console.log("=== End Debug ===");
 
         res.json(manuscripts);
     } catch (error) {
@@ -536,25 +658,17 @@ exports.getUsersWithManuscripts = async (req, res) => {
 		const manuscripts = await Manuscript.find({
 			status: { $nin: ["Saved",  "Pending"] },	
 		})
-			.select("authors correspondingAuthor customId title type status separateIssue submissionDate mergedFileUrl invitations manuscriptFile updatedAt")
+			.select("authors correspondingAuthor customId title type status separateIssue submissionDate mergedFileUrl invitations manuscriptFile updatedAt createdAt revisionAttempts maxRevisionAttempts revisionLocked revisionRequest")
 			.populate("authors", "firstName lastName middleName email")
 			.populate("correspondingAuthor", "firstName lastName middleName email")
 			.lean();
-
-		console.log("=== Backend Debug ===");
-		console.log("Total manuscripts found:", manuscripts.length);
 
 		// Create a map of user IDs to their manuscripts
 		const userManuscriptMap = new Map();
 
 		manuscripts.forEach((manuscript) => {
-			console.log(`Processing manuscript: ${manuscript.customId}`);
-			console.log(`Authors: ${manuscript.authors?.map(a => a._id).join(', ')}`);
-			console.log(`Corresponding Author: ${manuscript.correspondingAuthor?._id}`);
-
 			const author = manuscript.correspondingAuthor || manuscript.authors?.[0];
 			if (!author?._id) {
-				console.log(`Skipping manuscript ${manuscript.customId} because no author is available`);
 				return;
 			}
 
@@ -573,20 +687,12 @@ exports.getUsersWithManuscripts = async (req, res) => {
 					...manuscript,
 					authorName: formatFullName(author)
 				});
-				console.log(`Added manuscript ${manuscript.customId} to author ${author.firstName} ${author.lastName}`);
-			} else {
-				console.log(`Skipping duplicate manuscript ${manuscript.customId} for author ${author.firstName} ${author.lastName}`);
 			}
 		});
 
 		// Convert map to array and filter users with manuscripts
 		const usersWithManuscripts = Array.from(userManuscriptMap.values())
 			.filter(user => user.manuscripts.length > 0);
-
-		console.log("=== Final User Summary ===");
-		usersWithManuscripts.forEach(user => {
-			console.log(`User: ${user.firstName} ${user.lastName} - Manuscripts: ${user.manuscripts.length}`);
-		});
 
 		res.json(usersWithManuscripts);
 	} catch (error) {
@@ -674,7 +780,13 @@ exports.updateManuscriptStatus = async (req, res) => {
 		}
 		const actor = req.editor || req.user;
 		const { manuscriptId } = req.params;
-		const { status, note } = req.body;
+		const {
+			status,
+			note,
+			revisionNote,
+			revisionNoteText,
+			comment,
+		} = req.body;
 
 		// First, get the current manuscript to check its current status
 		const currentManuscript = await Manuscript.findById(manuscriptId);
@@ -718,31 +830,42 @@ exports.updateManuscriptStatus = async (req, res) => {
 		}
 
 		if (status === "Revision Required") {
-			const revisionText =
-				(note && note.trim().length > 0
-					? note.trim()
-					: "Revision required by editor.");
+			const revisionText = resolveRevisionNote({
+				revisionNoteText,
+				revisionNote,
+				note,
+				comment,
+			});
+			const resolvedDaysAllowed = resolveRevisionDaysAllowed(req.body);
 			try {
 				const {
 					updatedManuscript,
 					attemptsExhausted,
 					maxAttempts,
+					dueDate,
+					daysAllowed: parsedDaysAllowed,
 				} = await applyRevisionRequiredUpdate({
 					manuscript: currentManuscript,
 					text: revisionText,
 					editor: actor,
+					daysAllowed: resolvedDaysAllowed,
 				});
 
-				if (oldStatus !== updatedManuscript.status) {
+				if (!attemptsExhausted) {
 					try {
-						await sendStatusChangeNotification(
-							updatedManuscript,
-							updatedManuscript.status,
-							attemptsExhausted
-								? buildRevisionExhaustedMessage(maxAttempts)
-								: revisionText,
-							actor
-						);
+						const populatedManuscript = await Manuscript.findById(
+							updatedManuscript._id
+						)
+							.populate("authors", "firstName middleName lastName email")
+							.populate(
+								"correspondingAuthor",
+								"firstName middleName lastName email"
+							);
+						await sendRevisionRequiredEmail({
+							manuscript: populatedManuscript || updatedManuscript,
+							daysAllowed: parsedDaysAllowed,
+							dueDate,
+						});
 					} catch (emailError) {
 						console.error(
 							"Failed to send revision required email:",
@@ -754,7 +877,7 @@ exports.updateManuscriptStatus = async (req, res) => {
 				return res.json({
 					message: attemptsExhausted
 						? `Revision attempts exhausted. Manuscript rejected after ${maxAttempts} rounds.`
-						: "Revision required note added and status updated successfully",
+						: "Revision required note added, deadline saved, and author notified successfully",
 					manuscript: updatedManuscript,
 				});
 			} catch (error) {
@@ -840,7 +963,14 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 			return res.status(401).json({ message: "Authentication required" });
 		}
 		const actor = req.editor || req.user;
-		const { manuscriptIds, status, note } = req.body;
+		const {
+			manuscriptIds,
+			status,
+			note,
+			revisionNote,
+			revisionNoteText,
+			comment,
+		} = req.body;
 
 		// Validate status
 		const validStatuses = [
@@ -888,31 +1018,42 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 			}
 
 			if (status === "Revision Required") {
-				const revisionText =
-					(note && note.trim().length > 0
-						? note.trim()
-						: "Revision required by editor.");
+				const revisionText = resolveRevisionNote({
+					revisionNoteText,
+					revisionNote,
+					note,
+					comment,
+				});
+				const resolvedDaysAllowed = resolveRevisionDaysAllowed(req.body);
 				try {
 					const {
 						updatedManuscript,
 						attemptsExhausted,
 						maxAttempts,
+						dueDate,
+						daysAllowed: parsedDaysAllowed,
 					} = await applyRevisionRequiredUpdate({
 						manuscript: currentManuscript,
 						text: revisionText,
 						editor: actor,
+						daysAllowed: resolvedDaysAllowed,
 					});
 
-					if (oldStatus !== updatedManuscript.status) {
+					if (!attemptsExhausted) {
 						try {
-							await sendStatusChangeNotification(
-								updatedManuscript,
-								updatedManuscript.status,
-								attemptsExhausted
-									? buildRevisionExhaustedMessage(maxAttempts)
-									: revisionText,
-								actor
-							);
+							const populatedManuscript = await Manuscript.findById(
+								updatedManuscript._id
+							)
+								.populate("authors", "firstName middleName lastName email")
+								.populate(
+									"correspondingAuthor",
+									"firstName middleName lastName email"
+								);
+							await sendRevisionRequiredEmail({
+								manuscript: populatedManuscript || updatedManuscript,
+								daysAllowed: parsedDaysAllowed,
+								dueDate,
+							});
 						} catch (emailError) {
 							console.error(
 								`Failed to send status change email for manuscript ${manuscriptId}:`,
@@ -1020,32 +1161,21 @@ exports.bulkUpdateManuscriptStatus = async (req, res) => {
 // Add revision required note and update status
 exports.addRevisionRequiredNote = async (req, res) => {
     try {
-        // Require editor authentication for adding revision notes
         if (!req.editor && !req.user) {
             return res.status(401).json({ message: "Authentication required" });
         }
         const { manuscriptId } = req.params;
-        const { text } = req.body;
+		const revisionNoteText = resolveRevisionNote(req.body);
+		const daysAllowed = resolveRevisionDaysAllowed(req.body);
 
-        if (!text || !text.trim()) {
-            return res.status(400).json({
-                message: "Revision note text is required",
-            });
-        }
-
-        // Get manuscript with author details for email
         const currentManuscript = await Manuscript.findById(manuscriptId)
-            .populate("authors", "firstName lastName email")
-            .populate("correspondingAuthor", "firstName lastName email");
+            .populate("authors", "firstName middleName lastName email")
+            .populate("correspondingAuthor", "firstName middleName lastName email");
             
         if (!currentManuscript) {
             return res.status(404).json({ message: "Manuscript not found" });
         }
 
-        // Store old status for comparison
-        const oldStatus = currentManuscript.status;
-
-        // Prevent any status changes if the manuscript is already rejected
         if (currentManuscript.status === "Rejected") {
             return res.status(403).json({
                 message:
@@ -1058,15 +1188,32 @@ exports.addRevisionRequiredNote = async (req, res) => {
             updatedManuscript,
             attemptsExhausted,
             maxAttempts,
-        } = await applyRevisionRequiredUpdate({
-            manuscript: currentManuscript,
-            text: text.trim(),
-            editor: actor,
+            dueDate,
+            daysAllowed: parsedDaysAllowed,
+		} = await applyRevisionRequiredUpdate({
+			manuscript: currentManuscript,
+			text: revisionNoteText,
+			editor: actor,
+			daysAllowed,
         });
 
-        const notificationText = attemptsExhausted
-            ? buildRevisionExhaustedMessage(maxAttempts)
-            : text.trim();
+		if (!attemptsExhausted) {
+			try {
+				await sendRevisionRequiredEmail({
+					manuscript: updatedManuscript,
+					daysAllowed: parsedDaysAllowed,
+					dueDate,
+				});
+            } catch (emailError) {
+                console.error("[addRevisionRequiredNote] Email error:", emailError);
+            }
+
+            return res.json({
+                message:
+                    "Revision required note added, deadline saved, and author notified successfully",
+                manuscript: updatedManuscript,
+            });
+        }
 
         // ===================================
         // 🔥 EMAIL NOTIFICATION TO AUTHORS
@@ -1209,6 +1356,12 @@ exports.addRevisionRequiredNote = async (req, res) => {
         });
     } catch (error) {
         console.error("Error adding revision required note:", error);
+        if (error.code === "REVISION_LOCKED") {
+            return res.status(403).json({
+                message:
+                    "All revision attempts have been exhausted. This manuscript has already been rejected.",
+            });
+        }
         res.status(500).json({
             message: "Error adding revision required note",
             error: error.message,

@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const manuscriptController = require("../controllers/manuscriptController");
 const auth = require("../middleware/auth");
+const requireEditor = require("../middleware/requireEditor");
 const multer = require("multer");
 const os = require("os");
 
@@ -13,6 +14,16 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => cb(null, `${Date.now()}_${file.originalname}`)
 });
 const upload = multer({ storage });
+
+const optionalAuth = (req, res, next) => {
+    const authorization = req.header("Authorization") || "";
+    if (!authorization.startsWith("Bearer ")) {
+        return next();
+    }
+
+    return auth(req, res, next);
+};
+
 // Manuscript routes
 router.get("/manuscripts/published", manuscriptController.getPublishedManuscripts);
 router.get("/manuscripts/special-issue", manuscriptController.getSpecialIssueManuscripts);
@@ -25,7 +36,7 @@ router.get(
 	router.post("/manuscripts/:manuscriptId/view", manuscriptController.incrementViewCount);
 router.get(
 	"/manuscripts/:manuscriptId",
-	
+	optionalAuth,
 	manuscriptController.getManuscriptById
 );
 
@@ -100,6 +111,8 @@ router.post(
 
 router.post(
     "/manuscript/publish/:manuscriptId",
+    auth,
+    requireEditor,
     upload.single("pdfFile"), 
     manuscriptController.uploadPublishedPdf
 );

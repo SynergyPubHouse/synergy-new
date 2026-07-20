@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../App';
 import axios from 'axios';
@@ -34,7 +34,7 @@ function OrcidCallback() {
 
                     console.log("Data stored in localStorage");
                     console.log("User:", user);
-                    console.log("Token:", token.substring(0, 20) + "...");
+                    console.log("Token received:", Boolean(token));
 
                     // Update auth context
                     login(user);
@@ -140,4 +140,4 @@ function OrcidCallback() {
     );
 }
 
-export default OrcidCallback; 
+export default OrcidCallback;
