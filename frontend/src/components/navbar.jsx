@@ -3,12 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaBars, FaTimes, FaSearch, FaChevronDown } from 'react-icons/fa';
 import { useAuth } from '../App';
+import { useSsrContext } from '../ssr/SsrContext.jsx';
 
 const BASE_URL = '';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   console.log("user", user)
+  const { initialData } = useSsrContext();
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || user.email
     : "";
@@ -77,7 +79,7 @@ const Navbar = () => {
   return (
     <motion.nav
       className="fixed top-0 w-full p-4 shadow-lg fixed w-full z-50 transition-all bg-[#00796b] text-white"
-      initial={{ y: -50, opacity: 0 }}
+      initial={initialData ? false : { y: -50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
     >

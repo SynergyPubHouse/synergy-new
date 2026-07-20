@@ -2023,6 +2023,7 @@ const extractAuthorsFromPdfUrl = async (pdfUrl) => {
         .filter((a) => a && a.length > 2);
 
       console.log("🔍 Raw Authors Match:", authorsText);
+
     }
 
     // ✅ Pattern for "Corresponding Author(s)Rakesh Kumar"
@@ -2041,6 +2042,121 @@ const extractAuthorsFromPdfUrl = async (pdfUrl) => {
   } catch (error) {
     console.error("❌ PDF extraction error:", error.message);
     return { authors: [], correspondingAuthor: null };
+  }
+};
+
+const publicArticleDetailFields = [
+  "_id",
+  "customId",
+  "custom_id",
+  "type",
+  "classification",
+  "additionalInfo",
+  "title",
+  "keywords",
+  "abstract",
+  "authors",
+  "correspondingAuthor",
+  "pdfAuthors",
+  "pdfCorrespondingAuthor",
+  "submissionDate",
+  "publishedAt",
+  "updatedAt",
+  "status",
+  "issueVolume",
+  "issueNumber",
+  "issueYear",
+  "issueTitle",
+  "pageStart",
+  "pageEnd",
+  "section",
+  "publishedFileUrl",
+  "doi",
+  "viewCount",
+  "citationCount",
+  "separateIssue",
+].join(" ");
+
+const toPublicPerson = (person) =>
+  person
+    ? {
+        _id: person._id,
+        firstName: person.firstName,
+        middleName: person.middleName,
+        lastName: person.lastName,
+      }
+    : null;
+
+const toPublicArticle = (article) => ({
+  _id: article._id,
+  customId: article.customId,
+  custom_id: article.custom_id,
+  type: article.type,
+  classification: article.classification,
+  additionalInfo: article.additionalInfo,
+  title: article.title,
+  keywords: article.keywords,
+  abstract: article.abstract,
+  authors: Array.isArray(article.authors)
+    ? article.authors.map(toPublicPerson).filter(Boolean)
+    : [],
+  correspondingAuthor: toPublicPerson(article.correspondingAuthor),
+  pdfAuthors: Array.isArray(article.pdfAuthors) ? article.pdfAuthors : [],
+  pdfCorrespondingAuthor: article.pdfCorrespondingAuthor,
+  submissionDate: article.submissionDate,
+  publishedAt: article.publishedAt,
+  updatedAt: article.updatedAt,
+  status: article.status,
+  issueVolume: article.issueVolume,
+  issueNumber: article.issueNumber,
+  issueYear: article.issueYear,
+  issueTitle: article.issueTitle,
+  pageStart: article.pageStart,
+  pageEnd: article.pageEnd,
+  section: article.section,
+  publishedFileUrl: article.publishedFileUrl,
+  doi: article.doi,
+  viewCount: article.viewCount,
+  citationCount: article.citationCount,
+  separateIssue: Boolean(article.separateIssue),
+});
+
+exports.getPublicArticle = async (req, res) => {
+  try {
+    const identifierQuery = buildManuscriptIdentifierQuery(req.params.id);
+    if (!identifierQuery) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid article id",
+      });
+    }
+
+    const article = await Manuscript.findOne({
+      ...identifierQuery,
+      status: "Published",
+    })
+      .select(publicArticleDetailFields)
+      .populate("authors", "firstName middleName lastName")
+      .populate("correspondingAuthor", "firstName middleName lastName")
+      .lean();
+
+    if (!article) {
+      return res.status(404).json({
+        success: false,
+        message: "Article not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: toPublicArticle(article),
+    });
+  } catch (error) {
+    console.error("Error fetching public article:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch article",
+    });
   }
 };
 
@@ -3517,6 +3633,111 @@ const currentIssuePublishedFilter = {
 const specialIssuePublishedFilter = {
   status: "Published",
   separateIssue: true,
+};
+
+const regularPublishedIssueFilter = {
+  status: "Published",
+  separateIssue: { $in: [false, null] },
+  issueYear: { $ne: null },
+  issueVolume: { $ne: null },
+  issueNumber: { $ne: null },
+};
+
+const publicIssueArticleFields = [
+  "_id",
+  "customId",
+  "custom_id",
+  "title",
+  "abstract",
+  "pdfAuthors",
+  "publishedAt",
+  "issueVolume",
+  "issueNumber",
+  "issueYear",
+  "issueTitle",
+  "pageStart",
+  "pageEnd",
+  "section",
+  "publishedFileUrl",
+].join(" ");
+
+const buildPublicIssueMetadata = (issue) => {
+  const volume = issue.issueVolume;
+  const issueNumber = issue.issueNumber;
+  const year = issue.issueYear;
+  const title = String(issue.issueTitle || "").trim();
+  const dateLabel = title ? `${title} ${year}` : String(year);
+
+  return {
+    volume,
+    issueNumber,
+    year,
+    title,
+    dateLabel,
+    label: `Vol. ${volume}, Issue ${issueNumber} • ${dateLabel}`,
+  };
+};
+
+const sendPublicIssue = async (res, issue, notFoundMessage) => {
+  const articles = await Manuscript.find({
+    status: "Published",
+    separateIssue: { $in: [false, null] },
+    issueYear: issue.issueYear,
+    issueVolume: issue.issueVolume,
+    issueNumber: issue.issueNumber,
+  })
+    .select(publicIssueArticleFields)
+    .sort({ pageStart: 1, _id: 1 })
+    .lean();
+
+  if (articles.length === 0) {
+    return res.status(404).json({
+      success: false,
+      message: notFoundMessage,
+    });
+  }
+
+  return res.json({
+    success: true,
+    count: articles.length,
+    issue: buildPublicIssueMetadata({
+      ...issue,
+      issueTitle:
+        issue.issueTitle ||
+        articles.find((article) => String(article.issueTitle || "").trim())
+          ?.issueTitle ||
+        "",
+    }),
+    articles,
+  });
+};
+
+exports.getCurrentIssue = async (req, res) => {
+  try {
+    const currentIssue = await Manuscript.findOne(regularPublishedIssueFilter)
+      .select("issueYear issueVolume issueNumber issueTitle")
+      .sort({ issueYear: -1, issueVolume: -1, issueNumber: -1 })
+      .lean();
+
+    if (!currentIssue) {
+      return res.status(404).json({
+        success: false,
+        message: "No published current issue found",
+      });
+    }
+
+    return await sendPublicIssue(
+      res,
+      currentIssue,
+      "No published current issue found",
+    );
+  } catch (error) {
+    console.error("Error fetching current issue:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch current issue",
+    });
+  }
 };
 
 const sendPublishedManuscriptList = async (res, filter, emptyMessage) => {

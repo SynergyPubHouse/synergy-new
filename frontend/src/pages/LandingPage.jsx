@@ -1,9 +1,14 @@
-import React from "react";
 import Header from "../components/Header";
 import Navigation from "../components/Navigation";
+import PageMetadata from "../components/PageMetadata";
 
 const LandingPage = () => (
   <div className="min-h-screen bg-[#f9f9f9] font-sans">
+    <PageMetadata
+      title="Synergy World Press | Scholarly Publishing"
+      description="Synergy World Press publishes peer-reviewed journals, books, and conference research across computing, engineering, and interdisciplinary fields."
+      pathname="/"
+    />
     <Header />
     <Navigation />
 

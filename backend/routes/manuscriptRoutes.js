@@ -25,6 +25,8 @@ const optionalAuth = (req, res, next) => {
 };
 
 // Manuscript routes
+router.get("/manuscripts/issues/current", manuscriptController.getCurrentIssue);
+router.get("/public/manuscripts/:id", manuscriptController.getPublicArticle);
 router.get("/manuscripts/published", manuscriptController.getPublishedManuscripts);
 router.get("/manuscripts/special-issue", manuscriptController.getSpecialIssueManuscripts);
 router.get(

@@ -2,19 +2,22 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Helmet } from "react-helmet-async";
+import PropTypes from "prop-types";
 import { useAuth } from "../../../../App";
-import { pdfjs } from "react-pdf";
-
-const cdnUrl = "https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js";
-pdfjs.GlobalWorkerOptions.workerSrc = cdnUrl;
+import PageMetadata from "../../../../components/PageMetadata.jsx";
+import { useSsrContext } from "../../../../ssr/SsrContext.jsx";
+import { buildCanonicalUrl } from "../../../../../ssr/config.js";
+import { serializeJsonLd } from "../../../../utils/serializeJsonLd.js";
 
 // Generate unique visitor ID
 const getVisitorId = () => {
-  let visitorId = localStorage.getItem("visitorId");
+  if (typeof window === "undefined") return "";
+
+  let visitorId = window.localStorage.getItem("visitorId");
   if (!visitorId) {
     visitorId =
       "visitor_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now();
-    localStorage.setItem("visitorId", visitorId);
+    window.localStorage.setItem("visitorId", visitorId);
   }
   return visitorId;
 };
@@ -22,24 +25,62 @@ const getVisitorId = () => {
 const getArticleUrlId = (article) =>
   article?.customId || article?.custom_id || article?._id;
 
-const getDoiUrl = (doi) => {
+const normalizeDoi = (doi) => {
   const value = String(doi || "").trim();
-  if (!value) return "";
+  if (!value) return { value: "", url: "", display: "" };
 
-  const normalizedDoi = value.replace(/^https?:\/\/doi\.org\//i, "").trim();
-  return normalizedDoi ? `doi.org/${normalizedDoi}` : "";
+  const normalizedDoi = value
+    .replace(/^(?:https?:\/\/)?(?:dx\.)?doi\.org\//i, "")
+    .trim();
+  if (!normalizedDoi) return { value: "", url: "", display: "" };
+
+  return {
+    value: normalizedDoi,
+    url: `https://doi.org/${normalizedDoi}`,
+    display: `doi.org/${normalizedDoi}`,
+  };
 };
 
-const ArticleDetail = () => {
+const getMeaningfulText = (value) =>
+  typeof value === "string" ? value.trim() : "";
+
+const getValidMetadataDate = (...values) => {
+  for (const value of values) {
+    if (!value) continue;
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      const iso = date.toISOString();
+      return {
+        iso,
+        scholar: iso.slice(0, 10).replace(/-/g, "/"),
+      };
+    }
+  }
+  return null;
+};
+
+const ArticleDetail = ({ initialData = null }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [article, setArticle] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { publicSiteUrl } = useSsrContext();
+  const hasMatchingSsrArticle =
+    initialData?.routeName === "articleDetail" &&
+    String(initialData?.params?.id || "") === String(id || "");
+  const initialArticle = hasMatchingSsrArticle
+    ? initialData?.data?.article || null
+    : null;
+  const [article, setArticle] = useState(() =>
+    hasMatchingSsrArticle ? initialArticle : null,
+  );
+  const [loading, setLoading] = useState(!hasMatchingSsrArticle);
+  const [error, setError] = useState(() =>
+    hasMatchingSsrArticle ? initialData?.error || null : null,
+  );
   const [isPdfLoading, setIsPdfLoading] = useState(false);
-  const [viewCount, setViewCount] = useState(0);
+  const [viewCount, setViewCount] = useState(() => initialArticle?.viewCount || 0);
   const viewCountedRef = useRef(false);
+  const doi = normalizeDoi(article?.doi);
 
   const getDirectPdfSourceUrl = useCallback((pdfUrl) => {
     if (!pdfUrl) return "";
@@ -74,7 +115,7 @@ const ArticleDetail = () => {
     // Get authors as array for meta tags
     const getAuthorsArray = () => {
       if (article?.pdfAuthors && article.pdfAuthors.length > 0) {
-        return article.pdfAuthors;
+        return article.pdfAuthors.map(getMeaningfulText).filter(Boolean);
       }
       if (!article?.authors || !Array.isArray(article.authors)) {
         return [];
@@ -85,87 +126,95 @@ const ArticleDetail = () => {
           author.middleName,
           author.lastName,
         ].filter((part) => part && part.trim() !== "");
-        return nameParts.join(" ");
-      });
+        return nameParts.join(" ").trim();
+      }).filter(Boolean);
     };
 
     const authors = getAuthorsArray();
-
-    // Format date for Google Scholar (YYYY/MM/DD)
-    const getPublishedDate = () => {
-      const date = article.publishedAt || article.submissionDate;
-      if (!date) return "";
-      const d = new Date(date);
-      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-    };
-
-    const publishedDate = getPublishedDate();
+    const title = getMeaningfulText(article.title);
+    const description = getMeaningfulText(article.abstract);
+    const keywords = getMeaningfulText(article.keywords);
+    const publicationDate = getValidMetadataDate(
+      article.publishedAt,
+      article.submissionDate,
+    );
+    const modifiedDate = getValidMetadataDate(
+      article.updatedAt,
+      article.publishedAt,
+      article.submissionDate,
+    );
+    const hasCompleteScholarMetadata = Boolean(
+      title && authors.length > 0 && publicationDate,
+    );
     const articleUrlId = getArticleUrlId(article);
-    const articleUrl = `https://synergyworldpress.com/journal/jics/articles/${encodeURIComponent(
-      articleUrlId,
-    )}`;
-    const pdfUrl = article.publishedFileUrl || "";
+    const articleUrl = buildCanonicalUrl(
+      publicSiteUrl,
+      `/journal/jics/articles/${encodeURIComponent(articleUrlId)}`,
+    );
+    const pdfUrl = String(article.publishedFileUrl || "").trim();
+    const hasPublicFullText = Boolean(pdfUrl);
 
     // Schema.org JSON-LD structured data
-    const schemaData = {
+    const schemaData = hasCompleteScholarMetadata ? {
       "@context": "https://schema.org",
       "@type": "ScholarlyArticle",
-      headline: article.title,
-      name: article.title,
+      headline: title,
+      name: title,
       author: authors.map((name) => ({
         "@type": "Person",
         name: name,
       })),
-      datePublished: article.publishedAt || article.submissionDate,
-      dateModified:
-        article.updatedAt || article.publishedAt || article.submissionDate,
+      datePublished: publicationDate.iso,
+      dateModified: modifiedDate?.iso || publicationDate.iso,
       publisher: {
         "@type": "Organization",
         name: "Synergy World Press",
-        url: "https://synergyworldpress.com",
+        url: publicSiteUrl,
       },
       isPartOf: {
         "@type": "Periodical",
         name: "Journal of Intelligent Computing System (JICS)",
         issn: "3139-3616",
       },
-      description: article.abstract || "",
-      keywords: article.keywords || "",
       url: articleUrl,
       mainEntityOfPage: articleUrl,
       inLanguage: "en",
-    };
+    } : null;
 
     // Add optional fields
-    if (article.issueVolume)
+    if (schemaData && description) schemaData.description = description;
+    if (schemaData && keywords) schemaData.keywords = keywords;
+    if (schemaData && article.issueVolume)
       schemaData.volumeNumber = String(article.issueVolume);
-    if (article.issueNumber)
+    if (schemaData && article.issueNumber)
       schemaData.issueNumber = String(article.issueNumber);
-    if (article.pageStart && article.pageEnd) {
+    if (schemaData && article.pageStart && article.pageEnd) {
       schemaData.pagination = `${article.pageStart}-${article.pageEnd}`;
     }
-    if (pdfUrl) {
+    if (schemaData && pdfUrl) {
       schemaData.encoding = {
         "@type": "MediaObject",
         contentUrl: pdfUrl,
         encodingFormat: "application/pdf",
       };
     }
-    if (article.doi) {
-      schemaData.sameAs = `https://doi.org/${article.doi}`;
+    if (schemaData && doi.url) {
+      schemaData.sameAs = doi.url;
     }
 
     return (
-      <Helmet>
-        {/* ===== Basic Meta Tags ===== */}
-        <title>{article.title} | JICS - Synergy World Press</title>
-        <meta
-          name="description"
-          content={article.abstract?.substring(0, 160) || ""}
+      <>
+        <PageMetadata
+          title={`${title || "Journal Article"} | JICS - Synergy World Press`}
+          description={description.substring(0, 160)}
+          pathname={`/journal/jics/articles/${encodeURIComponent(articleUrlId)}`}
+          openGraphType="article"
         />
-
+        <Helmet>
+        {hasCompleteScholarMetadata && (
+          <>
         {/* ===== GOOGLE SCHOLAR META TAGS ===== */}
-        <meta name="citation_title" content={article.title} />
+        <meta name="citation_title" content={title} />
 
         {/* Each author needs separate meta tag */}
         {authors.map((author, index) => (
@@ -177,8 +226,8 @@ const ArticleDetail = () => {
         ))}
 
         {/* Publication date */}
-        <meta name="citation_publication_date" content={publishedDate} />
-        <meta name="citation_online_date" content={publishedDate} />
+        <meta name="citation_publication_date" content={publicationDate.scholar} />
+        <meta name="citation_online_date" content={publicationDate.scholar} />
 
         {/* Journal info */}
         <meta
@@ -211,70 +260,56 @@ const ArticleDetail = () => {
         {pdfUrl && <meta name="citation_pdf_url" content={pdfUrl} />}
 
         {/* DOI */}
-        {article.doi && <meta name="citation_doi" content={article.doi} />}
+        {doi.value && <meta name="citation_doi" content={doi.value} />}
 
         {/* Abstract */}
-        {article.abstract && (
-          <meta name="citation_abstract" content={article.abstract} />
+        {description && (
+          <meta name="citation_abstract" content={description} />
         )}
 
         {/* Keywords */}
-        {article.keywords && (
-          <meta name="citation_keywords" content={article.keywords} />
+        {keywords && (
+          <meta name="citation_keywords" content={keywords} />
         )}
 
         {/* Language */}
         <meta name="citation_language" content="en" />
 
         {/* Open Access */}
-        <meta name="citation_fulltext_world_readable" content="" />
+        {hasPublicFullText && (
+          <meta name="citation_fulltext_world_readable" content="true" />
+        )}
 
         {/* ===== DUBLIN CORE META TAGS ===== */}
-        <meta name="DC.title" content={article.title} />
+        <meta name="DC.title" content={title} />
         {authors.map((author, index) => (
           <meta key={`dc-author-${index}`} name="DC.creator" content={author} />
         ))}
-        <meta name="DC.date" content={publishedDate} />
+        <meta name="DC.date" content={publicationDate.scholar} />
         <meta name="DC.publisher" content="Synergy World Press" />
         <meta name="DC.type" content="Text" />
         <meta name="DC.format" content="text/html" />
         <meta name="DC.language" content="en" />
-        {article.abstract && (
-          <meta name="DC.description" content={article.abstract} />
+        {description && (
+          <meta name="DC.description" content={description} />
         )}
-        {article.keywords && (
-          <meta name="DC.subject" content={article.keywords} />
+        {keywords && (
+          <meta name="DC.subject" content={keywords} />
         )}
 
-        {/* ===== OPEN GRAPH TAGS ===== */}
-        <meta property="og:title" content={article.title} />
-        <meta
-          property="og:description"
-          content={article.abstract?.substring(0, 200) || ""}
-        />
-        <meta property="og:type" content="article" />
-        <meta property="og:url" content={articleUrl} />
-        <meta property="og:site_name" content="Synergy World Press" />
+        {/* ===== ARTICLE-SPECIFIC OPEN GRAPH TAGS ===== */}
         <meta
           property="article:published_time"
-          content={article.publishedAt || article.submissionDate}
+          content={publicationDate.iso}
         />
         {authors[0] && <meta property="article:author" content={authors[0]} />}
 
-        {/* ===== TWITTER CARDS ===== */}
-        <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content={article.title} />
-        <meta
-          name="twitter:description"
-          content={article.abstract?.substring(0, 200) || ""}
-        />
-
-        {/* ===== Canonical URL ===== */}
-        <link rel="canonical" href={articleUrl} />
-
         {/* ===== Schema.org JSON-LD ===== */}
-        <script type="application/ld+json">{JSON.stringify(schemaData)}</script>
-      </Helmet>
+        <script type="application/ld+json">{serializeJsonLd(schemaData)}</script>
+          </>
+        )}
+        </Helmet>
+      </>
     );
   };
   // =====================================================
@@ -283,7 +318,9 @@ const ArticleDetail = () => {
 
   // Increment view count - No Auth Required
   const incrementViewCount = useCallback(async () => {
-    if (viewCountedRef.current) return;
+    if (viewCountedRef.current === id) return;
+
+    viewCountedRef.current = id;
 
     try {
       const visitorId = getVisitorId();
@@ -298,10 +335,12 @@ const ArticleDetail = () => {
       );
 
       if (res.data.success) {
-        viewCountedRef.current = true;
         setViewCount(res.data.viewCount || 0);
       }
     } catch (error) {
+      if (viewCountedRef.current === id) {
+        viewCountedRef.current = null;
+      }
       console.error("Error incrementing view count:", error);
     }
   }, [id]);
@@ -358,11 +397,20 @@ const ArticleDetail = () => {
 
   // Fetch article - No Auth Required for published
   useEffect(() => {
+    if (hasMatchingSsrArticle) {
+      setArticle(initialArticle);
+      setViewCount(initialArticle?.viewCount || 0);
+      setError(initialData?.error || null);
+      setLoading(false);
+      return;
+    }
+
     const fetchArticle = async () => {
       setLoading(true);
+      setError(null);
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${id}`,
+          `${import.meta.env.VITE_BACKEND_URL}/api/public/manuscripts/${encodeURIComponent(id)}`,
         );
         const articleData = res.data.data || res.data;
         setArticle(articleData);
@@ -385,19 +433,19 @@ const ArticleDetail = () => {
     if (id) {
       fetchArticle();
     }
-  }, [id, navigate]);
+  }, [id, navigate, hasMatchingSsrArticle, initialArticle, initialData?.error]);
 
   // Increment view count when article loads
   useEffect(() => {
-    if (article && article.status === "Published" && !viewCountedRef.current) {
+    const loadedArticleId = getArticleUrlId(article);
+    const articleMatchesRoute =
+      String(loadedArticleId || "") === String(id || "") ||
+      (hasMatchingSsrArticle && article === initialArticle);
+
+    if (articleMatchesRoute && article?.status === "Published") {
       incrementViewCount();
     }
-  }, [article, incrementViewCount]);
-
-  // Reset when id changes
-  useEffect(() => {
-    viewCountedRef.current = false;
-  }, [id]);
+  }, [article, hasMatchingSsrArticle, id, incrementViewCount, initialArticle]);
 
   // Format view count
   const formatViewCount = (count) => {
@@ -409,8 +457,6 @@ const ArticleDetail = () => {
     }
     return count.toString();
   };
-
-  const doiUrl = getDoiUrl(article?.doi);
 
   // Get authors - PDF first, then API fallback
   const getAuthors = () => {
@@ -482,7 +528,7 @@ const ArticleDetail = () => {
   const getCitationText = () => {
     const citation = `${getAuthors()} (${article.issueYear}). ${article.title}. Journal of Intelligent Computing System (JICS), ${article.issueVolume}(${article.issueNumber})${article.pageStart && article.pageEnd ? `, ${article.pageStart}-${article.pageEnd}` : ""}.`;
 
-    return doiUrl ? `${citation} ${doiUrl}` : citation;
+    return doi.display ? `${citation} ${doi.display}` : citation;
   };
   // Parse classification
   const parseClassification = (classification) => {
@@ -495,8 +541,20 @@ const ArticleDetail = () => {
   };
 
   if (loading) return <div className="p-8">Loading article...</div>;
-  if (error) return <div className="p-8 text-red-600">{error}</div>;
-  if (!article) return <div className="p-8">Article not found.</div>;
+  if (error || !article) {
+    return (
+      <div className="p-8 text-red-600">
+        <PageMetadata
+          title="Article Not Found | JICS"
+          description="The requested journal article could not be found."
+          pathname={`/journal/jics/articles/${encodeURIComponent(id || "")}`}
+          noindex
+          includeCanonical={false}
+        />
+        {error || "Article not found."}
+      </div>
+    );
+  }
 
   const hasIssueInfo =
     article.issueVolume && article.issueNumber && article.issueYear;
@@ -685,16 +743,16 @@ const ArticleDetail = () => {
                     ? ` ${article.pageStart}-${article.pageEnd}`
                     : ""}
                   .
-                  {doiUrl && (
+                  {doi.url && (
                     <>
                       {" "}
                       <a
-                        href={doiUrl}
+                        href={doi.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="break-all text-blue-700 hover:text-blue-800 hover:underline"
                       >
-                        {doiUrl}
+                        {doi.display}
                       </a>
                     </>
                   )}
@@ -848,6 +906,16 @@ const ArticleDetail = () => {
       </div>
     </div>
   );
+};
+
+ArticleDetail.propTypes = {
+  initialData: PropTypes.shape({
+    routeName: PropTypes.string,
+    params: PropTypes.shape({ id: PropTypes.string }),
+    data: PropTypes.shape({ article: PropTypes.object }),
+    status: PropTypes.number,
+    error: PropTypes.string,
+  }),
 };
 
 export default ArticleDetail;

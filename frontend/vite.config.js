@@ -7,5 +7,14 @@ export default defineConfig({
   build: {
     outDir: "dist",
   },
+  ssr: {
+    external: ["react", "react-dom"],
+    noExternal: [
+      "react-helmet-async",
+      "react-router",
+      "react-router-dom",
+      "turbo-stream",
+    ],
+  },
   plugins: [react(), tailwindcss()],
 });

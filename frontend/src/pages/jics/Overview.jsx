@@ -1,8 +1,13 @@
-import React from "react";
 import { Link } from "react-router-dom";
+import PageMetadata from "../../components/PageMetadata";
 
 const Overview = () => (
   <section className="w-full max-w-6xl mx-auto my-8 px-6 py-8 lg:px-8">
+    <PageMetadata
+      title="Journal of Intelligent Computing System | Overview"
+      description="Learn about the Journal of Intelligent Computing System, a peer-reviewed open-access journal for intelligent computing and applied AI research."
+      pathname="/journal/jics/about/overview"
+    />
     <h2 className="text-3xl font-extrabold text-[#00796b] mb-6 tracking-tight">
       Journal Overview
     </h2>
