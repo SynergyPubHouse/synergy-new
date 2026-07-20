@@ -14,7 +14,7 @@ export class InvalidSsrRouteError extends Error {
   constructor(message, options = {}) {
     super(message, options);
     this.name = "InvalidSsrRouteError";
-    this.statusCode = 400;
+    this.statusCode = 404;
   }
 }
 

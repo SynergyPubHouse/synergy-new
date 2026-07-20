@@ -18,13 +18,15 @@ export async function loadArticleDetail({ apiClient, params }) {
       error instanceof BackendNotFoundError ||
       error instanceof BackendValidationError
     ) {
-      const status = error.statusCode;
       return {
-        status,
+        status: 404,
         data: {
           article: null,
         },
-        error: status === 400 ? "Invalid article URL." : "Article not found.",
+        error:
+          error instanceof BackendValidationError
+            ? "Invalid article URL."
+            : "Article not found.",
       };
     }
     throw error;

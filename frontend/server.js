@@ -155,16 +155,24 @@ app.use(async (req, res, next) => {
       ? productionRender
       : (await vite.ssrLoadModule("/src/entry-server.jsx")).render;
     const rendered = render(req.originalUrl, initialData);
-    const html = renderSsrTemplate(template, rendered, initialData, {
-      includeAds: status < 400,
-    });
+    const responseStatus = Number.isInteger(rendered.status)
+      ? rendered.status
+      : status;
+    const html = renderSsrTemplate(
+      template,
+      rendered,
+      rendered.initialData ?? initialData,
+      {
+        includeAds: responseStatus < 400,
+      },
+    );
 
-    if (status >= 400) {
+    if (responseStatus >= 400) {
       res.setHeader("Cache-Control", "no-store");
     } else if (route.cacheControl) {
       res.setHeader("Cache-Control", route.cacheControl);
     }
-    return res.status(status).type("html").send(html);
+    return res.status(responseStatus).type("html").send(html);
   } catch (error) {
     vite?.ssrFixStacktrace(error);
     console.error(error);
@@ -176,7 +184,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`SSR server listening on port ${port}`);
   console.log(`SSR API base URL: ${apiBaseUrl}`);
   console.log(`Public site URL: ${publicSiteUrl}`);
