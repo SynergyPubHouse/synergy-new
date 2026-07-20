@@ -13,9 +13,9 @@ function serializeInitialData(initialData) {
 
 export function renderSpaTemplate(template) {
   return template
-    .replace("<!--app-head-->", "")
-    .replace("<!--app-html-->", "")
-    .replace("<!--initial-data-->", "");
+    .replaceAll("<!--app-head-->", "")
+    .replaceAll("<!--app-html-->", "")
+    .replaceAll("<!--initial-data-->", "");
 }
 
 export function renderSsrTemplate(
@@ -28,9 +28,9 @@ export function renderSsrTemplate(
 
   return safeTemplate
     .replace("<title>Synergy World Press</title>", "")
-    .replace("<!--app-head-->", rendered.head)
-    .replace("<!--app-html-->", rendered.appHtml)
-    .replace(
+    .replaceAll("<!--app-head-->", rendered.head || "")
+    .replaceAll("<!--app-html-->", rendered.appHtml || "")
+    .replaceAll(
       "<!--initial-data-->",
       `<script>window.__INITIAL_DATA__=${serializeInitialData(initialData)}</script>`,
     );

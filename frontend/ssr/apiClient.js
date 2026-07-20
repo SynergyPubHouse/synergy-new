@@ -37,7 +37,7 @@ export function createBackendApiClient({
   fetchImpl = globalThis.fetch,
 }) {
   if (!baseUrl) {
-    throw new Error("API_BASE_URL is required");
+    throw new Error("SSR_BACKEND_URL is required");
   }
 
   if (typeof fetchImpl !== "function") {

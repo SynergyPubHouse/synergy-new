@@ -16,11 +16,8 @@ function positiveInteger(value, fallback) {
 
 export function createSsrConfig({ processEnv, viteEnv = {}, isProduction }) {
   const apiBaseUrl = normalizeSiteUrl(
-    processEnv.API_BASE_URL ||
-      processEnv.SSR_API_BASE_URL ||
-      viteEnv.API_BASE_URL ||
-      viteEnv.SSR_API_BASE_URL ||
-      viteEnv.VITE_BACKEND_URL ||
+    processEnv.SSR_BACKEND_URL ||
+      viteEnv.SSR_BACKEND_URL ||
       (isProduction ? DEFAULT_API_URL : "http://localhost:5000"),
   );
   const publicSiteUrl = normalizeSiteUrl(
@@ -33,7 +30,7 @@ export function createSsrConfig({ processEnv, viteEnv = {}, isProduction }) {
   return {
     apiBaseUrl,
     publicSiteUrl,
-    port: positiveInteger(processEnv.PORT || viteEnv.PORT, 4173),
+    port: positiveInteger(processEnv.PORT || 4173, 4173),
     requestTimeoutMs: positiveInteger(
       processEnv.SSR_REQUEST_TIMEOUT_MS || viteEnv.SSR_REQUEST_TIMEOUT_MS,
       8_000,

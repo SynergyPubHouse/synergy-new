@@ -14,15 +14,20 @@ export function render(url, initialData) {
   );
 
   const { helmet } = helmetContext;
-  const head = [
-    helmet?.title?.toString(),
-    helmet?.priority?.toString(),
-    helmet?.meta?.toString(),
-    helmet?.link?.toString(),
-    helmet?.script?.toString(),
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const metadata = {
+    title: helmet?.title?.toString() || "",
+    priority: helmet?.priority?.toString() || "",
+    meta: helmet?.meta?.toString() || "",
+    link: helmet?.link?.toString() || "",
+    script: helmet?.script?.toString() || "",
+  };
+  const head = Object.values(metadata).filter(Boolean).join("\n");
 
-  return { appHtml, head };
+  return {
+    appHtml,
+    head,
+    initialData,
+    metadata,
+    status: Number.isInteger(initialData?.status) ? initialData.status : 200,
+  };
 }
