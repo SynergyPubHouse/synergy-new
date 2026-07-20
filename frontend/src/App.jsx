@@ -1,7 +1,6 @@
-import React, { useState, createContext, useContext, useEffect } from "react";
-import { HelmetProvider } from 'react-helmet-async';
+import React, { createContext, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
-  BrowserRouter as Router,
   Route,
   Routes,
   Navigate,
@@ -11,7 +10,6 @@ import Login from "./components/Login";
 import SendLoginDetails from "./pages/SendLoginDetails";
 import ResetPassword from "./pages/ResetPassword";
 import Register from "./components/Register";
-import HomePage from "./pages/HomePage";
 import LandingPage from "./pages/LandingPage";
 import JICSJournal from "./pages/JICSJournal";
 import Publish from "./pages/publish";
@@ -57,6 +55,7 @@ import ArticleDetail from "./pages/journal/jics/articles/ArticleDetail";
 import VerifyEmail from "./pages/VerifyEmail";
 import VerificationPending from "./pages/VerificationPending";
 import { useAutoLogout } from "./hooks/useAutoLogout";
+import { SsrProvider } from "./ssr/SsrContext.jsx";
 // Create Authentication Context
 const AuthContext = createContext(null);
 
@@ -73,14 +72,15 @@ function ScrollToTop() {
 
   return null;
 }
-function AppContent() {
+function AppContent({ initialData = null }) {
   const location = useLocation();
   const hideNavFooter =
     location.pathname === "/login" ||
     location.pathname === "/register" ||
     location.pathname.startsWith("/pdf/");
   const [user, setUser] = React.useState(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const isSsrHydration = Boolean(initialData?.routeName);
+  const [isLoading, setIsLoading] = React.useState(!isSsrHydration);
 
   React.useEffect(() => {
     console.log(
@@ -205,11 +205,16 @@ function AppContent() {
         <Route path={`/team`} element={<TeamDevPage />} />
         <Route path={`/settings`} element={<Settings />} />
         <Route path={`/about`} element={<AboutUs />} />
-        <Route path={`/journal/jics/articles/current`} element={<CurrentIssue />} />
+        <Route
+          path={`/journal/jics/articles/current`}
+          element={<CurrentIssue initialData={initialData} />}
+        />
         <Route path={`/journal/jics/articles/archives`} element={<CurrentIssue archive />} />
         <Route path={`/journal/jics/articles/special-issue`} element={<CurrentIssue separateIssue />} />
-        <Route path={`${JICS_URL}/articles/:id`} element={<ArticleDetail />} />
-        <Route path={`/journal/jics/articles/:id`} element={<ArticleDetail />} />
+        <Route
+          path={`${JICS_URL}/articles/:id`}
+          element={<ArticleDetail initialData={initialData} />}
+        />
 
         {/* Editor Routes */}
         <Route
@@ -312,18 +317,24 @@ function AppContent() {
   );
 }
 
+AppContent.propTypes = {
+  initialData: PropTypes.object,
+};
+
 // Custom hook to use the AuthContext
 export const useAuth = () => React.useContext(AuthContext);
 
-function App() {
+function App({ initialData = null }) {
   return (
-    <HelmetProvider>
-      <Router>
-        <ScrollToTop />
-        <AppContent />
-      </Router>
-    </HelmetProvider>
+    <SsrProvider initialData={initialData}>
+      <ScrollToTop />
+      <AppContent initialData={initialData} />
+    </SsrProvider>
   );
 }
+
+App.propTypes = {
+  initialData: PropTypes.object,
+};
 
 export default App;

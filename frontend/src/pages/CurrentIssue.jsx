@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../App";
 import PropTypes from "prop-types";
+import PageMetadata from "../components/PageMetadata";
 
 const MONTH_NAMES = [
   "Jan",
@@ -152,18 +153,32 @@ const getArticlePath = (article) => {
     : "/journal/jics/articles/current";
 };
 
-const CurrentIssue = ({ separateIssue = false, archive = false }) => {
+const CurrentIssue = ({ separateIssue = false, archive = false, initialData = null }) => {
+  const hasMatchingSsrRoute =
+    !separateIssue &&
+    !archive &&
+    initialData?.routeName === "currentIssue";
+  const ssrData = hasMatchingSsrRoute ? initialData.data : null;
   const { user, loading: authLoading } = useAuth();
-  const [articles, setArticles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [articles, setArticles] = useState(() =>
+    Array.isArray(ssrData?.articles) ? ssrData.articles : [],
+  );
+  const [issue, setIssue] = useState(() =>
+    ssrData?.issue || null,
+  );
+  const [loading, setLoading] = useState(!hasMatchingSsrRoute);
+  const [error, setError] = useState(() =>
+    hasMatchingSsrRoute ? initialData?.error || "" : "",
+  );
   const navigate = useNavigate();
   const issueWindow = getIssueWindow();
   const pageTitle = separateIssue
     ? "Special Issue"
     : archive
       ? "Past Issues / Archives"
-      : "Current Issue";
+      : issue
+        ? `Current Issue — Volume ${issue.volume}, Issue ${issue.issueNumber} (${issue.year})`
+        : "Current Issue";
   const emptyMessage = separateIssue
     ? "No special issue articles available."
     : archive
@@ -173,21 +188,30 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
     ? "Special Issue"
     : archive
       ? `Before ${issueWindow.rangeLabel}`
-      : issueWindow.label;
+      : issue?.label || "Current Issue";
 
   useEffect(() => {
+    if (hasMatchingSsrRoute) {
+      return;
+    }
+
     const fetchIssueArticles = async () => {
       try {
         setLoading(true);
         setError("");
         const endpoint = separateIssue
           ? "/api/manuscripts/special-issue"
-          : "/api/manuscripts/published";
+          : archive
+            ? "/api/manuscripts/published"
+            : "/api/manuscripts/issues/current";
         const res = await axios.get(
           `${import.meta.env.VITE_BACKEND_URL}${endpoint}`
         );
 
-        if (res.data && res.data.data) {
+        if (!separateIssue && !archive && Array.isArray(res.data?.articles)) {
+          setArticles(res.data.articles);
+          setIssue(res.data.issue || null);
+        } else if (res.data && res.data.data) {
           const data = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
           setArticles(separateIssue ? data : filterArticlesByIssueWindow(data, archive));
         } else {
@@ -212,7 +236,7 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
     };
 
     fetchIssueArticles();
-  }, [user, separateIssue, archive, emptyMessage]);
+  }, [user, separateIssue, archive, emptyMessage, hasMatchingSsrRoute]);
 
   // ✅ Same function as ArticleDetail - PDF authors first, then API fallback
   const getAuthors = (article) => {
@@ -258,7 +282,21 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
     return <div className="text-center mt-20 text-lg">Loading...</div>;
   }
 
-  if (error) return <div className="text-center mt-20 text-red-500">{error}</div>;
+  if (error) {
+    return (
+      <>
+        {!separateIssue && !archive && (
+          <PageMetadata
+            title="Current Issue Unavailable | JICS"
+            description="The current journal issue could not be found."
+            pathname="/journal/jics/articles/current"
+            noindex
+          />
+        )}
+        <div className="text-center mt-20 text-red-500">{error}</div>
+      </>
+    );
+  }
 
   if (!articles || articles.length === 0) {
     return <div className="text-center mt-20 text-gray-500">{emptyMessage}</div>;
@@ -266,6 +304,13 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
 
   return (
     <div className="min-h-screen bg-[#f9f9f9] text-[#212121] py-12 mt-[20px]">
+      {!separateIssue && !archive && (
+        <PageMetadata
+          title="Current Issue | Journal of Intelligent Computing System"
+          description="Read the current issue of the Journal of Intelligent Computing System, including peer-reviewed research articles in intelligent computing and applied AI."
+          pathname="/journal/jics/articles/current"
+        />
+      )}
       <div className="container mx-auto px-6 md:px-20">
         <button
           onClick={() => navigate('/journal/jics/about/overview')}
@@ -382,11 +427,22 @@ const CurrentIssue = ({ separateIssue = false, archive = false }) => {
 CurrentIssue.propTypes = {
   separateIssue: PropTypes.bool,
   archive: PropTypes.bool,
+  initialData: PropTypes.shape({
+    routeName: PropTypes.string,
+    params: PropTypes.object,
+    data: PropTypes.shape({
+      articles: PropTypes.array,
+      issue: PropTypes.object,
+    }),
+    status: PropTypes.number,
+    error: PropTypes.string,
+  }),
 };
 
 CurrentIssue.defaultProps = {
   separateIssue: false,
   archive: false,
+  initialData: null,
 };
 
 export default CurrentIssue;
