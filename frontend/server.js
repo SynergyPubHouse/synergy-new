@@ -183,10 +183,13 @@ app.use(async (req, res, next) => {
     return res.status(status).type("html").send(renderErrorDocument(status));
   }
 });
+if (!process.env.VERCEL) {
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`SSR server listening on port ${port}`);
+    console.log(`SSR API base URL: ${apiBaseUrl}`);
+    console.log(`Public site URL: ${publicSiteUrl}`);
+    console.log(`SSR request timeout: ${requestTimeoutMs}ms`);
+  });
+}
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`SSR server listening on port ${port}`);
-  console.log(`SSR API base URL: ${apiBaseUrl}`);
-  console.log(`Public site URL: ${publicSiteUrl}`);
-  console.log(`SSR request timeout: ${requestTimeoutMs}ms`);
-});
+export default app;
