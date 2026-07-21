@@ -175,10 +175,12 @@ app.use(async (req, res, next) => {
     return res.status(status).type("html").send(renderErrorDocument(status));
   }
 });
+const PORT = process.env.PORT || 4173;
 
-app.listen(port, () => {
-  console.log(`SSR server listening on port ${port}`);
-  console.log(`SSR API base URL: ${apiBaseUrl}`);
-  console.log(`Public site URL: ${publicSiteUrl}`);
-  console.log(`SSR request timeout: ${requestTimeoutMs}ms`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`SSR server running on port ${PORT}`);
+  });
+}
+
+export default app;
