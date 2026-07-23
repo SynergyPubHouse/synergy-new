@@ -410,7 +410,8 @@ const ArticleDetail = ({ initialData = null }) => {
       setError(null);
       try {
         const res = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/public/manuscripts/${encodeURIComponent(id)}`,
+                   `${import.meta.env.VITE_BACKEND_URL}/api/manuscripts/${encodeURIComponent(id)}`,
+
         );
         const articleData = res.data.data || res.data;
         setArticle(articleData);
