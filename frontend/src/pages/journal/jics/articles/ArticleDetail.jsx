@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import {
+  useParams,
+  Link,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import axios from "axios";
 import { Helmet } from "react-helmet-async";
 import PropTypes from "prop-types";
@@ -62,8 +67,13 @@ const getValidMetadataDate = (...values) => {
 const ArticleDetail = ({ initialData = null }) => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { publicSiteUrl } = useSsrContext();
+  const articlesReturnPath =
+    searchParams.get("from") === "archives"
+      ? "/journal/jics/articles/archives"
+      : "/journal/jics/articles/current";
   const hasMatchingSsrArticle =
     initialData?.routeName === "articleDetail" &&
     String(initialData?.params?.id || "") === String(id || "");
@@ -566,7 +576,7 @@ const ArticleDetail = ({ initialData = null }) => {
 
       <div className="container mx-auto px-6 md:px-20">
          <button
-          onClick={() => navigate('/journal/jics/articles/current')}
+          onClick={() => navigate(articlesReturnPath)}
           className="mb-6 inline-flex items-center gap-2 text-[#00796b] transition-colors hover:text-[#00acc1]"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -895,7 +905,7 @@ const ArticleDetail = ({ initialData = null }) => {
               )}
 
               <Link
-                to="/journal/jics/articles/current"
+                to={articlesReturnPath}
                 className="px-4 py-2 bg-gray-200 text-[#212121] rounded-lg hover:bg-gray-300 transition-colors text-sm"
               >
                 ← Back to Articles
