@@ -73,8 +73,69 @@ const apiClient = createBackendApiClient({
 });
 
 const app = express();
-let productionTemplate;
-let productionRender;
+let productionRuntimePromise;
+
+async function getProductionRuntime() {
+  if (!productionRuntimePromise) {
+    const templatePath = path.resolve(root, "dist/client/index.html");
+    const serverEntryPath = path.resolve(
+      root,
+      "dist/server/entry-server.js",
+    );
+    let templateExists = false;
+    let serverEntryExists = false;
+
+    productionRuntimePromise = (async () => {
+      [templateExists, serverEntryExists] = await Promise.all([
+        fs.access(templatePath).then(
+          () => true,
+          () => false,
+        ),
+        fs.access(serverEntryPath).then(
+          () => true,
+          () => false,
+        ),
+      ]);
+
+      if (!templateExists) {
+        throw new Error(`Missing SSR client template: ${templatePath}`);
+      }
+
+      if (!serverEntryExists) {
+        throw new Error(`Missing SSR server entry: ${serverEntryPath}`);
+      }
+
+      const [template, serverModule] = await Promise.all([
+        fs.readFile(templatePath, "utf-8"),
+        import(pathToFileURL(serverEntryPath).href),
+      ]);
+
+      if (typeof serverModule.render !== "function") {
+        throw new Error(
+          `SSR bundle does not export render(): ${serverEntryPath}`,
+        );
+      }
+
+      return {
+        template,
+        render: serverModule.render,
+      };
+    })().catch((error) => {
+      productionRuntimePromise = undefined;
+      console.error("SSR runtime initialization failed:", {
+        cwd: process.cwd(),
+        templatePath,
+        serverEntryPath,
+        templateExists,
+        serverEntryExists,
+        error: error?.message || String(error),
+      });
+      throw error;
+    });
+  }
+
+  return productionRuntimePromise;
+}
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -86,14 +147,6 @@ app.get("/health", (_req, res) => {
 if (isProduction) {
   const clientDirectory = path.resolve(root, "dist/client");
   const assetsDirectory = path.join(clientDirectory, "assets");
-  productionTemplate = await fs.readFile(
-    path.join(clientDirectory, "index.html"),
-    "utf-8",
-  );
-  const serverEntryUrl = pathToFileURL(
-    path.resolve(root, "dist/server/entry-server.js"),
-  ).href;
-  ({ render: productionRender } = await import(serverEntryUrl));
 
   app.use(
     "/assets",
@@ -113,7 +166,9 @@ if (isProduction) {
 }
 
 async function getTemplate(url) {
-  if (isProduction) return productionTemplate;
+  if (isProduction) {
+    return (await getProductionRuntime()).template;
+  }
   const source = await fs.readFile(path.resolve(root, "index.html"), "utf-8");
   return vite.transformIndexHtml(url, source);
 }
@@ -152,7 +207,7 @@ app.use(async (req, res, next) => {
     };
     const template = await getTemplate(req.originalUrl);
     const render = isProduction
-      ? productionRender
+      ? (await getProductionRuntime()).render
       : (await vite.ssrLoadModule("/src/entry-server.jsx")).render;
     const rendered = render(req.originalUrl, initialData);
     const responseStatus = Number.isInteger(rendered.status)
