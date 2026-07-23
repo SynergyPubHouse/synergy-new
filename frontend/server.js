@@ -1,7 +1,7 @@
 /* global process */
 import fs from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import express from "express";
 import { createBackendApiClient } from "./ssr/apiClient.js";
 import { createSsrConfig } from "./ssr/config.js";
@@ -12,7 +12,8 @@ import {
 } from "./ssr/html.js";
 import { InvalidSsrRouteError, matchSsrRoute } from "./ssr/routes.js";
 
-const root = process.cwd();
+const currentFilePath = fileURLToPath(import.meta.url);
+const root = path.dirname(currentFilePath);
 const isProduction = process.env.NODE_ENV === "production";
 const mode = isProduction ? "production" : "development";
 let vite;
