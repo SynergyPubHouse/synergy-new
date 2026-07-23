@@ -156,9 +156,10 @@ const getArticlePath = (article, fromArchives = false) => {
 
 const CurrentIssue = ({ separateIssue = false, archive = false, initialData = null }) => {
   const hasMatchingSsrRoute =
-    !separateIssue &&
-    !archive &&
-    initialData?.routeName === "currentIssue";
+    (!separateIssue &&
+      !archive &&
+      initialData?.routeName === "currentIssue") ||
+    (archive && initialData?.routeName === "pastIssues");
   const ssrData = hasMatchingSsrRoute ? initialData.data : null;
   const { user, loading: authLoading } = useAuth();
   const [articles, setArticles] = useState(() =>

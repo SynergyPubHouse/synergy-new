@@ -209,7 +209,10 @@ function AppContent({ initialData = null }) {
           path={`/journal/jics/articles/current`}
           element={<CurrentIssue initialData={initialData} />}
         />
-        <Route path={`/journal/jics/articles/archives`} element={<CurrentIssue archive />} />
+        <Route
+          path={`/journal/jics/articles/archives`}
+          element={<CurrentIssue archive initialData={initialData} />}
+        />
         <Route path={`/journal/jics/articles/special-issue`} element={<CurrentIssue separateIssue />} />
         <Route
           path={`${JICS_URL}/articles/:id`}

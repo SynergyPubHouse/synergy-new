@@ -252,7 +252,7 @@ const JournalInsights = () => (
                 Professor and Head – Conferences & Research Outreach
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Chandigarh University, Mohali, Punjab, 140413, India
+                Mohali, Punjab, 140413, India
               </p>
             </div>
           </div>
@@ -268,7 +268,7 @@ const JournalInsights = () => (
                 Associate Director, Department of CSE
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Chandigarh University, Mohali, Punjab, 140413, India
+                 Mohali, Punjab, 140413, India
               </p>
             </div>
           </div>

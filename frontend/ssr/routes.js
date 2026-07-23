@@ -1,8 +1,10 @@
 import { loadArticleDetail } from "./loaders/articleDetailLoader.js";
 import { loadCurrentIssue } from "./loaders/currentIssueLoader.js";
+import { loadPastIssues } from "./loaders/pastIssuesLoader.js";
 
 const STATIC_CACHE = "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400";
 const CONTENT_CACHE = "public, max-age=0, s-maxage=300, stale-while-revalidate=1800";
+const RESERVED_ARTICLE_SEGMENTS = new Set(["current", "archives"]);
 
 function exactPath(path) {
   const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -47,6 +49,12 @@ export const ssrRoutes = [
     cacheControl: CONTENT_CACHE,
   },
   {
+    routeName: "pastIssues",
+    match: exactPath("/journal/jics/articles/archives"),
+    loader: loadPastIssues,
+    cacheControl: CONTENT_CACHE,
+  },
+  {
     routeName: "articleDetail",
     match(pathname) {
       const match = pathname.match(/^\/journal\/jics\/articles\/([^/]+)\/?$/);
@@ -55,6 +63,7 @@ export const ssrRoutes = [
       try {
         const id = decodeURIComponent(match[1]).trim();
         if (!id) throw new InvalidSsrRouteError("Invalid article URL");
+        if (RESERVED_ARTICLE_SEGMENTS.has(id.toLowerCase())) return null;
         return { id };
       } catch (error) {
         if (error instanceof InvalidSsrRouteError) throw error;
