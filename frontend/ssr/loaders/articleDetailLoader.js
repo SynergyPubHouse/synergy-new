@@ -11,7 +11,7 @@ export async function loadArticleDetail({ apiClient, params }) {
 
   try {
     body = await apiClient.getJson(
-      `/api/public/manuscripts/${encodeURIComponent(routeId)}`,
+      `/api/manuscripts/${encodeURIComponent(routeId)}`,
     );
   } catch (error) {
     if (
@@ -32,16 +32,31 @@ export async function loadArticleDetail({ apiClient, params }) {
     throw error;
   }
 
-  if (!body.data || typeof body.data !== "object") {
+  const articleData = body.data;
+  const hasArticleId = [
+    articleData?.customId,
+    articleData?.custom_id,
+    articleData?._id,
+  ].some((value) => typeof value === "string" && value.trim());
+  const hasArticleTitle =
+    typeof articleData?.title === "string" && articleData.title.trim();
+
+  if (
+    !articleData ||
+    typeof articleData !== "object" ||
+    Array.isArray(articleData) ||
+    !hasArticleId ||
+    !hasArticleTitle
+  ) {
     throw new BackendApiError(
-      "Article API response is missing its article data",
+      "Article API response is missing valid article data",
     );
   }
 
   return {
     status: 200,
     data: {
-      article: sanitizeArticle(body.data),
+      article: sanitizeArticle(articleData),
     },
   };
 }
